@@ -37,12 +37,114 @@ def _get(field: str, action: Callable[[], Any], coverage: dict[str, Coverage], d
     return default
 
 
+def _endpoint(text: str) -> tuple[str, int]:
+    """Parse one numeric lsof endpoint without DNS/service-name ambiguity."""
+    value = text.strip()
+    if " (" in value:
+        value = value.rsplit(" (", 1)[0]
+    if value.startswith("["):
+        marker = value.rfind("]:")
+        if marker >= 0:
+            host, port = value[1:marker], value[marker + 2:]
+        else:
+            return value[:512], 0
+    else:
+        host, separator, port = value.rpartition(":")
+        if not separator:
+            return value[:512], 0
+    if not port.isdigit():
+        return value[:512], 0
+    return ("" if host == "*" else host[:512], int(port))
+
+
+def _parse_lsof_network(output: str) -> dict[int, list[Connection]]:
+    """Parse lsof field output; f records delimit sockets and p records delimit processes."""
+    by_pid: dict[int, list[Connection]] = defaultdict(list)
+    pid: int | None = None
+    protocol = ""
+    endpoint = ""
+    status = ""
+
+    def flush() -> None:
+        nonlocal protocol, endpoint, status
+        if pid is not None and protocol in {"TCP", "UDP"} and endpoint:
+            local_text, arrow, remote_text = endpoint.partition("->")
+            local_address, local_port = _endpoint(local_text)
+            remote_address, remote_port = _endpoint(remote_text) if arrow else ("", 0)
+            by_pid[pid].append(Connection(
+                protocol=protocol.lower(),
+                local_address=local_address,
+                local_port=local_port,
+                remote_address=remote_address,
+                remote_port=remote_port,
+                status=status[:512],
+            ))
+        protocol = endpoint = status = ""
+
+    for line in output.splitlines():
+        if not line:
+            continue
+        field, value = line[0], line[1:]
+        if field == "p":
+            flush()
+            try:
+                pid = int(value)
+            except ValueError:
+                pid = None
+        elif field == "f":
+            flush()
+        elif field == "P":
+            protocol = value.upper()
+        elif field == "n":
+            endpoint = value
+        elif field == "T" and value.startswith("ST="):
+            status = value[3:]
+    flush()
+
+    result: dict[int, list[Connection]] = {}
+    for owner, entries in by_pid.items():
+        unique = {
+            (c.protocol, c.local_address, c.local_port, c.remote_address, c.remote_port, c.status): c
+            for c in entries
+        }
+        result[owner] = sorted(
+            unique.values(),
+            key=lambda c: (
+                c.protocol, c.local_address, c.local_port,
+                c.remote_address, c.remote_port, c.status,
+            ),
+        )
+    return result
+
+
+def _lsof_network() -> tuple[dict[int, list[Connection]], Coverage]:
+    """Best-effort macOS fallback when psutil cannot enumerate system sockets unprivileged."""
+    try:
+        result = subprocess.run(
+            ["/usr/sbin/lsof", "-nP", "-iTCP", "-iUDP", "-FpcfnPT"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {}, "unavailable"
+    if result.returncode not in {0, 1}:
+        return {}, "unavailable"
+    # An unprivileged lsof view is useful but not guaranteed complete for every other UID.
+    return _parse_lsof_network(result.stdout), "partial"
+
+
 def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
     if not settings.connections:
         return {}, "not_requested"
     try:
         sockets = psutil.net_connections(kind="inet")
     except psutil.AccessDenied:
+        if sys.platform == "darwin":
+            return _lsof_network()
         return {}, "denied"
     except (OSError, NotImplementedError):
         return {}, "unavailable"
@@ -99,35 +201,91 @@ def _hash_file(path: str, max_bytes: int) -> tuple[str | None, Coverage]:
         return None, "unavailable"
 
 
-def _signature(path: str) -> tuple[str, Coverage]:
+def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
     if sys.platform != "darwin":
-        return "unavailable", "unavailable"
+        return {"signature": "unavailable"}, "unavailable"
     try:
-        result = subprocess.run(
+        verify = subprocess.run(
             ["/usr/bin/codesign", "--verify", "--strict", "--", path],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            timeout=3, check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=3,
+            check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return "unavailable", "unavailable"
-    # This verifies the on-disk code signature. It does not establish signer trust,
-    # notarization, user consent, the integrity of process memory or benign behavior.
-    return ("valid" if result.returncode == 0 else "verification_failed"), "observed"
+        return {"signature": "unavailable"}, "unavailable"
+
+    if verify.returncode != 0:
+        return {"signature": "verification_failed"}, "observed"
+
+    values: dict[str, Any] = {"signature": "valid"}
+    try:
+        display = subprocess.run(
+            ["/usr/bin/codesign", "--display", "--verbose=4", "--", path],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=3,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return values, "observed"
+
+    authorities: list[str] = []
+    text = (getattr(display, "stdout", "") or "") + "\n" + (getattr(display, "stderr", "") or "")
+    for line in text.splitlines():
+        if line.startswith("Identifier="):
+            values["signature_identifier"] = line.split("=", 1)[1][:512]
+        elif line.startswith("TeamIdentifier="):
+            team = line.split("=", 1)[1]
+            if team and team != "not set":
+                values["signature_team_id"] = team[:512]
+        elif line.startswith("Authority=") and len(authorities) < 8:
+            authorities.append(line.split("=", 1)[1][:512])
+    values["signature_authorities"] = authorities
+    # Verification proves only that the on-disk signature is structurally valid.
+    return values, "observed"
 
 
-def _file_info(path: str | None, settings: CollectionSettings) -> tuple[Executable, dict[str, Coverage]]:
+def _file_info(
+    path: str | None,
+    settings: CollectionSettings,
+    cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None = None,
+) -> tuple[Executable, dict[str, Coverage]]:
     coverage: dict[str, Coverage] = {
-        "file": "unavailable", "hash": "not_requested", "signature": "not_requested"
+        "file": "unavailable",
+        "hash": "unavailable" if settings.hashes else "not_requested",
+        "signature": "unavailable" if settings.signatures else "not_requested",
     }
     if not path or not os.path.isabs(path) or "\x00" in path:
         return Executable(), coverage
-    values: dict = {}
+
+    values: dict[str, Any] = {}
     before = None
+    cache_key = None
+    regular = False
     try:
         info = os.stat(path)
+        regular = stat.S_ISREG(info.st_mode)
         before = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
-        values = {"exists": True, "size": info.st_size, "mode": stat.S_IMODE(info.st_mode),
-                  "owner_uid": info.st_uid, "modified_ns": info.st_mtime_ns}
+        cache_key = (
+            *before,
+            settings.hashes,
+            settings.signatures,
+            settings.max_hash_bytes,
+        )
+        if cache is not None and cache_key in cache:
+            cached_info, cached_coverage = cache[cache_key]
+            return cached_info, dict(cached_coverage)
+        values = {
+            "exists": True,
+            "size": info.st_size,
+            "mode": stat.S_IMODE(info.st_mode),
+            "owner_uid": info.st_uid,
+            "modified_ns": info.st_mtime_ns,
+        }
         coverage["file"] = "observed"
     except FileNotFoundError:
         values["exists"] = False
@@ -136,10 +294,14 @@ def _file_info(path: str | None, settings: CollectionSettings) -> tuple[Executab
         coverage["file"] = "denied"
     except OSError:
         pass
-    if settings.hashes:
-        values["sha256"], coverage["hash"] = _hash_file(path, settings.max_hash_bytes)
-    if settings.signatures:
-        values["signature"], coverage["signature"] = _signature(path)
+
+    if values.get("exists") is True and regular:
+        if settings.hashes:
+            values["sha256"], coverage["hash"] = _hash_file(path, settings.max_hash_bytes)
+        if settings.signatures:
+            signature_values, coverage["signature"] = _signature(path)
+            values.update(signature_values)
+
     if before is not None and (settings.hashes or settings.signatures):
         try:
             info = os.stat(path)
@@ -154,8 +316,11 @@ def _file_info(path: str | None, settings: CollectionSettings) -> tuple[Executab
             if settings.signatures:
                 coverage["signature"] = "unavailable"
             return Executable(), coverage
-    return Executable.model_validate(values), coverage
 
+    result = Executable.model_validate(values)
+    if cache is not None and cache_key is not None and coverage["file"] == "observed":
+        cache[cache_key] = (result, dict(coverage))
+    return result, coverage
 
 def _age_band(created: float | None, now: float) -> str:
     if created is None or created > now:
@@ -165,7 +330,10 @@ def _age_band(created: float | None, now: float) -> str:
 
 
 def _process(
-    pid: int, settings: CollectionSettings, now: float,
+    pid: int,
+    settings: CollectionSettings,
+    now: float,
+    file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None = None,
 ) -> Process:
     try:
         proc = psutil.Process(pid)
@@ -198,7 +366,7 @@ def _process(
         executable = executable[:8192]
         coverage["executable"] = "truncated"
     if executable and coverage["executable"] != "truncated":
-        file_info, file_coverage = _file_info(executable, settings)
+        file_info, file_coverage = _file_info(executable, settings, file_cache)
     else:
         file_info, file_coverage = Executable(), {"file": "unavailable"}
     coverage.update(file_coverage)
@@ -294,7 +462,8 @@ def collect(settings: CollectionSettings, pids: list[int] | None = None) -> Snap
     selected = sorted(set(pids if pids is not None else psutil.pids()))
     omitted = max(0, len(selected) - settings.max_processes)
     selected = selected[:settings.max_processes]
-    processes = [_process(pid, settings, now) for pid in selected]
+    file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] = {}
+    processes = [_process(pid, settings, now, file_cache) for pid in selected]
     # Capture sockets AFTER process identities and revalidate those identities afterwards.
     # Otherwise a reused PID could inherit the previous process's network evidence.
     network, coverage = _network(settings)
