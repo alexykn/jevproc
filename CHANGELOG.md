@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Enable redacted command lines, bounded executable hashes and macOS signature inspection by default.
+- Deduplicate expensive hash/signature work per stable file identity and include bounded signer metadata.
+- Fall back to partial numeric `lsof` socket collection on macOS when psutil system-wide enumeration is denied.
+- Enrich the 72-case calibration corpus to match the richer default evidence profile.
+
 - Calibrate JPR001 defaults to `uncertain_at=0.08` and `warning_at=0.10` from the 72-case synthetic corpus.
 - Simplify Noul policy mapping to direct benign/review/warning bands and remove inverse-threshold symmetry.
 - Track suspicious surfaced recall separately from hard-warning recall and benign hard-warning false positives.
