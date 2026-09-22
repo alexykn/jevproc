@@ -231,3 +231,7 @@ def main(argv: list[str] | None = None) -> int:
             "jevproc-test: corpus/config validation failed; no classification result is implied"
         )
         return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
