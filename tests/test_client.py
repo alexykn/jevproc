@@ -8,7 +8,7 @@ import pytest
 
 from jevproc.core.client import JevClient, endpoint, retry_after
 from jevproc.core.config import JevSettings, NoulQuestion
-from jevproc.core.protocol import BudgetError, ContextLimitError, JevError, encode
+from jevproc.core.protocol import BudgetError, ContextLimitError, JevError, RequestRejectedError, encode
 
 Q = {"q": NoulQuestion(type="noul", instructions="Is the evidence suspicious?")}
 BODY = encode({"model": "jev-1.13.0", "state": "synthetic", "questions": {"q": Q["q"].model_dump(exclude_none=True)}})
@@ -79,12 +79,28 @@ async def test_timeout_is_sanitized():
         assert "ReadTimeout" in str(exc.value)
 
 
-@pytest.mark.parametrize("status,body", [(413,{}),(422,{"error":{"code":"max_tokens_exceeded"}})])
+@pytest.mark.parametrize("status,body", [(413,{}),(422,{"error":{"code":"max_tokens_exceeded"}}),(400,{"error":{"details":[{"code":"max_tokens_exceeded"}]}})])
 async def test_recognized_context_limit(status,body):
     async with JevClient(settings(),"key",transport=httpx.MockTransport(lambda r:httpx.Response(status,json=body))) as client:
         with pytest.raises(ContextLimitError):
             await client.evaluate(BODY,Q)
         assert client.requests==1
+
+
+async def test_generic_400_exposes_only_safe_machine_fields():
+    body={"error":{"code":"invalid_request","message":"PRIVATE RESPONSE TEXT"},"status":"bad_request"}
+    transport=httpx.MockTransport(lambda r:httpx.Response(
+        400,
+        headers={"x-typesafe-request-id":"req_ABC-123"},
+        json=body,
+    ))
+    async with JevClient(settings(),"key",transport=transport) as client:
+        with pytest.raises(RequestRejectedError) as exc:
+            await client.evaluate(BODY,Q)
+    text=str(exc.value)
+    assert "invalid_request" in text and "bad_request" in text
+    assert "req_ABC-123" in text
+    assert "PRIVATE" not in text
 
 
 async def test_model_pin_is_enforced():
