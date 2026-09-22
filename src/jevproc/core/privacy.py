@@ -86,6 +86,11 @@ def sanitize_process(process: Process, include_command_line: bool) -> Process:
         parent["name"] = clean(parent["name"], 512, "ancestry")
         if parent["executable"] is not None:
             parent["executable"] = clean(parent["executable"], 8192, "ancestry")
+    for child in data["children"]:
+        child["name"] = clean(child["name"], 512, "children")
+        if child["executable"] is not None:
+            child["executable"] = clean(child["executable"], 8192, "children")
+        child["status"] = clean(child["status"], 512, "children")
     for connection in data["connections"]:
         for key in ("local_address", "remote_address", "status"):
             connection[key] = clean(connection[key], 512, "connections")
