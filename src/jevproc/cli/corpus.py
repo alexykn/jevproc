@@ -184,6 +184,15 @@ async def _run(args: argparse.Namespace) -> int:
 
     config = _settings(args)
     current_uncertain, current_warning = _policy(config)
+    if args.calibrate:
+        labels = {case.label for case in cases}
+        required = {"benign", "ambiguous", "suspicious"}
+        missing = required - labels
+        if missing:
+            raise ValueError(
+                "--calibrate requires at least one selected case from: "
+                + ", ".join(sorted(missing))
+            )
     snapshot = snapshot_for(corpus, cases)
     by_pid = {case.process.pid: case for case in cases}
     results: list[dict[str, Any]] = []
