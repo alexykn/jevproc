@@ -117,9 +117,11 @@ for that object before showing findings.
 
 The CLI constructs its reporter before inference. Text reporters immediately
 flush visible warnings/uncertain warnings (or every process under `--verbose`)
-and maintain one carriage-return progress line on TTYs. JSONL emits one process
-event per completed assessment. JSON intentionally stays buffered until completion
-so it remains one conventional report document.
+and maintain one carriage-return progress line on TTYs. Local evidence collection
+does not render a separate progress line; after the parallel collector redesign it
+is intentionally kept visually silent to avoid terminal flicker. JSONL emits one
+process event per completed assessment. JSON intentionally stays buffered until
+completion so it remains one conventional report document.
 
 ## Uncertainty and reporting
 
