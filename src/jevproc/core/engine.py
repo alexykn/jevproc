@@ -3,6 +3,7 @@
 import asyncio
 import time
 from collections import Counter
+from collections.abc import Callable
 from typing import Literal
 
 from jevproc.core.assessment import assess
@@ -81,6 +82,7 @@ class Engine:
         self,
         snapshot: Snapshot,
         mode: Literal["live", "offline", "demo"] = "live",
+        on_assessment: Callable[[Assessment], None] | None = None,
     ) -> Report:
         started = time.monotonic()
         before = self._counters()
@@ -89,16 +91,20 @@ class Engine:
 
         for process in snapshot.processes:
             if mode == "offline":
-                assessments.append(
-                    _unavailable(process, "Offline inventory only; Jev did not classify this process.")
+                assessment = _unavailable(
+                    process, "Offline inventory only; Jev did not classify this process."
                 )
+                assessments.append(assessment)
+                if on_assessment is not None:
+                    on_assessment(assessment)
             elif process.freshness != "observed" or process.created_at is None:
-                assessments.append(
-                    _unavailable(
-                        process,
-                        f"Process identity is {process.freshness}; not submitted to Jev.",
-                    )
+                assessment = _unavailable(
+                    process,
+                    f"Process identity is {process.freshness}; not submitted to Jev.",
                 )
+                assessments.append(assessment)
+                if on_assessment is not None:
+                    on_assessment(assessment)
             else:
                 candidates.append(process)
 
@@ -114,7 +120,10 @@ class Engine:
                         process = queue.get_nowait()
                     except asyncio.QueueEmpty:
                         return
-                    assessments.append(await self._evaluate(snapshot, process))
+                    assessment = await self._evaluate(snapshot, process)
+                    assessments.append(assessment)
+                    if on_assessment is not None:
+                        on_assessment(assessment)
 
             async with asyncio.TaskGroup() as group:
                 for _ in range(min(self.config.jev.concurrency, len(candidates))):

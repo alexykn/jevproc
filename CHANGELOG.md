@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Stream completed process assessments to text and JSONL output instead of waiting for the full scan.
+- Show one in-place TTY progress line between streamed findings.
+
 - Evaluate each process in its own Jev request, with every applicable rule for that process in the same call.
 - Restore bounded concurrency/rate pacing without reintroducing multi-process batching.
 - Align the request state/question contract with jevscan and make cache/failures process-local.

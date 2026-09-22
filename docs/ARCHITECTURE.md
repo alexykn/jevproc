@@ -8,6 +8,7 @@ psutil snapshot or validated saved JSON
   -> validated cache / paced Jev client
   -> exact typed answers
   -> local warning policy
+  -> progressive assessment events
   -> warnings-first text OR complete versioned JSON/JSONL
 ```
 
@@ -58,6 +59,19 @@ metadata during the read. The final file component is not followed as a symlink.
 This is not a cryptographic binding to the loaded image or the complete filesystem
 path. macOS signature checks have a subprocess timeout and fixed executable/argv;
 failed verification is not equivalent to detected malware.
+
+## Progressive reporting
+
+The engine accepts an assessment callback and invokes it synchronously on the
+event loop as soon as each process worker completes. The final `Report` remains
+the authoritative complete, PID-sorted result, but interactive text does not wait
+for that object before showing findings.
+
+The CLI constructs its reporter before inference. Text reporters immediately
+flush visible warnings/uncertain warnings (or every process under `--verbose`)
+and maintain one carriage-return progress line on TTYs. JSONL emits one process
+event per completed assessment. JSON intentionally stays buffered until completion
+so it remains one conventional report document.
 
 ## Uncertainty and reporting
 

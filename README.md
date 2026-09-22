@@ -112,7 +112,11 @@ A shortened excerpt from the synthetic demo:
 ```
 
 Text uses small ANSI styles with Unicode-cell-aware wrapping and hanging
-indentation. Piped output is plain; `NO_COLOR` overrides forced color.
+indentation. **Text output is progressive:** completed process findings are flushed
+as their async Jev requests finish, while a TTY shows a single updating
+`working — completed=x/y` line between findings. JSONL streams process events the
+same way; JSON remains a complete document emitted after the scan. Piped text
+output is plain; `NO_COLOR` overrides forced color.
 Process-supplied control characters and bidirectional controls are escaped.
 There are no full-screen redraws, panels, terminal UI frameworks, or Rich dependency.
 

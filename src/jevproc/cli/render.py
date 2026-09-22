@@ -1,9 +1,10 @@
-"""Plain ANSI, hanging indentation and full JSON reports. No terminal UI framework."""
+"""Progressive plain-ANSI reporting with complete JSON output. No terminal UI framework."""
 
 import json
 import os
-import shutil
 import shlex
+import shutil
+import time
 from datetime import UTC, datetime
 from typing import TextIO
 
@@ -11,13 +12,27 @@ from wcwidth import wcwidth
 
 from jevproc import __version__
 from jevproc.core.assessment import VISIBLE
-from jevproc.core.models import Report, RuleResult
+from jevproc.core.models import Assessment, Report, RuleResult
 from jevproc.core.privacy import terminal_text
 
-_STYLES = {"warning": "\x1b[33m", "uncertain_warning": "\x1b[36m", "probably_legitimate": "\x1b[32m",
-           "no_warning": "\x1b[2m", "unknown": "\x1b[36m", "not_evaluated": "\x1b[2m", "not_applicable": "\x1b[2m"}
-_MARKERS = {"warning": "!", "uncertain_warning": "?", "probably_legitimate": "+", "no_warning": ".",
-            "unknown": "?", "not_evaluated": "-", "not_applicable": "-"}
+_STYLES = {
+    "warning": "\x1b[33m",
+    "uncertain_warning": "\x1b[36m",
+    "probably_legitimate": "\x1b[32m",
+    "no_warning": "\x1b[2m",
+    "unknown": "\x1b[36m",
+    "not_evaluated": "\x1b[2m",
+    "not_applicable": "\x1b[2m",
+}
+_MARKERS = {
+    "warning": "!",
+    "uncertain_warning": "?",
+    "probably_legitimate": "+",
+    "no_warning": ".",
+    "unknown": "?",
+    "not_evaluated": "-",
+    "not_applicable": "-",
+}
 
 
 def wrap_cells(text: str, width: int) -> list[str]:
@@ -48,14 +63,24 @@ class Terminal:
     def __init__(self, stream: TextIO, *, width: int | None = None, color: str = "auto"):
         self.stream = stream
         self.width = max(20, width or shutil.get_terminal_size(fallback=(100, 24)).columns)
-        self.color = ("NO_COLOR" not in os.environ and color != "never" and os.getenv("TERM") != "dumb"
-                      and (color == "always" or stream.isatty()))
+        self.color = (
+            "NO_COLOR" not in os.environ
+            and color != "never"
+            and os.getenv("TERM") != "dumb"
+            and (color == "always" or stream.isatty())
+        )
 
-    def line(self, text: str = "", *, indent: int = 0, style: str = "", following: int | None = None) -> None:
+    def line(
+        self,
+        text: str = "",
+        *,
+        indent: int = 0,
+        style: str = "",
+        following: int | None = None,
+    ) -> None:
         text = terminal_text(text)
         indent = min(indent, self.width // 3)
         continuation = min(following if following is not None else indent, self.width // 3)
-        # Use the smaller width for both lines; never overrun a narrow terminal.
         chunks = wrap_cells(text, self.width - max(indent, continuation))
         for number, chunk in enumerate(chunks):
             prefix = " " * (indent if number == 0 else continuation)
@@ -82,88 +107,253 @@ def _value(result: RuleResult) -> str:
     return text
 
 
-def render(report: Report, stream: TextIO, *, verbose: bool = False, format_name: str = "text",
-           width: int | None = None, color: str = "auto") -> None:
+class Reporter:
+    """Flush process results as workers complete; only the summary waits for the full scan."""
+
+    def __init__(
+        self,
+        stream: TextIO,
+        *,
+        mode: str,
+        snapshot_time: float,
+        model_requested: str,
+        synthetic: bool,
+        total_processes: int,
+        verbose: bool = False,
+        format_name: str = "text",
+        width: int | None = None,
+        color: str = "auto",
+    ) -> None:
+        if format_name not in {"text", "jsonl"}:
+            raise ValueError("progressive Reporter supports text and jsonl output")
+        self.stream = stream
+        self.mode = mode
+        self.snapshot_time = snapshot_time
+        self.model_requested = model_requested
+        self.synthetic = synthetic
+        self.total_processes = total_processes
+        self.verbose = verbose
+        self.format_name = format_name
+        self.term = Terminal(stream, width=width, color=color)
+        self.completed = 0
+        self.shown = 0
+        self.progress_width = 0
+        self.started = time.monotonic()
+        self.closed = False
+
+        if self.format_name == "jsonl":
+            self._json_line(
+                {
+                    "event": "start",
+                    "schema_version": 1,
+                    "mode": mode,
+                    "snapshot_time": snapshot_time,
+                    "model_requested": model_requested,
+                }
+            )
+        else:
+            self._header()
+
+    def _header(self) -> None:
+        self.term.line(
+            f"jevproc {__version__}  {self.mode}  model={self.model_requested}",
+            style="\x1b[1;36m",
+        )
+        if self.synthetic:
+            self.term.line(
+                "DEMO / SYNTHETIC DATA - fixture answers, not a scan of your machine.",
+                style="\x1b[1;33m",
+            )
+        stamp = datetime.fromtimestamp(self.snapshot_time, UTC).isoformat(timespec="seconds")
+        self.term.line(
+            f"Snapshot: {stamp} | read-only process triage, not a safety guarantee",
+            style="\x1b[2m",
+        )
+        if self.verbose:
+            self.term.line(
+                "! warning  ? uncertain warning / unknown  + probably legitimate  . no warning  - not evaluated",
+                style="\x1b[2m",
+            )
+        self.stream.flush()
+
+    def _json_line(self, event: dict) -> None:
+        self.stream.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
+        self.stream.flush()
+
+    def _clear_progress(self) -> None:
+        if not self.progress_width:
+            return
+        self.stream.write("\r" + (" " * self.progress_width) + "\r")
+        self.progress_width = 0
+
+    def _progress(self) -> None:
+        if self.format_name != "text" or not self.stream.isatty() or self.completed >= self.total_processes:
+            return
+        text = terminal_text(
+            f"working — completed={self.completed}/{self.total_processes} "
+            f"elapsed={time.monotonic() - self.started:.1f}s"
+        )
+        width = max(self.progress_width, len(text))
+        self.stream.write("\r" + text.ljust(width))
+        self.stream.flush()
+        self.progress_width = width
+
+    def emit(self, result: Assessment) -> None:
+        if self.closed:
+            return
+        self.completed += 1
+        if self.format_name == "jsonl":
+            self._json_line({"event": "process", **result.model_dump(mode="json")})
+            return
+
+        self._clear_progress()
+        if self.verbose or result.status in VISIBLE:
+            self.shown += 1
+            self._process(result)
+            self.stream.flush()
+        self._progress()
+
+    def _process(self, result: Assessment) -> None:
+        process = result.process
+        self.term.line()
+        suffix = "  [cached]" if result.cached else ""
+        self.term.line(
+            f"{process.name}  PID {process.pid}  UID {process.uid if process.uid is not None else '?'}{suffix}",
+            style="\x1b[1m",
+            indent=2,
+            following=4,
+        )
+        self.term.line(process.executable or "<executable unavailable>", indent=4, style="\x1b[2m")
+        if process.ancestors:
+            chain = " -> ".join(f"{parent.name} ({parent.pid})" for parent in reversed(process.ancestors))
+            self.term.line(f"Parents: {chain}", indent=4, style="\x1b[2m")
+        for rule in result.rules:
+            if not self.verbose and rule.status not in VISIBLE:
+                continue
+            self.term.line(
+                f"{_MARKERS[rule.status]} {rule.rule}  {rule.title}",
+                indent=6,
+                following=8,
+                style=_STYLES[rule.status],
+            )
+            self.term.line(_value(rule), indent=8, style=_STYLES[rule.status])
+            if rule.message:
+                self.term.line(rule.message, indent=8, style="\x1b[2m")
+        for observation in process.observations:
+            self.term.line(f"Observed: {observation}", indent=6, style="\x1b[2m")
+        if not self.verbose:
+            return
+        if process.command_line is not None:
+            self.term.line("Arguments: " + shlex.join(process.command_line), indent=6, style="\x1b[2m")
+        details = []
+        if process.file.mode is not None:
+            details.append(f"mode={process.file.mode:04o}")
+        if process.file.owner_uid is not None:
+            details.append(f"owner-uid={process.file.owner_uid}")
+        if process.file.signature != "not_requested":
+            details.append(f"signature={process.file.signature}")
+        if details:
+            self.term.line("On disk: " + "  ".join(details), indent=6, style="\x1b[2m")
+        if process.file.sha256:
+            self.term.line("SHA-256 (on disk): " + process.file.sha256, indent=6, style="\x1b[2m")
+        for connection in process.connections:
+            local = f"[{connection.local_address}]:{connection.local_port}"
+            remote = (
+                f"[{connection.remote_address}]:{connection.remote_port}"
+                if connection.remote_address
+                else "-"
+            )
+            self.term.line(
+                f"Socket: {connection.protocol} local={local} remote={remote} {connection.status}",
+                indent=6,
+                style="\x1b[2m",
+            )
+        coverage = ", ".join(
+            f"{key}={value}"
+            for key, value in sorted(process.coverage.items())
+            if value != "observed"
+        )
+        if coverage:
+            self.term.line(f"Coverage: {coverage}", indent=6, style="\x1b[2m")
+
+    def finish(self, report: Report) -> None:
+        if self.closed:
+            return
+        self._clear_progress()
+        if self.format_name == "jsonl":
+            self._json_line({"event": "summary", **report.summary})
+            self.closed = True
+            return
+
+        summary = report.summary
+        self.term.line()
+        self.term.line(
+            f"Warnings: {summary['warnings']}  |  uncertain warnings: {summary['uncertain_warnings']}  (processes)",
+            style="\x1b[1;33m" if summary["warnings"] else "\x1b[36m",
+        )
+        self.term.line(
+            f"processes={summary['processes']}  evaluated={summary['evaluated']}  unknown={summary['unknown']}  "
+            f"not-evaluated={summary['not_evaluated']}  hidden={summary['processes'] - self.shown}",
+            style="\x1b[2m",
+        )
+        self.term.line(
+            f"coverage-limited={summary['coverage_limited']}  changed/exited={summary['unstable_processes']}  "
+            f"omitted={summary['omitted']}  failed={summary['failed_processes']}",
+            style="\x1b[2m",
+        )
+        self.term.line(
+            f"requests={summary['requests']}  retries={summary['retries']}  cached={summary['cached_processes']}  "
+            f"input-tokens={summary['input_tokens']}  elapsed={summary['elapsed_seconds']:.2f}s",
+            style="\x1b[2m",
+        )
+        if summary["incomplete"]:
+            self.term.line(
+                "INCOMPLETE: some selected processes were omitted or could not be evaluated.",
+                style="\x1b[1;31m",
+            )
+        for error in sorted({assessment.error for assessment in report.assessments if assessment.error}):
+            self.term.line(f"error: {error}", style="\x1b[31m")
+        if report.mode == "offline":
+            self.term.line(
+                "Offline inventory: no semantic classification was performed.",
+                style="\x1b[2m",
+            )
+        if not self.verbose:
+            self.term.line(
+                "Use -v/--verbose for other processes and all rule results.",
+                style="\x1b[2m",
+            )
+        self.stream.flush()
+        self.closed = True
+
+
+def render(
+    report: Report,
+    stream: TextIO,
+    *,
+    verbose: bool = False,
+    format_name: str = "text",
+    width: int | None = None,
+    color: str = "auto",
+) -> None:
+    """Render a completed report; live CLI paths use Reporter directly for progressive output."""
     if format_name == "json":
         stream.write(report.model_dump_json(indent=2) + "\n")
+        stream.flush()
         return
-    if format_name == "jsonl":
-        stream.write(json.dumps({"event": "start", "schema_version": 1, "mode": report.mode,
-                                 "snapshot_time": report.snapshot_time, "model_requested": report.model_requested}) + "\n")
-        for result in report.assessments:
-            stream.write(json.dumps({"event": "process", **result.model_dump(mode="json")}) + "\n")
-        stream.write(json.dumps({"event": "summary", **report.summary}) + "\n")
-        return
-    term = Terminal(stream, width=width, color=color)
-    term.line(f"jevproc {__version__}  {report.mode}  model={report.model_requested}", style="\x1b[1;36m")
-    if report.summary["synthetic"]:
-        term.line("DEMO / SYNTHETIC DATA - fixture answers, not a scan of your machine.", style="\x1b[1;33m")
-    stamp = datetime.fromtimestamp(report.snapshot_time, UTC).isoformat(timespec="seconds")
-    term.line(f"Snapshot: {stamp} | read-only process triage, not a safety guarantee", style="\x1b[2m")
-    if verbose:
-        term.line("! warning  ? uncertain warning / unknown  + probably legitimate  . no warning  - not evaluated", style="\x1b[2m")
-    shown = 0
+
+    reporter = Reporter(
+        stream,
+        mode=report.mode,
+        snapshot_time=report.snapshot_time,
+        model_requested=report.model_requested,
+        synthetic=report.summary["synthetic"],
+        total_processes=report.summary["processes"],
+        verbose=verbose,
+        format_name=format_name,
+        width=width,
+        color=color,
+    )
     for result in report.assessments:
-        if not verbose and result.status not in VISIBLE:
-            continue
-        shown += 1
-        process = result.process
-        term.line()
-        suffix = "  [cached]" if result.cached else ""
-        term.line(f"{process.name}  PID {process.pid}  UID {process.uid if process.uid is not None else '?'}{suffix}",
-                  style="\x1b[1m", indent=2, following=4)
-        term.line(process.executable or "<executable unavailable>", indent=4, style="\x1b[2m")
-        if process.ancestors:
-            chain = " -> ".join(f"{p.name} ({p.pid})" for p in reversed(process.ancestors))
-            term.line(f"Parents: {chain}", indent=4, style="\x1b[2m")
-        for rule in result.rules:
-            if not verbose and rule.status not in VISIBLE:
-                continue
-            term.line(f"{_MARKERS[rule.status]} {rule.rule}  {rule.title}", indent=6, following=8,
-                      style=_STYLES[rule.status])
-            term.line(_value(rule), indent=8, style=_STYLES[rule.status])
-            if rule.message:
-                term.line(rule.message, indent=8, style="\x1b[2m")
-        for observation in process.observations:
-            term.line(f"Observed: {observation}", indent=6, style="\x1b[2m")
-        if verbose:
-            if process.command_line is not None:
-                term.line("Arguments: " + shlex.join(process.command_line), indent=6, style="\x1b[2m")
-            details = []
-            if process.file.mode is not None:
-                details.append(f"mode={process.file.mode:04o}")
-            if process.file.owner_uid is not None:
-                details.append(f"owner-uid={process.file.owner_uid}")
-            if process.file.signature != "not_requested":
-                details.append(f"signature={process.file.signature}")
-            if details:
-                term.line("On disk: " + "  ".join(details), indent=6, style="\x1b[2m")
-            if process.file.sha256:
-                term.line("SHA-256 (on disk): " + process.file.sha256, indent=6, style="\x1b[2m")
-            for connection in process.connections:
-                local = f"[{connection.local_address}]:{connection.local_port}"
-                remote = f"[{connection.remote_address}]:{connection.remote_port}" if connection.remote_address else "-"
-                term.line(f"Socket: {connection.protocol} local={local} remote={remote} {connection.status}",
-                          indent=6, style="\x1b[2m")
-            coverage = ", ".join(f"{key}={value}" for key, value in sorted(process.coverage.items()) if value != "observed")
-            if coverage:
-                term.line(f"Coverage: {coverage}", indent=6, style="\x1b[2m")
-    summary = report.summary
-    term.line()
-    term.line(f"Warnings: {summary['warnings']}  |  uncertain warnings: {summary['uncertain_warnings']}  (processes)",
-              style="\x1b[1;33m" if summary["warnings"] else "\x1b[36m")
-    term.line(f"processes={summary['processes']}  evaluated={summary['evaluated']}  unknown={summary['unknown']}  "
-              f"not-evaluated={summary['not_evaluated']}  hidden={summary['processes'] - shown}", style="\x1b[2m")
-    term.line(f"coverage-limited={summary['coverage_limited']}  changed/exited={summary['unstable_processes']}  "
-              f"omitted={summary['omitted']}  failed={summary['failed_processes']}", style="\x1b[2m")
-    term.line(f"requests={summary['requests']}  retries={summary['retries']}  cached={summary['cached_processes']}  "
-              f"input-tokens={summary['input_tokens']}  elapsed={summary['elapsed_seconds']:.2f}s", style="\x1b[2m")
-    if summary["incomplete"]:
-        term.line("INCOMPLETE: some selected processes were omitted or could not be evaluated.", style="\x1b[1;31m")
-    for error in sorted({a.error for a in report.assessments if a.error}):
-        term.line(f"error: {error}", style="\x1b[31m")
-    if report.mode == "offline":
-        term.line("Offline inventory: no semantic classification was performed.", style="\x1b[2m")
-    if not verbose:
-        term.line("Use -v/--verbose for other processes and all rule results.", style="\x1b[2m")
-    stream.flush()
+        reporter.emit(result)
+    reporter.finish(report)
