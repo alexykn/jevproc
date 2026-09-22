@@ -107,37 +107,6 @@ def _value(result: RuleResult) -> str:
     return text
 
 
-class CollectionProgress:
-    """One in-place TTY line while local process evidence is being collected."""
-
-    def __init__(self, stream: TextIO) -> None:
-        self.stream = stream
-        self.started = time.monotonic()
-        self.progress_width = 0
-        self.closed = False
-
-    def update(self, completed: int, total: int) -> None:
-        if self.closed or not self.stream.isatty():
-            return
-        text = terminal_text(
-            f"gathering evidence — completed={completed}/{total} "
-            f"elapsed={time.monotonic() - self.started:.1f}s"
-        )
-        width = max(self.progress_width, len(text))
-        self.stream.write("\r" + text.ljust(width))
-        self.stream.flush()
-        self.progress_width = width
-
-    def finish(self) -> None:
-        if self.closed:
-            return
-        if self.progress_width:
-            self.stream.write("\r" + (" " * self.progress_width) + "\r")
-            self.stream.flush()
-        self.progress_width = 0
-        self.closed = True
-
-
 class Reporter:
     """Flush process results as workers complete; only the summary waits for the full scan."""
 

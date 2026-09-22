@@ -6,7 +6,7 @@ import pytest
 from wcwidth import wcswidth
 
 from jevproc.cli.main import exit_code, main
-from jevproc.cli.render import CollectionProgress, Reporter, Terminal, render
+from jevproc.cli.render import Reporter, Terminal, render
 from jevproc.core.client import JevClient
 from jevproc.core.demo import demo_transport
 from jevproc.core.engine import Engine
@@ -164,29 +164,6 @@ def test_bad_cli_combinations_rejected(args):
 
 
 
-
-
-def test_collection_progress_is_tty_only_and_clears(monkeypatch):
-    class TTYBuffer(io.StringIO):
-        def isatty(self):
-            return True
-
-    times = iter([100.0, 100.0, 101.25, 102.0])
-    monkeypatch.setattr("jevproc.cli.render.time.monotonic", lambda: next(times))
-    stream = TTYBuffer()
-    progress = CollectionProgress(stream)
-    progress.update(0, 558)
-    progress.update(260, 558)
-    partial = stream.getvalue()
-    assert "gathering evidence — completed=0/558 elapsed=0.0s" in partial
-    assert "gathering evidence — completed=260/558 elapsed=1.2s" in partial
-
-    progress.finish()
-    assert stream.getvalue().endswith("\r")
-
-    quiet = io.StringIO()
-    CollectionProgress(quiet).update(1, 2)
-    assert quiet.getvalue() == ""
 
 
 def test_reporter_prints_visible_process_before_summary(report):

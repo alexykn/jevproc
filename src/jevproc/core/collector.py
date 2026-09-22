@@ -918,13 +918,10 @@ def _collect_processes_parallel(
     now: float,
     resource_probes: dict[int, psutil.Process],
     executor: ThreadPoolExecutor,
-    on_progress: Callable[[int, int], None] | None,
 ) -> list[Process]:
     # Expensive hash/signature inspection is deliberately split into the next phase.
     # This phase captures identity, argv, resources and cheap file metadata only.
     base_settings = settings.model_copy(update={"hashes": False, "signatures": False})
-    if on_progress is not None:
-        on_progress(0, len(selected))
     futures: dict[Future[Process], int] = {
         executor.submit(
             _process,
@@ -937,13 +934,9 @@ def _collect_processes_parallel(
         for pid in selected
     }
     by_pid: dict[int, Process] = {}
-    for completed, future in enumerate(as_completed(futures), start=1):
+    for future in as_completed(futures):
         pid = futures[future]
         by_pid[pid] = future.result()
-        if on_progress is not None and completed < len(selected):
-            # The last unit is reserved until file/network/ancestry/child evidence
-            # is attached, so the TTY never claims collection is complete early.
-            on_progress(completed, len(selected))
     return [by_pid[pid] for pid in selected]
 
 
@@ -997,7 +990,6 @@ def collect(
     pids: list[int] | None = None,
     *,
     family_pid: int | None = None,
-    on_progress: Callable[[int, int], None] | None = None,
 ) -> Snapshot:
     if sys.platform not in {"linux", "darwin"}:
         raise CollectionError("live collection supports Linux and macOS; use a saved snapshot on other platforms")
@@ -1030,7 +1022,6 @@ def collect(
             now,
             resource_probes,
             executor,
-            on_progress,
         )
 
         # These operations are independent once the process identities are captured.
@@ -1079,9 +1070,6 @@ def collect(
                 by_parent,
                 child_coverage,
             )
-
-    if on_progress is not None:
-        on_progress(len(selected), len(selected))
 
     snapshot = Snapshot(
         captured_at=now,

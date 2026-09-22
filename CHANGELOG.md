@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Remove the local evidence-gathering progress line now that parallel collection completes fast enough to make it flicker.
+
+
 - Replace serial PID evidence collection with a bounded parallel local worker pool.
 - Deduplicate executable paths before parallel hash/signature inspection and overlap file, socket and child-table collection.
 - Parallelize post-socket PID/executable revalidation while preserving identity ordering guarantees.

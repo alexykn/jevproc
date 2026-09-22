@@ -295,7 +295,6 @@ def test_process_metadata_collection_runs_in_parallel(monkeypatch):
         resources=False,
         child_limit=0,
     )
-    events = []
     with ThreadPoolExecutor(max_workers=2) as executor:
         result = _collect_processes_parallel(
             [10, 11],
@@ -303,14 +302,10 @@ def test_process_metadata_collection_runs_in_parallel(monkeypatch):
             100.0,
             {},
             executor,
-            lambda completed, total: events.append((completed, total)),
         )
 
     assert [process.pid for process in result] == [10, 11]
     assert max_active == 2
-    assert events[0] == (0, 2)
-    # The final unit is deliberately held until global evidence is attached.
-    assert events[-1] == (1, 2)
 
 
 def test_file_evidence_is_deduplicated_and_parallel(monkeypatch):
@@ -387,25 +382,6 @@ def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):
 
 
 
-
-
-def test_collect_reports_selected_process_progress():
-    events = []
-    snapshot = collect(
-        CollectionSettings(
-            ancestry_depth=0,
-            connections=False,
-            command_line=False,
-            hashes=False,
-            signatures=False,
-            resources=False,
-            child_limit=0,
-        ),
-        [os.getpid()],
-        on_progress=lambda completed, total: events.append((completed, total)),
-    )
-    assert len(snapshot.processes) == 1
-    assert events == [(0, 1), (1, 1)]
 
 
 def test_import_rejects_unknown_fields_and_duplicate_pids(tmp_path,snapshot):
