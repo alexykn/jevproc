@@ -46,6 +46,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--ignore", action="append", default=[], metavar="RULE_OR_SET", help="disable a rule/ruleset (repeatable)")
     p.add_argument("--model", help="Jev model ID; a pinned version is preferred")
     p.add_argument("--max-processes", type=positive_int, help="bound the process inventory; omissions are reported")
+    p.add_argument("--collection-workers", type=positive_int, help="maximum concurrent local evidence-collection workers")
     p.add_argument("--max-requests", type=positive_int, help="hard attempt budget including retries across watch cycles")
     p.add_argument("--concurrency", type=positive_int, help="maximum concurrent per-process Jev requests")
     p.add_argument("--no-cache", action="store_true", help="disable the local short-lived answer cache")
