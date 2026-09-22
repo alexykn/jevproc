@@ -70,6 +70,7 @@ def test_duplicate_yaml_mapping_keys_are_rejected(tmp_path):
 
 def test_rich_evidence_is_enabled_by_default():
     collection = load_config().collection
+    assert collection.workers == 16
     assert collection.command_line is True
     assert collection.connections is True
     assert collection.hashes is True
