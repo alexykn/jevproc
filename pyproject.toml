@@ -46,12 +46,18 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM"]
-ignore = ["E501"]
+extend-select = ["I", "B", "UP", "S", "N", "C4", "SIM", "RET", "PTH", "LOG", "TRY", "PERF", "ARG"]
+ignore = [
+  "PTH113", "PTH118", "PTH119", "PTH120", "PTH123", "TRY003", "B904", "S101", "S108",
+  "SIM108", "PERF203", "UP007", "UP035", "UP045", "UP006",
+]
+
+[tool.ruff.format]
+preview = true
 
 [tool.ty.environment]
 python-version = "3.12"
