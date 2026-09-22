@@ -404,23 +404,83 @@ def _prime_resource_probes(
     return probes
 
 
-def _process_name_without_cmdline(proc: psutil.Process, pid: int) -> str:
+def _darwin_comm_table() -> dict[int, str]:
+    try:
+        result = subprocess.run(
+            ["/bin/ps", "-axo", "pid=,comm="],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    if result.returncode != 0:
+        return {}
+    table: dict[int, str] = {}
+    for line in result.stdout.splitlines():
+        value = line.strip()
+        if not value:
+            continue
+        pid_text, separator, command = value.partition(" ")
+        if not separator or not pid_text.isdigit():
+            continue
+        command = command.strip()
+        if command:
+            table[int(pid_text)] = command[:8192]
+    return table
+
+
+def _darwin_comm(pid: int) -> str | None:
+    try:
+        result = subprocess.run(
+            ["/bin/ps", "-p", str(pid), "-o", "comm="],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=2,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    value = result.stdout.strip() if result.returncode == 0 else ""
+    return value[:8192] or None
+
+
+def _process_name_without_cmdline(
+    proc: psutil.Process,
+    pid: int,
+    darwin_comm: str | None = None,
+) -> str:
     try:
         if sys.platform == "linux":
             with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as handle:
                 return handle.read(513).strip()[:512] or "<unavailable>"
+        if sys.platform == "darwin":
+            value = darwin_comm or _darwin_comm(pid)
+            return os.path.basename(value)[:512] if value else "<unavailable>"
         return proc.name()[:512]
     except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
         return "<unavailable>"
 
 
-def _process_executable_without_cmdline(proc: psutil.Process, pid: int) -> str | None:
+def _process_executable_without_cmdline(
+    proc: psutil.Process,
+    pid: int,
+    darwin_comm: str | None = None,
+) -> str | None:
     try:
         if sys.platform == "linux":
             value = os.readlink(f"/proc/{pid}/exe")
             if value.endswith(" (deleted)"):
                 value = value[:-10]
             return value[:8192] or None
+        if sys.platform == "darwin":
+            value = darwin_comm or _darwin_comm(pid)
+            return value[:8192] if value else None
         value = proc.exe() or None
         return value[:8192] if value else None
     except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
@@ -430,6 +490,7 @@ def _process_executable_without_cmdline(proc: psutil.Process, pid: int) -> str |
 def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
     by_parent: dict[int, list[Child]] = defaultdict(list)
     incomplete = False
+    darwin_commands = _darwin_comm_table() if sys.platform == "darwin" else {}
     try:
         iterator = psutil.process_iter(
             ["pid", "ppid", "create_time", "status"],
@@ -443,8 +504,9 @@ def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
                 incomplete = True
                 continue
             pid = int(pid)
-            name = _process_name_without_cmdline(item, pid)
-            executable = _process_executable_without_cmdline(item, pid)
+            darwin_comm = darwin_commands.get(pid)
+            name = _process_name_without_cmdline(item, pid, darwin_comm)
+            executable = _process_executable_without_cmdline(item, pid, darwin_comm)
             status = info.get("status") or "unknown"
             created = info.get("create_time")
             if created is None or executable is None or name == "<unavailable>":
@@ -543,8 +605,14 @@ def _process(
         return Process(pid=pid, freshness="gone", coverage={"identity": "gone"})
     coverage: dict[str, Coverage] = {}
     created = _get("identity", proc.create_time, coverage)
-    name = _get("name", proc.name, coverage, "<unavailable>")
-    executable = _get("executable", proc.exe, coverage) or None
+    if settings.command_line:
+        name = _get("name", proc.name, coverage, "<unavailable>")
+        executable = _get("executable", proc.exe, coverage) or None
+    else:
+        name = _process_name_without_cmdline(proc, pid)
+        executable = _process_executable_without_cmdline(proc, pid)
+        coverage["name"] = "observed" if name != "<unavailable>" else "unavailable"
+        coverage["executable"] = "observed" if executable else "unavailable"
     if executable is None and coverage["executable"] == "observed":
         coverage["executable"] = "unavailable"
     ppid = _get("parent", proc.ppid, coverage)
