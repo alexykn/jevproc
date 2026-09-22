@@ -232,6 +232,9 @@ def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
         or "resource modified:" in text
         or "resource missing:" in text
         or "resource added:" in text
+        or "file modified:" in text
+        or "file missing:" in text
+        or "file added:" in text
     ):
         return "verification_failed", "resource_modified"
     if (
@@ -247,6 +250,7 @@ def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
     if (
         "does not satisfy its designated requirement" in text
         or "failed to satisfy one of the code requirements" in text
+        or "code failed to satisfy specified code requirement" in text
     ):
         return "verification_failed", "requirement_failed"
     if (
