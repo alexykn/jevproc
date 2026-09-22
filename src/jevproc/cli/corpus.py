@@ -340,7 +340,23 @@ async def _run(args: argparse.Namespace) -> int:
 
         separation = calibration["separation"]
         term.line()
-        term.line("Case-mean separation", style="\x1b[1m")
+        term.line("Separation", style="\x1b[1m")
+        term.line(
+            f"sample max benign={separation['max_benign_sample']:.3f}  "
+            f"sample min ambiguous={separation['min_ambiguous_sample']:.3f}  "
+            f"sample min suspicious={separation['min_suspicious_sample']:.3f}",
+            indent=2,
+        )
+        term.line(
+            f"sample benign→ambiguous gap={separation['benign_to_ambiguous_sample_gap']:+.3f}  "
+            f"sample benign→suspicious gap={separation['benign_to_suspicious_sample_gap']:+.3f}",
+            indent=2,
+        )
+        term.line(
+            "case means:",
+            indent=2,
+            style="\x1b[2m",
+        )
         term.line(
             f"max benign={separation['max_benign_mean']:.3f}  "
             f"min ambiguous={separation['min_ambiguous_mean']:.3f}  "
@@ -354,9 +370,20 @@ async def _run(args: argparse.Namespace) -> int:
         )
 
         term.line()
-        term.line("Candidate threshold pairs (descriptive only; NOT applied)", style="\x1b[1m")
+        term.line(
+            "Sample-level candidate threshold pairs (operational; descriptive only; NOT applied)",
+            style="\x1b[1m",
+        )
         for name in ("current", "warnings_first", "balanced", "zero_benign_fp", "high_suspicious_recall"):
             term.line(_fmt_pair(name, calibration["candidates"][name]), indent=2)
+
+        term.line()
+        term.line(
+            "Case-mean candidate threshold pairs (stability view only)",
+            style="\x1b[1m",
+        )
+        for name in ("current", "warnings_first", "balanced", "zero_benign_fp", "high_suspicious_recall"):
+            term.line(_fmt_pair(name, calibration["case_mean_candidates"][name]), indent=2)
 
         term.line()
         term.line("Most variable cases across runs", style="\x1b[1m")

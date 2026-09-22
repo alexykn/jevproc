@@ -73,8 +73,10 @@ jevproc-test --calibrate --format json
 
 Calibration analyzes raw JPR001 Noul values by corpus label, reports distributions,
 case-to-case separation and repeated-run stability, and calculates descriptive
-candidate threshold pairs, including a warnings-first operating point that
-maximizes suspicious cases surfaced while avoiding benign hard warnings.
+candidate threshold pairs from **individual repeated-run samples**. The
+warnings-first operating point therefore cannot hide a rare benign warning or
+missed suspicious sample behind a case average. Case-mean candidates are retained
+as a separate stability view.
 It never writes those thresholds back into configuration automatically. Regular
 regression mode still exits 0 for matching declared statuses, 1 for a mismatch,
 and 2 for operational failure. See [the corpus documentation](docs/CORPUS.md).
@@ -193,7 +195,7 @@ than being interpreted as malicious or as transport failures.
 The default classifier asks **one Noul question per process**: does this specific
 process instance have concrete evidence of malicious or abusive behavior in the
 observed snapshot? The calibrated JPR001 policy uses `0.08` as the review
-boundary and `0.10` as the hard-warning boundary. Complete evidence below the
+boundary and `0.12` as the hard-warning boundary. Complete evidence below the
 review boundary is `probably_legitimate`; evidence-limited cases remain
 `unknown` or tentative instead of being promoted by a low scalar alone. These
 numbers are operating points from the synthetic corpus, not literal malware

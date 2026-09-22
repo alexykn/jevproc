@@ -69,14 +69,16 @@ extracts the raw JPR001 Noul value for every sample and reports:
 
 - distribution statistics per ground-truth label: min, p05, p10, p25, median,
   p75, p90, p95, max, mean and standard deviation;
-- case-mean separation, including the maximum benign mean and minimum ambiguous
-  and suspicious means;
+- sample-level separation, including the maximum benign sample and minimum
+  ambiguous/suspicious samples, plus the corresponding case-mean separation;
 - repeated-run variance and the most unstable cases;
-- how the **current** `uncertain_at / warning_at` pair performs on the corpus;
+- how the **current** `uncertain_at / warning_at` pair performs across every
+  individual repeated-run sample;
 - explicit **suspicious surfaced recall** (warning or uncertain warning),
   suspicious hard-warning recall, benign surfaced rate, and benign hard-warning
   rate;
-- descriptive candidate pairs:
+- descriptive **sample-level** candidate pairs used for operational threshold
+  selection, plus a separate case-mean candidate table retained for stability analysis:
   - **warnings first** — among pairs with zero benign hard warnings, maximize
     suspicious surfaced recall, then minimize benign surfaced alerts;
   - **balanced** — maximizes macro recall across benign / ambiguous / suspicious;
@@ -96,13 +98,19 @@ Evidence-limited `unknown` cases are summarized but excluded from threshold
 optimization because their final status is deliberately constrained by missing
 evidence rather than score alone.
 
+Operational candidate metrics are calculated from **individual samples, not case
+means**. This matters because averaging can hide a rare benign hard warning or a
+low suspicious run. Threshold search includes observed score values as well as
+midpoints, so meaningful quantized boundaries such as `0.08` or `0.12` can be
+selected directly. Case-mean candidates remain available only as a stability view.
+
 Candidate thresholds are **descriptive synthetic-corpus operating points**.
 `jevproc-test` never edits `jevproc.yaml`, packaged defaults or runtime policy.
-The current packaged JPR001 defaults (`0.08 / 0.10`) were selected from the
-warnings-first tradeoff observed on the synthetic corpus: tolerate a small review
-band to surface weak suspicious signals while avoiding benign hard warnings. A
-human should still review corpus composition, false-positive behavior and
-repeated-run stability before future threshold changes.
+The current packaged JPR001 defaults (`0.08 / 0.12`) preserve the weakest observed
+suspicious samples in the review band while moving the hard-warning boundary above
+the benign upper tail observed during repeated calibration. A human should still
+review corpus composition, false-positive behavior and repeated-run stability
+before future threshold changes.
 
 ## Why the corpus is deliberately difficult
 
