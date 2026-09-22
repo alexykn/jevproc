@@ -8,7 +8,7 @@ import pytest
 from wcwidth import wcswidth
 
 from jevproc.cli.main import exit_code, main
-from jevproc.cli.render import Terminal, render
+from jevproc.cli.render import Reporter, Terminal, render
 from jevproc.core.client import JevClient
 from jevproc.core.demo import demo_transport
 from jevproc.core.engine import Engine
@@ -106,3 +106,44 @@ def test_bad_cli_combinations_rejected(args):
     with pytest.raises(SystemExit) as exc:
         main(args)
     assert exc.value.code==2
+
+
+def test_reporter_prints_visible_process_before_summary(report):
+    stream = io.StringIO()
+    reporter = Reporter(
+        stream,
+        mode=report.mode,
+        snapshot_time=report.snapshot_time,
+        model_requested=report.model_requested,
+        synthetic=report.summary["synthetic"],
+        total_processes=report.summary["processes"],
+        color="never",
+    )
+    warning = next(item for item in report.assessments if item.status == "warning")
+    reporter.emit(warning)
+    partial = stream.getvalue()
+    assert "system-update" in partial
+    assert "Warnings:" not in partial
+
+    reporter.finish(report)
+    assert "Warnings:" in stream.getvalue()
+
+
+def test_jsonl_reporter_flushes_process_event_before_summary(report):
+    stream = io.StringIO()
+    reporter = Reporter(
+        stream,
+        mode=report.mode,
+        snapshot_time=report.snapshot_time,
+        model_requested=report.model_requested,
+        synthetic=report.summary["synthetic"],
+        total_processes=report.summary["processes"],
+        format_name="jsonl",
+    )
+    reporter.emit(report.assessments[0])
+    events = [json.loads(line) for line in stream.getvalue().splitlines()]
+    assert [event["event"] for event in events] == ["start", "process"]
+
+    reporter.finish(report)
+    events = [json.loads(line) for line in stream.getvalue().splitlines()]
+    assert events[-1]["event"] == "summary"
