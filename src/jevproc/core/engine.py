@@ -1,6 +1,5 @@
-"""Fixed worker pool, bounded shared-state batches and visible failure/coverage accounting."""
+"""Single-snapshot Jev evaluation with visible failure and coverage accounting."""
 
-import asyncio
 import time
 from collections import Counter
 from typing import Literal
@@ -9,7 +8,7 @@ from jevproc.core.assessment import assess
 from jevproc.core.client import JevClient
 from jevproc.core.config import Config
 from jevproc.core.models import Assessment, Process, Report, RuleResult, Snapshot
-from jevproc.core.protocol import Batch, ContextLimitError, JevError, make_batch, plan_batches
+from jevproc.core.protocol import ContextLimitError, EvaluationRequest, JevError, make_request
 from jevproc.core.storage import AnswerCache, request_key
 
 
@@ -22,32 +21,32 @@ class Engine:
     def __init__(self, config: Config, client: JevClient | None = None, cache: AnswerCache | None = None):
         self.config, self.client, self.cache = config, client, cache
 
-    async def _batch(self, snapshot: Snapshot, batch: Batch) -> list[Assessment]:
+    async def _evaluate(self, request: EvaluationRequest) -> list[Assessment]:
         assert self.client is not None
-        if not batch.checks:
-            return [_unavailable(p, "No configured rules have the required evidence.") for p in batch.processes]
-        key = request_key(self.client.base_url, batch.body)
+        if not request.checks:
+            return [_unavailable(process, "No configured rules have the required evidence.") for process in request.processes]
+        key = request_key(self.client.base_url, request.body)
         try:
-            answer = self.cache.get(key, batch.questions) if self.cache else None
+            answer = self.cache.get(key, request.questions) if self.cache else None
             if answer and self.config.jev.model not in {"jev-latest", "jev-preview"} and answer.model != self.config.jev.model:
                 assert self.cache is not None
                 self.cache.delete(key)
                 answer = None
             cached = answer is not None
             if answer is None:
-                answer = await self.client.evaluate(batch.body, batch.questions)
+                answer = await self.client.evaluate(request.body, request.questions)
                 if self.cache:
                     self.cache.put(key, answer)
         except ContextLimitError:
-            if len(batch.processes) == 1:
-                return [_unavailable(batch.processes[0], "Context rejected; process was not evaluated or silently truncated.", failure=True)]
-            midpoint = len(batch.processes) // 2
-            first = await self._batch(snapshot, make_batch(snapshot, batch.processes[:midpoint], self.config))
-            second = await self._batch(snapshot, make_batch(snapshot, batch.processes[midpoint:], self.config))
-            return first + second
+            reason = (
+                "Snapshot exceeded Jev's context limit; no process was silently dropped or evaluated in a different "
+                "context. Retry with --pid or reduce optional collected evidence."
+            )
+            return [_unavailable(process, reason, failure=True) for process in request.processes]
         except JevError as exc:
-            return [_unavailable(p, str(exc), failure=True) for p in batch.processes]
-        return [assess(p, self.config.active_rules, answer.answers, answer.model, cached) for p in batch.processes]
+            return [_unavailable(process, str(exc), failure=True) for process in request.processes]
+        return [assess(process, self.config.active_rules, answer.answers, answer.model, cached)
+                for process in request.processes]
 
     async def scan(self, snapshot: Snapshot, mode: Literal["live", "offline", "demo"] = "live") -> Report:
         started = time.monotonic()
@@ -63,24 +62,7 @@ class Engine:
                 candidates.append(process)
         if candidates:
             assert self.client is not None
-            batches, oversized = plan_batches(snapshot, candidates, self.config)
-            assessments.extend(_unavailable(p, "Process evidence exceeds the request budget; not silently truncated.", failure=True) for p in oversized)
-            queue: asyncio.Queue[Batch] = asyncio.Queue()
-            for batch in batches:
-                queue.put_nowait(batch)
-
-            async def worker() -> None:
-                while True:
-                    try:
-                        item = queue.get_nowait()
-                    except asyncio.QueueEmpty:
-                        return
-                    assessments.extend(await self._batch(snapshot, item))
-
-            # At most concurrency tasks, not one unbounded task per process.
-            async with asyncio.TaskGroup() as group:
-                for _ in range(min(self.config.jev.concurrency, len(batches))):
-                    group.create_task(worker())
+            assessments.extend(await self._evaluate(make_request(snapshot, candidates, self.config)))
         assessments.sort(key=lambda a: a.process.pid)
         counts = Counter(a.status for a in assessments)
         operational_failures = sum(a.error is not None for a in assessments)
