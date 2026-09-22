@@ -12,7 +12,8 @@ host_context: >-
   expected. Interactive logins should be rare. These expectations are context,
   not an automatic allowlist or evidence that an invocation was authorized.
 jev:
-  requests_per_minute: 60
+  concurrency: 8
+  requests_per_minute: 300
   max_requests: 200
 collection:
   command_line: false
@@ -90,17 +91,17 @@ below that threshold remains ordinary unknown.
 
 ## Limits and cache
 
-One live snapshot is one Jev request. Retries and watch cycles share the hard
-attempt budget and rate limiter; Ctrl-C stops the invocation. A cycle's delay
-begins after its report, so `--watch 30` is not an exact 30-second sampling
-frequency.
+Each selected process produces one Jev request containing all applicable questions
+for that process. Requests are scheduled concurrently but bounded by
+`jev.concurrency` and paced by `jev.requests_per_minute`. Defaults are 16 and
+600 respectively, matching jevscan's working transport defaults. Retries and watch
+cycles share the hard `max_requests` attempt budget.
 
-Jev 1.13 currently documents 64k tokens for the full request and 32k tokens for
-shared `state` plus the longest question. `jevproc` keeps shared state small and
-places each compact process record in its own independent question. It does not
-pretend byte counts are tokenizer counts and does not split one snapshot into
-different semantic contexts. A provider context rejection is an explicit
-incomplete scan; select processes with `--pid` or reduce optional evidence.
+A provider context rejection affects only that process request. Generic 400/422
+rejections expose only bounded machine-readable fields and the provider request ID;
+response prose is never printed. The cache is also per process request, so an
+unchanged process can hit cache independently of the rest of the snapshot.
+
 
 `TYPESAFE_BASE_URL` is an explicit transport-origin override. It requires HTTPS
 except loopback test servers and rejects embedded credentials, paths, queries and
