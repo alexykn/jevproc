@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Expand the synthetic process corpus to 72 labeled benign/suspicious/ambiguous/evidence-limited cases.
+- Add repeated-run raw-Noul calibration with quantiles, stability analysis and descriptive threshold-pair candidates.
+
 - Add a packaged synthetic warning/benign/unknown evaluation corpus and `jevproc-test` live regression command.
 
 - Stream completed process assessments to text and JSONL output instead of waiting for the full scan.
