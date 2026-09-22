@@ -12,14 +12,13 @@ host_context: >-
   expected. Interactive logins should be rare. These expectations are context,
   not an automatic allowlist or evidence that an invocation was authorized.
 jev:
-  concurrency: 4
   requests_per_minute: 60
   max_requests: 200
 collection:
   command_line: false
 cache:
   ttl_seconds: 30
-ignore: [JPR005]
+ignore: []
 rulesets:
   process:
     - id: JPR001
@@ -28,9 +27,9 @@ rulesets:
         confidence_min: 0.80
 ```
 
-The `process` override patches JPR001 by ID and preserves the other built-ins.
-An empty list does not erase a built-in ruleset. `ignore` accepts rule IDs or
-ruleset names. Disabling every rule is rejected; use `--offline` for inventory.
+The `process` override patches the built-in JPR001 classifier by ID. An empty
+list does not erase a built-in ruleset. `ignore` accepts rule IDs or ruleset
+names. Disabling every rule is rejected; use `--offline` for inventory.
 CLI `--ignore` entries add to the config. Other explicitly supplied CLI overrides
 win over the corresponding file values.
 
@@ -92,15 +91,17 @@ below that threshold remains ordinary unknown.
 
 ## Limits and cache
 
-All requests share a semaphore, rate limiter and hard attempt budget. Retries and
-context-recovery requests are charged too. Watch uses the same client and budget
-throughout the invocation; Ctrl-C stops it. A cycle's delay begins after its report,
-so `--watch 30` is not an exact 30-second sampling frequency.
+One live snapshot is one Jev request. Retries and watch cycles share the hard
+attempt budget and rate limiter; Ctrl-C stops the invocation. A cycle's delay
+begins after its report, so `--watch 30` is not an exact 30-second sampling
+frequency.
 
-`max_request_bytes` limits the entire encoded request. `max_state_question_bytes`
-limits the shared state plus the longest single question. They are conservative
-engineering guards, not a tokenizer or guaranteed context-fit calculation.
-Oversized processes are never silently discarded or semantically truncated to fit.
+Jev 1.13 currently documents 64k tokens for the full request and 32k tokens for
+shared `state` plus the longest question. `jevproc` keeps shared state small and
+places each compact process record in its own independent question. It does not
+pretend byte counts are tokenizer counts and does not split one snapshot into
+different semantic contexts. A provider context rejection is an explicit
+incomplete scan; select processes with `--pid` or reduce optional evidence.
 
 `TYPESAFE_BASE_URL` is an explicit transport-origin override. It requires HTTPS
 except loopback test servers and rejects embedded credentials, paths, queries and
