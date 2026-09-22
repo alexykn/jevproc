@@ -39,6 +39,7 @@ The default collector is evidence-rich:
 
 ```yaml
 collection:
+  workers: 16
   connections: true
   command_line: true
   hashes: true
@@ -47,6 +48,13 @@ collection:
   resource_sample_seconds: 0.10
   child_limit: 16
 ```
+
+Collection workers are independent from `jev.concurrency`. They bound local
+blocking OS/file work such as per-process metadata reads, executable hashing,
+macOS `codesign`, and post-socket identity revalidation. The default is 16;
+use `--collection-workers N` for a one-run override. File evidence is deduplicated
+by executable path before parallel inspection, so processes sharing the same
+binary do not schedule duplicate hash/signature work.
 
 Resource evidence is a short shared sampling window, not a profiler: CPU percent,
 RSS, memory percent, thread count and file-descriptor count are collected when
