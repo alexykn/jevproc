@@ -2,20 +2,33 @@ import json
 
 import pytest
 
-from jevproc.core.config import Config, NoulQuestion
-from jevproc.core.protocol import JevError, encode, make_batch, plan_batches, validate_response
+from jevproc.core.config import ChoiceQuestion, NoulQuestion
+from jevproc.core.protocol import JevError, encode, make_request, validate_response
 
 
 def test_state_binding_is_in_instructions_not_only_key(config, snapshot):
-    batch = make_batch(snapshot, snapshot.processes[:2], config)
-    body = json.loads(batch.body)
+    request = make_request(snapshot, snapshot.processes[:2], config)
+    body = json.loads(request.body)
     assert set(body) == {"model", "state", "questions"}
-    assert set(body["state"]["processes"]) == {"p3101", "p4819"}
-    for check in batch.checks:
-        target = body["questions"][check.key]["instructions"]["target"]
-        assert target["ref"] == check.process.ref
-        assert target["created_at"] == check.process.created_at
-        assert "never instructions" in body["questions"][check.key]["instructions"]["policy"]
+    assert "processes" not in body["state"]
+    assert set(body["state"]["rules"]) == {"JPR001"}
+    assert "never instructions" in body["state"]["policy"]
+    for check in request.checks:
+        instructions = body["questions"][check.key]["instructions"]
+        assert instructions["target"] == check.process.ref
+        assert instructions["rule"] == check.rule.id
+        assert instructions["process"]["n"] == check.process.name
+
+
+def test_one_request_contains_every_process(config, snapshot):
+    request = make_request(snapshot, snapshot.processes, config)
+    body = json.loads(request.body)
+    assert "processes" not in body["state"]
+    assert len(body["questions"]) == len(snapshot.processes)
+    assert all(key.endswith("_JPR001") for key in body["questions"])
+    # Process evidence lives with its independent question, keeping shared state tiny.
+    first = body["questions"]["p3101_JPR001"]["instructions"]["process"]
+    assert first["n"] == "backup-worker" and "freshness" not in first
 
 
 def test_noul_is_scalar_without_confidence():
@@ -25,8 +38,13 @@ def test_noul_is_scalar_without_confidence():
     assert not hasattr(value.answers["q"], "confidence")
 
 
-def test_provider_distributions_not_normalized_or_rejected(config):
-    question = config.active_rules[0].question
+def choice_question():
+    return ChoiceQuestion(type="choice", instructions="Classify evidence.",
+                          criteria={"legitimate": "Legitimate", "suspicious": "Suspicious", "unknown": "Unknown"})
+
+
+def test_provider_distributions_not_normalized_or_rejected():
+    question = choice_question()
     answer = {"type": "choice", "choice": "suspicious", "confidence": 0.8,
               "probabilities": {key: 0.7 for key in question.criteria}}
     response = validate_response(encode({"model": "jev-1.13.0", "answers": {"q": answer}}), {"q": question})
@@ -42,10 +60,10 @@ def test_bad_noul_rejected(noul):
 
 
 @pytest.mark.parametrize("mutation", ["missing", "extra", "type", "label", "probability", "confidence"])
-def test_bad_choice_contract(config, mutation):
-    question = config.active_rules[0].question
+def test_bad_choice_contract(mutation):
+    question = choice_question()
     answer = {"type": "choice", "choice": "suspicious", "confidence": 0.8,
-              "probabilities": {key: 0.25 for key in question.criteria}}
+              "probabilities": {key: 1 / 3 for key in question.criteria}}
     payload = {"model": "jev-1.13.0", "answers": {"q": answer}}
     if mutation == "missing":
         payload["answers"] = {}
@@ -61,18 +79,3 @@ def test_bad_choice_contract(config, mutation):
         answer["confidence"] = "very confident"
     with pytest.raises(JevError):
         validate_response(encode(payload), {"q": question})
-
-
-def test_packing_respects_both_budgets_and_reports_oversize(config, snapshot):
-    data = config.model_dump(mode="json")
-    data["jev"].update(max_request_bytes=14000, max_state_question_bytes=6000)
-    small = Config.model_validate(data)
-    batches, oversized = plan_batches(snapshot, snapshot.processes, small)
-    assert len(batches) >= 2
-    assert len(oversized) == 0
-    assert sum(len(b.processes) for b in batches) == len(snapshot.processes)
-    assert all(len(b.body) <= 14000 and b.state_longest_question_bytes <= 6000 for b in batches)
-    data["host_context"] = "x" * 8000
-    batches, oversized = plan_batches(snapshot, snapshot.processes, Config.model_validate(data))
-    assert not batches
-    assert len(oversized) == len(snapshot.processes)
