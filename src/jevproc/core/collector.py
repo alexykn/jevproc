@@ -211,6 +211,79 @@ def _hash_file(path: str, max_bytes: int) -> tuple[str | None, Coverage]:
         return None, "unavailable"
 
 
+def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
+    """Normalize stable Security.framework/codesign diagnostics into bounded evidence."""
+    text = stderr.lower()
+
+    # These are legacy signature formats/resource rules, not evidence that code was modified.
+    if "resource envelope is obsolete (custom omit rules)" in text:
+        return "legacy", "weak_resource_rules"
+    if "resource envelope is obsolete (version 1 signature)" in text:
+        return "legacy", "weak_resource_envelope"
+
+    if "code object is not signed" in text:
+        return "unsigned", None
+
+    # Integrity failures: prefer the most specific observed condition.
+    if (
+        "a sealed resource is missing or invalid" in text
+        or "sealed resource is missing or invalid" in text
+        or "invalid resource directory" in text
+        or "resource modified:" in text
+        or "resource missing:" in text
+        or "resource added:" in text
+        or "file modified:" in text
+        or "file missing:" in text
+        or "file added:" in text
+    ):
+        return "verification_failed", "resource_modified"
+    if (
+        "nested code is modified or invalid" in text
+        or "embedded framework contains modified or invalid version" in text
+        or "nested code is unsigned" in text
+    ):
+        return "verification_failed", "nested_code_invalid"
+    if "code or signature modified" in text:
+        return "verification_failed", "signature_modified"
+
+    # Requirement, trust, and format failures are distinct from content modification.
+    if (
+        "does not satisfy its designated requirement" in text
+        or "failed to satisfy one of the code requirements" in text
+        or "code failed to satisfy specified code requirement" in text
+    ):
+        return "verification_failed", "requirement_failed"
+    if (
+        "notarization indicates this code has been revoked" in text
+        or "cssmerr_tp_cert_revoked" in text
+        or "certificate was revoked" in text
+    ):
+        return "verification_failed", "revoked"
+    if (
+        "cssmerr_tp_cert_expired" in text
+        or "certificate has expired" in text
+        or "certificate expired" in text
+    ):
+        return "verification_failed", "certificate_expired"
+    if (
+        "bundle format is ambiguous" in text
+        or "bundle format unrecognized, invalid, or unsuitable" in text
+        or "object file format invalid or unsuitable" in text
+        or "required information property list" in text
+    ):
+        return "verification_failed", "bundle_format_invalid"
+    if (
+        "main executable failed strict validation" in text
+        or "unsealed contents present" in text
+        or "invalid destination for symbolic link in bundle" in text
+        or "unsupported resource found" in text
+        or "must be a regular file" in text
+    ):
+        return "verification_failed", "strict_validation_failed"
+
+    return "verification_failed", "other"
+
+
 def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
     if sys.platform != "darwin":
         return {"signature": "unavailable"}, "unavailable"
@@ -219,17 +292,27 @@ def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
             ["/usr/bin/codesign", "--verify", "--strict", "--", path],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
             timeout=3,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
         return {"signature": "unavailable"}, "unavailable"
 
-    if verify.returncode != 0:
-        return {"signature": "verification_failed"}, "observed"
+    if verify.returncode == 0:
+        values: dict[str, Any] = {"signature": "valid"}
+    else:
+        state, issue = _classify_codesign_failure(getattr(verify, "stderr", "") or "")
+        values = {"signature": state}
+        if issue is not None:
+            values["signature_issue"] = issue
+        if state == "unsigned":
+            return values, "observed"
 
-    values: dict[str, Any] = {"signature": "valid"}
+    # Display metadata is useful provenance even when integrity verification failed
+    # or the signature uses a legacy resource envelope. It does not make the
+    # verification result valid.
     try:
         display = subprocess.run(
             ["/usr/bin/codesign", "--display", "--verbose=4", "--", path],
@@ -255,7 +338,8 @@ def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
         elif line.startswith("Authority=") and len(authorities) < 8:
             authorities.append(line.split("=", 1)[1][:512])
     values["signature_authorities"] = authorities
-    # Verification proves only that the on-disk signature is structurally valid.
+    # Verification and display are separate evidence: metadata never upgrades
+    # a legacy or failed verification result to valid.
     return values, "observed"
 
 

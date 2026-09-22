@@ -283,6 +283,8 @@ class Reporter:
             details.append(f"owner-uid={process.file.owner_uid}")
         if process.file.signature != "not_requested":
             details.append(f"signature={process.file.signature}")
+        if process.file.signature_issue:
+            details.append(f"signature-issue={process.file.signature_issue}")
         if process.file.signature_identifier:
             details.append(f"identifier={process.file.signature_identifier}")
         if process.file.signature_team_id:

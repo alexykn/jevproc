@@ -54,7 +54,27 @@ class Executable(Record):
     modified_ns: int | None = None
     sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     deleted: bool | None = None
-    signature: Literal["valid", "verification_failed", "unavailable", "not_requested"] = "not_requested"
+    signature: Literal[
+        "valid",
+        "legacy",
+        "unsigned",
+        "verification_failed",
+        "unavailable",
+        "not_requested",
+    ] = "not_requested"
+    signature_issue: Literal[
+        "weak_resource_rules",
+        "weak_resource_envelope",
+        "signature_modified",
+        "resource_modified",
+        "nested_code_invalid",
+        "requirement_failed",
+        "bundle_format_invalid",
+        "revoked",
+        "certificate_expired",
+        "strict_validation_failed",
+        "other",
+    ] | None = None
     signature_identifier: Name | None = None
     signature_team_id: Name | None = None
     signature_authorities: list[Name] = Field(default_factory=list, max_length=8)

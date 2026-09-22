@@ -9,6 +9,7 @@ import pytest
 from pydantic import ValidationError
 
 from jevproc.core.collector import (
+    _classify_codesign_failure,
     _family_pids,
     _file_info,
     _get,
@@ -142,6 +143,120 @@ def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
     assert calls[1][0]==['/usr/bin/codesign','--display','--verbose=4','--','/tmp/a;echo owned']
     assert all('shell' not in kwargs for _, kwargs in calls)
     assert all(kwargs['timeout']==3 for _, kwargs in calls)
+
+
+
+
+@pytest.mark.parametrize(
+    "diagnostic,state,issue",
+    [
+        ("resource envelope is obsolete (custom omit rules)", "legacy", "weak_resource_rules"),
+        ("resource envelope is obsolete (version 1 signature)", "legacy", "weak_resource_envelope"),
+        ("code object is not signed at all", "unsigned", None),
+        ("a sealed resource is missing or invalid", "verification_failed", "resource_modified"),
+        ("file modified: Contents/Resources/example", "verification_failed", "resource_modified"),
+        ("nested code is modified or invalid", "verification_failed", "nested_code_invalid"),
+        ("code or signature modified", "verification_failed", "signature_modified"),
+        ("does not satisfy its designated Requirement", "verification_failed", "requirement_failed"),
+        ("test-requirement: code failed to satisfy specified code requirement(s)", "verification_failed", "requirement_failed"),
+        ("bundle format is ambiguous (could be app or framework)", "verification_failed", "bundle_format_invalid"),
+        ("bundle format unrecognized, invalid, or unsuitable", "verification_failed", "bundle_format_invalid"),
+        ("notarization indicates this code has been revoked", "verification_failed", "revoked"),
+        ("CSSMERR_TP_CERT_EXPIRED", "verification_failed", "certificate_expired"),
+        ("main executable failed strict validation", "verification_failed", "strict_validation_failed"),
+        ("some future codesign diagnostic", "verification_failed", "other"),
+    ],
+)
+def test_codesign_failure_diagnostics_are_normalized(diagnostic, state, issue):
+    assert _classify_codesign_failure(diagnostic) == (state, issue)
+
+
+def test_legacy_codesign_keeps_signer_metadata(monkeypatch):
+    import jevproc.core.collector as module
+
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        if "--verify" in argv:
+            return SimpleNamespace(
+                returncode=1,
+                stderr=(
+                    "/Library/Apple/System/Library/CoreServices/XProtect.app/"
+                    "Contents/XPCServices/XProtectPluginService.xpc: "
+                    "resource envelope is obsolete (custom omit rules)\n"
+                ),
+            )
+        return SimpleNamespace(
+            returncode=0,
+            stdout="",
+            stderr=(
+                "Identifier=com.apple.XProtectPluginService\n"
+                "TeamIdentifier=Software Signing\n"
+                "Authority=Software Signing\n"
+                "Authority=Apple Code Signing Certification Authority\n"
+            ),
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    values, coverage = _signature("/Library/Apple/System/Library/CoreServices/XProtect")
+    assert coverage == "observed"
+    assert values == {
+        "signature": "legacy",
+        "signature_issue": "weak_resource_rules",
+        "signature_identifier": "com.apple.XProtectPluginService",
+        "signature_team_id": "Software Signing",
+        "signature_authorities": [
+            "Software Signing",
+            "Apple Code Signing Certification Authority",
+        ],
+    }
+    assert len(calls) == 2
+    assert calls[0][0][:3] == ["/usr/bin/codesign", "--verify", "--strict"]
+    assert calls[1][0][:3] == ["/usr/bin/codesign", "--display", "--verbose=4"]
+    assert all("shell" not in kwargs for _, kwargs in calls)
+
+
+def test_unsigned_codesign_skips_display(monkeypatch):
+    import jevproc.core.collector as module
+
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        return SimpleNamespace(returncode=1, stderr="code object is not signed at all")
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    values, coverage = _signature("/tmp/unsigned")
+    assert coverage == "observed"
+    assert values == {"signature": "unsigned"}
+    assert calls == [["/usr/bin/codesign", "--verify", "--strict", "--", "/tmp/unsigned"]]
+
+
+def test_failed_codesign_can_preserve_display_identity(monkeypatch):
+    import jevproc.core.collector as module
+
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+
+    def run(argv, **kwargs):
+        if "--verify" in argv:
+            return SimpleNamespace(returncode=1, stderr="code or signature modified")
+        return SimpleNamespace(
+            returncode=0,
+            stdout="",
+            stderr="Identifier=com.example.tool\nTeamIdentifier=TEAM123456\n",
+        )
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    values, coverage = _signature("/tmp/tool")
+    assert coverage == "observed"
+    assert values["signature"] == "verification_failed"
+    assert values["signature_issue"] == "signature_modified"
+    assert values["signature_identifier"] == "com.example.tool"
+    assert values["signature_team_id"] == "TEAM123456"
+
 
 
 def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):

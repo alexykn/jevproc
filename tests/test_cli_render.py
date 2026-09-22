@@ -173,7 +173,7 @@ def test_collection_progress_is_tty_only_and_clears(monkeypatch):
         def isatty(self):
             return True
 
-    times = iter([100.0, 100.0, 101.25])
+    times = iter([100.0, 100.0, 101.25, 102.0])
     monkeypatch.setattr("jevproc.cli.render.time.monotonic", lambda: next(times))
     stream = TTYBuffer()
     progress = CollectionProgress(stream)

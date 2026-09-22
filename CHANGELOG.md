@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Distinguish legacy macOS resource-envelope signatures and unsigned code from generic `codesign` verification failures.
+- Normalize common `codesign` failure reasons and retain signer metadata when display information remains readable.
+
+
 - Recalibrate JPR001 to `uncertain_at=0.08` / `warning_at=0.12` after adding resource/child evidence.
 - Select operational calibration candidates from individual repeated-run samples instead of case means.
 - Report sample-level separation and keep case-mean candidate metrics as a separate stability view.
