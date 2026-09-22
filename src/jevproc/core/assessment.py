@@ -33,6 +33,10 @@ def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
             status = "warning"
         elif value >= policy.uncertain_at:
             status = "uncertain_warning"
+        elif limited:
+            status = "unknown"
+        elif value <= 1 - policy.warning_at:
+            status = "probably_legitimate"
         elif value > 1 - policy.uncertain_at:
             status = "unknown"
         else:
