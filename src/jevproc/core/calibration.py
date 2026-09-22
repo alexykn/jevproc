@@ -65,7 +65,10 @@ class PairMetrics:
     exact_accuracy: float
     benign_false_positive_rate: float
     benign_warning_rate: float
+    benign_surface_rate: float
+    benign_hard_warning_rate: float
     ambiguous_band_recall: float
+    suspicious_surface_recall: float
     suspicious_warning_recall: float
 
     def as_dict(self) -> dict[str, float]:
@@ -76,7 +79,10 @@ class PairMetrics:
             "exact_accuracy": self.exact_accuracy,
             "benign_false_positive_rate": self.benign_false_positive_rate,
             "benign_warning_rate": self.benign_warning_rate,
+            "benign_surface_rate": self.benign_surface_rate,
+            "benign_hard_warning_rate": self.benign_hard_warning_rate,
             "ambiguous_band_recall": self.ambiguous_band_recall,
+            "suspicious_surface_recall": self.suspicious_surface_recall,
             "suspicious_warning_recall": self.suspicious_warning_recall,
         }
 
@@ -96,7 +102,7 @@ def evaluate_pair(
 
     totals = {"benign": 0, "ambiguous": 0, "suspicious": 0}
     correct = {"benign": 0, "ambiguous": 0, "suspicious": 0}
-    benign_fp = benign_warning = 0
+    benign_fp = benign_warning = suspicious_surface = 0
 
     for case_id, score in case_means.items():
         label = cases[case_id].label
@@ -119,6 +125,8 @@ def evaluate_pair(
         if label == "benign":
             benign_fp += predicted != "benign"
             benign_warning += predicted == "warning"
+        elif label == "suspicious":
+            suspicious_surface += predicted in {"ambiguous", "warning"}
 
     recalls = [_rate(correct[label], totals[label]) for label in ("benign", "ambiguous", "suspicious")]
     total = sum(totals.values())
@@ -129,7 +137,10 @@ def evaluate_pair(
         exact_accuracy=_rate(sum(correct.values()), total),
         benign_false_positive_rate=_rate(benign_fp, totals["benign"]),
         benign_warning_rate=_rate(benign_warning, totals["benign"]),
+        benign_surface_rate=_rate(benign_fp, totals["benign"]),
+        benign_hard_warning_rate=_rate(benign_warning, totals["benign"]),
         ambiguous_band_recall=_rate(correct["ambiguous"], totals["ambiguous"]),
+        suspicious_surface_recall=_rate(suspicious_surface, totals["suspicious"]),
         suspicious_warning_recall=_rate(correct["suspicious"], totals["suspicious"]),
     )
 
@@ -177,6 +188,19 @@ def candidate_pairs(
         ),
     )
 
+    no_hard_benign = [item for item in pairs if item.benign_hard_warning_rate == 0]
+    warnings_first = max(
+        no_hard_benign or pairs,
+        key=lambda item: (
+            item.suspicious_surface_recall,
+            -item.benign_surface_rate,
+            item.suspicious_warning_recall,
+            item.ambiguous_band_recall,
+            item.macro_recall,
+            item.warning_at,
+        ),
+    )
+
     high_recall = [item for item in pairs if item.suspicious_warning_recall >= 0.95]
     recall_first = min(
         high_recall or pairs,
@@ -193,6 +217,7 @@ def candidate_pairs(
         "current": current.as_dict(),
         "balanced": balanced.as_dict(),
         "zero_benign_fp": conservative.as_dict(),
+        "warnings_first": warnings_first.as_dict(),
         "high_suspicious_recall": recall_first.as_dict(),
     }
 
