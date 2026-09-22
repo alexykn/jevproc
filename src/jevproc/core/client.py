@@ -12,7 +12,7 @@ import httpx
 
 from jevproc import __version__
 from jevproc.core.config import JevSettings, Question
-from jevproc.core.protocol import BudgetError, ContextLimitError, JevError, JevResponse, validate_response
+from jevproc.core.protocol import (BudgetError, ContextLimitError, JevError, JevResponse, RequestRejectedError, validate_response)
 
 
 class Limiter:
@@ -66,20 +66,59 @@ def retry_after(headers: httpx.Headers) -> float | None:
         return None
 
 
+def _safe_request_id(response: httpx.Response) -> str:
+    value = response.headers.get("x-typesafe-request-id", "")[:100]
+    return "".join(char for char in value if char.isalnum() or char in "-_")
+
+
+def _safe_machine_value(value: object) -> str | None:
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, int):
+        return str(value)
+    if not isinstance(value, str) or not 1 <= len(value) <= 80:
+        return None
+    return value if all(char.isalnum() or char in "._:-" for char in value) else None
+
+
+def _machine_fields(body: object) -> dict[str, tuple[str, ...]]:
+    found: dict[str, set[str]] = {}
+
+    def visit(value: object) -> None:
+        if isinstance(value, dict):
+            for raw_key, child in value.items():
+                key = str(raw_key)
+                if key in {"code", "type", "status", "error"}:
+                    safe = _safe_machine_value(child)
+                    if safe is not None:
+                        found.setdefault(key, set()).add(safe)
+                visit(child)
+        elif isinstance(value, list):
+            for child in value[:64]:
+                visit(child)
+
+    visit(body)
+    return {key: tuple(sorted(values)) for key, values in sorted(found.items())}
+
+
+def _json_body(response: httpx.Response) -> object:
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
 def _context_error(response: httpx.Response) -> bool:
     if response.status_code == 413:
         return True
     if response.status_code not in {400, 422}:
         return False
-    try:
-        body = response.json()
-    except ValueError:
-        return False
-    if not isinstance(body, dict):
-        return False
-    fields = [body, body.get("error")]
-    return any(isinstance(item, dict) and item.get("code") in {"max_tokens_exceeded", "context_length_exceeded"}
-               for item in fields)
+    fields = _machine_fields(_json_body(response))
+    return any(
+        value in {"max_tokens_exceeded", "context_length_exceeded", "content_too_large"}
+        for values in fields.values()
+        for value in values
+    )
 
 
 class JevClient:
@@ -97,10 +136,11 @@ class JevClient:
         self.output_tokens = 0
         self.fatal_error: str | None = None
         self.limiter = Limiter(settings.requests_per_minute)
+        self.slots = asyncio.Semaphore(settings.concurrency)
         self.http = httpx.AsyncClient(
             base_url=self.base_url, transport=transport,
             timeout=settings.timeout_seconds, follow_redirects=False, trust_env=False,
-            limits=httpx.Limits(max_connections=2, max_keepalive_connections=2),
+            limits=httpx.Limits(max_connections=settings.concurrency, max_keepalive_connections=settings.concurrency),
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
                      "Accept": "application/json", "User-Agent": f"jevproc/{__version__}"},
         )
@@ -112,27 +152,26 @@ class JevClient:
             raise BudgetError("Jev request-attempt budget exhausted; remaining processes were not analyzed")
 
     async def _post(self, body: bytes) -> httpx.Response:
-        self._check_ready()
-        await self.limiter.acquire()
-        self._check_ready()
-        self.requests += 1
-        async with self.http.stream("POST", "/v1/systemone", content=body) as response:
-            parts: list[bytes] = []
-            size = 0
-            async for part in response.aiter_bytes(chunk_size=65536):
-                size += len(part)
-                if size > 2 * 1024 * 1024:
-                    raise JevError("Jev response exceeds the 2 MiB safety limit")
-                parts.append(part)
-            # Keep a bounded response for decoding after the connection is closed.
-            headers = response.headers.copy()
-            # aiter_bytes already decoded the transport encoding; do not decode it twice.
-            headers.pop("content-encoding", None)
-            headers.pop("content-length", None)
-            result = httpx.Response(response.status_code, headers=headers, content=b"".join(parts))
-            if response.status_code in {401, 403}:
-                self.fatal_error = f"Jev authentication/authorization failed (HTTP {response.status_code})"
-            return result
+        async with self.slots:
+            self._check_ready()
+            await self.limiter.acquire()
+            self._check_ready()
+            self.requests += 1
+            async with self.http.stream("POST", "/v1/systemone", content=body) as response:
+                parts: list[bytes] = []
+                size = 0
+                async for part in response.aiter_bytes(chunk_size=65536):
+                    size += len(part)
+                    if size > 2 * 1024 * 1024:
+                        raise JevError("Jev response exceeds the 2 MiB safety limit")
+                    parts.append(part)
+                headers = response.headers.copy()
+                headers.pop("content-encoding", None)
+                headers.pop("content-length", None)
+                result = httpx.Response(response.status_code, headers=headers, content=b"".join(parts))
+                if response.status_code in {401, 403}:
+                    self.fatal_error = f"Jev authentication/authorization failed (HTTP {response.status_code})"
+                return result
 
     async def evaluate(self, body: bytes, questions: dict[str, Question]) -> JevResponse:
         for attempt in range(self.settings.retries + 1):
@@ -152,8 +191,16 @@ class JevClient:
                     return validated
                 if _context_error(response):
                     raise ContextLimitError("Jev rejected the context size")
+                if response.status_code in {400, 422}:
+                    raise RequestRejectedError(
+                        status=response.status_code,
+                        machine_fields=_machine_fields(_json_body(response)),
+                        request_id=_safe_request_id(response),
+                    )
                 if response.status_code not in {408, 429} and response.status_code < 500:
-                    raise JevError(f"Jev request failed (HTTP {response.status_code})")
+                    request_id = _safe_request_id(response)
+                    suffix = f"; request-id={request_id}" if request_id else ""
+                    raise JevError(f"Jev request failed (HTTP {response.status_code}{suffix})")
                 if attempt == self.settings.retries:
                     raise JevError(f"Jev retries exhausted (HTTP {response.status_code})")
                 provider_delay = retry_after(response.headers)
