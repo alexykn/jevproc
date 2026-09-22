@@ -41,6 +41,28 @@ processes.
 
 ## Collection and evidence limits
 
+Collection is a phased, bounded blocking-I/O pipeline rather than one serial PID
+loop:
+
+```text
+prime shared CPU sample
+        |
+        v
+parallel PID metadata capture
+        |
+        +--> deduplicated file hash/codesign ----+
+        +--> system socket snapshot -------------+--> parallel PID/exec revalidation
+        +--> child process-table snapshot -------+             |
+                                                               v
+                                                    ancestry + child attachment
+```
+
+The default local worker pool is 16 and is independent from Jev request
+concurrency. Thread workers are used intentionally because psutil, filesystem
+reads, hashing and subprocess waits are blocking operations; putting those calls
+directly on the asyncio event loop would not make them concurrent. Final process
+ordering remains PID-stable.
+
 Creation time accompanies each PID. A fresh psutil object checks identity and the
 executable path after collection. Reused PIDs, changed executable paths, exits and
 unverifiable identities are not submitted for classification. Socket enumeration
@@ -72,8 +94,9 @@ Limited-access enumeration is marked partial; absent entries are not safe entrie
 
 File evidence is bound to stable device/inode/size/time metadata rather than
 trusted by pathname alone. Bounded SHA-256 and macOS signature inspection are
-enabled by default and deduplicated for processes that reference the same stable
-on-disk file identity. Hashing requires a regular file, a size limit and stable
+enabled by default. Executable paths are deduplicated before parallel inspection,
+and each inspection still verifies stable before/after file metadata before its
+result is attached to every process referencing that path. Hashing requires a regular file, a size limit and stable
 before/after metadata during the read; the final file component is not followed as
 a symlink. This is not a cryptographic binding to the loaded image or complete
 filesystem path. macOS signature checks use fixed executable/argv and timeouts,

@@ -96,7 +96,8 @@ jevproc --no-hashes             # Skip bounded executable SHA-256
 jevproc --no-signatures         # Skip macOS code-signature inspection
 jevproc --no-resources          # Skip CPU/memory/thread/fd evidence
 jevproc --watch 30 --max-requests 200
-jevproc --concurrency 8
+jevproc --concurrency 8              # Jev request concurrency
+jevproc --collection-workers 16      # local evidence concurrency
 jevproc --format json
 jevproc --format jsonl --watch 30
 ```
@@ -104,7 +105,14 @@ jevproc --format jsonl --watch 30
 Live mode sends process names, paths, UID, parent/child context, a short
 CPU/memory/thread/FD sample, redacted command arguments, file metadata, bounded
 executable SHA-256 values, available socket endpoints and (on macOS) code-signature
-identity to the configured TypeSafe API by default. Resource usage and bounded
+identity to the configured TypeSafe API by default.
+
+Local collection uses a separate bounded worker pool (16 workers by default).
+Process metadata is gathered concurrently; identical executable paths are
+deduplicated before bounded hash/signature inspection; file inspection overlaps
+with the system socket and child-table snapshots; and post-socket PID/executable
+revalidation is parallelized. `--collection-workers` tunes only this local
+blocking-I/O work and does not change Jev request concurrency. Resource usage and bounded
 child summaries are **evidence for Jev/JSON only**; the normal text report does not
 print them because top/htop/Activity Monitor are better resource interfaces.
 

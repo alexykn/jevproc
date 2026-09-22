@@ -1,6 +1,8 @@
 import os
 import stat
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +12,8 @@ from pydantic import ValidationError
 
 from jevproc.core.collector import (
     _classify_codesign_failure,
+    _collect_processes_parallel,
+    _file_evidence_futures,
     _family_pids,
     _file_info,
     _get,
@@ -257,6 +261,111 @@ def test_failed_codesign_can_preserve_display_identity(monkeypatch):
     assert values["signature_identifier"] == "com.example.tool"
     assert values["signature_team_id"] == "TEAM123456"
 
+
+
+
+
+def test_process_metadata_collection_runs_in_parallel(monkeypatch):
+    import jevproc.core.collector as module
+
+    barrier = threading.Barrier(2, timeout=2)
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def fake_process(pid, settings, now, file_cache=None, resource_probe=None):
+        nonlocal active, max_active
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        barrier.wait()
+        with lock:
+            active -= 1
+        return Process(
+            pid=pid,
+            created_at=now,
+            name=f"p{pid}",
+            executable=f"/tmp/tool-{pid}",
+            coverage={"identity": "observed", "executable": "observed"},
+        )
+
+    monkeypatch.setattr(module, "_process", fake_process)
+    settings = CollectionSettings(
+        workers=2,
+        connections=False,
+        hashes=False,
+        signatures=False,
+        resources=False,
+        child_limit=0,
+    )
+    events = []
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        result = _collect_processes_parallel(
+            [10, 11],
+            settings,
+            100.0,
+            {},
+            executor,
+            lambda completed, total: events.append((completed, total)),
+        )
+
+    assert [process.pid for process in result] == [10, 11]
+    assert max_active == 2
+    assert events[0] == (0, 2)
+    # The final unit is deliberately held until global evidence is attached.
+    assert events[-1] == (1, 2)
+
+
+def test_file_evidence_is_deduplicated_and_parallel(monkeypatch):
+    import jevproc.core.collector as module
+
+    barrier = threading.Barrier(2, timeout=2)
+    calls = []
+    active = 0
+    max_active = 0
+    lock = threading.Lock()
+
+    def fake_file_info(path, settings, cache=None):
+        nonlocal active, max_active
+        calls.append(path)
+        with lock:
+            active += 1
+            max_active = max(max_active, active)
+        barrier.wait()
+        with lock:
+            active -= 1
+        return module.Executable(exists=True), {
+            "file": "observed",
+            "hash": "observed",
+            "signature": "observed",
+        }
+
+    monkeypatch.setattr(module, "_file_info", fake_file_info)
+    processes = [
+        Process(
+            pid=1,
+            executable="/tmp/shared",
+            coverage={"executable": "observed"},
+        ),
+        Process(
+            pid=2,
+            executable="/tmp/shared",
+            coverage={"executable": "observed"},
+        ),
+        Process(
+            pid=3,
+            executable="/tmp/other",
+            coverage={"executable": "observed"},
+        ),
+    ]
+    settings = CollectionSettings(workers=2, hashes=True, signatures=True)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = _file_evidence_futures(processes, settings, executor)
+        evidence = {path: future.result() for path, future in futures.items()}
+
+    assert set(evidence) == {"/tmp/shared", "/tmp/other"}
+    assert sorted(calls) == ["/tmp/other", "/tmp/shared"]
+    assert max_active == 2
 
 
 def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):

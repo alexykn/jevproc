@@ -126,6 +126,7 @@ class JevSettings(Settings):
 
 class CollectionSettings(Settings):
     max_processes: int = Field(default=2048, ge=1, le=10000)
+    workers: int = Field(default=16, ge=1, le=64)
     ancestry_depth: int = Field(default=4, ge=0, le=8)
     connections: bool = True
     command_line: bool = True

@@ -40,6 +40,8 @@ def _settings(args: argparse.Namespace) -> Config:
         data["collection"]["connections"] = False
     if args.max_processes is not None:
         data["collection"]["max_processes"] = args.max_processes
+    if args.collection_workers is not None:
+        data["collection"]["workers"] = args.collection_workers
     for name in ("model", "max_requests", "concurrency"):
         if (value := getattr(args, name)) is not None:
             data["jev"][name] = value

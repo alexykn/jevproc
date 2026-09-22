@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Replace serial PID evidence collection with a bounded parallel local worker pool.
+- Deduplicate executable paths before parallel hash/signature inspection and overlap file, socket and child-table collection.
+- Parallelize post-socket PID/executable revalidation while preserving identity ordering guarantees.
+- Use psutil `oneshot()` for grouped process reads and add `--collection-workers` tuning.
+
+
 - Distinguish legacy macOS resource-envelope signatures and unsigned code from generic `codesign` verification failures.
 - Normalize common `codesign` failure reasons and retain signer metadata when display information remains readable.
 
