@@ -6,12 +6,12 @@ import os
 import sqlite3
 import sys
 from contextlib import ExitStack
-from typing import TextIO
+from typing import Callable, TextIO
 
 from pydantic import ValidationError
 
 from jevproc.cli.args import parser
-from jevproc.cli.render import Reporter, Terminal, render
+from jevproc.cli.render import CollectionProgress, Reporter, Terminal, render
 from jevproc.core.client import JevClient
 from jevproc.core.collector import CollectionError, collect, load_snapshot
 from jevproc.core.config import Config, ConfigError, default_yaml, load_config
@@ -51,12 +51,21 @@ def _settings(args: argparse.Namespace) -> Config:
     return Config.model_validate(data)
 
 
-def _snapshot(args: argparse.Namespace, config: Config) -> Snapshot:
+def _snapshot(
+    args: argparse.Namespace,
+    config: Config,
+    on_progress: Callable[[int, int], None] | None = None,
+) -> Snapshot:
     if args.demo:
         return demo_snapshot()
     if args.input is not None:
         return load_snapshot(args.input, include_command_line=config.collection.command_line)
-    return collect(config.collection, args.pid, family_pid=args.family)
+    return collect(
+        config.collection,
+        args.pid,
+        family_pid=args.family,
+        on_progress=on_progress,
+    )
 
 
 def exit_code(report: Report, fail_on: str) -> int:
@@ -73,7 +82,20 @@ async def _cycles(args: argparse.Namespace, config: Config, engine: Engine, stdo
     code = 0
     while True:
         # Collection is synchronous and bounded by the selected process/file budgets.
-        snapshot = _snapshot(args, config)
+        collection_progress = (
+            CollectionProgress(stdout)
+            if args.format == "text" and not args.demo and args.input is None
+            else None
+        )
+        try:
+            snapshot = _snapshot(
+                args,
+                config,
+                on_progress=collection_progress.update if collection_progress else None,
+            )
+        finally:
+            if collection_progress is not None:
+                collection_progress.finish()
         if args.save_snapshot is not None:
             write_private(args.save_snapshot, (snapshot.model_dump_json(indent=2) + "\n").encode())
         mode = "demo" if args.demo else "offline" if args.offline else "live"
