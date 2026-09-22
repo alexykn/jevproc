@@ -4,7 +4,7 @@
 psutil snapshot or validated saved JSON
   -> privacy minimization + bounded typed Process records
   -> independent rule applicability checks
-  -> one Jev request for the complete selected snapshot
+  -> one Jev request per selected process
   -> validated cache / paced Jev client
   -> exact typed answers
   -> local warning policy
@@ -18,34 +18,24 @@ policy. `protocol.py` binds targets and owns response validation; `client.py`
 handles only transport, pacing and request accounting. `assessment.py` applies
 local policy. `engine.py` owns orchestration. `cli` never invents a second detector.
 
-## One snapshot, one request
+## One process, one request
 
-The shared `state` contains host context, the fixed evidence policy, active rule
-definitions and compact field legends. It deliberately does **not** repeat the
-whole process table. Each independent question carries one compact process record
-and explicitly names its target and rule. The provider's API says question IDs
-are not passed to the model, so the target binding remains inside instructions.
-The full local `Process` objects are retained for reporting and policy decisions;
-only the inference wire is compacted.
+Each selected process is evaluated independently. Its full compacted evidence is
+placed once in `state.process`, and every applicable rule for that process is sent
+as an independent question with an explicit target binding. This follows the same
+state/question shape used successfully by jevscan while preventing a large process
+table or hundreds of process questions from sharing one provider request.
 
-This layout follows Jev 1.13's documented context model: 64k tokens for a full
-request, with a 32k limit on shared state plus the longest question. It also
-follows TypeSafe's speculative fan-out guidance that many independent questions
-should normally be sent together because they are evaluated in parallel. There
-is no process batch planner, API worker pool, recursive context split or local
-byte-count approximation of model tokens. If the provider rejects an unusually
-large snapshot, every affected process is explicitly `not_evaluated`; the tool
-does not silently change the context and retry subsets.
+A bounded worker pool schedules process requests. The transport semaphore and
+shared rate limiter cap concurrency and request starts; defaults are 16 concurrent
+requests and 600 starts/minute. This is scheduling, not semantic batching: a
+process is never split across requests and two processes never share one request.
 
-Question independence is intentional. Relationships between observed processes
-are evidence only when present in the process record; they are not fabricated
-execution history. There is no hidden agent/tool loop, shell execution or
-model-written remediation.
+Cache identity is per process request, so unchanged processes can be reused even
+when another process changes. Provider context or request-validation failures are
+also process-local and do not erase successful classifications for other
+processes.
 
-The boundary checks exact answer IDs, answer types, criterion labels, finite
-ranges and score scale. Choice/Score numeric distributions are preserved without
-normalization. Cached answers use the same decoder. Pinned-model mismatches are
-errors, not transparent model substitutions. Noul has no invented confidence.
 
 ## Collection and evidence limits
 
@@ -90,7 +80,7 @@ identity, age band, evidence or snapshot context changes the key. Responses are
 stored; raw requests and process evidence are not.
 
 The transport pacing lock and attempt budget include retries and watch cycles.
-A snapshot has only one in-flight evaluation request. Authentication, transport
+At most the configured number of process requests are in flight. Authentication, transport
 and context failures become explicit non-evaluations rather than fallback
 classifications.
 
