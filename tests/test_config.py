@@ -74,3 +74,5 @@ def test_rich_evidence_is_enabled_by_default():
     assert collection.connections is True
     assert collection.hashes is True
     assert collection.signatures is True
+    assert collection.resources is True
+    assert collection.child_limit == 16
