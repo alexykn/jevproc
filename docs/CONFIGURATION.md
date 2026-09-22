@@ -61,9 +61,15 @@ PID plus all currently observed descendants, bounded by `max_processes`.
 
 Command arguments are bounded and redacted before submission. Hashing reads only
 bounded regular executable files and sends the SHA-256, never file contents.
-macOS signature inspection sends verification status plus bounded identifier,
-team-ID and authority metadata. Hash/signature work is deduplicated by stable
-on-disk file identity within each snapshot.
+macOS signature inspection sends normalized verification status plus bounded
+identifier, team-ID and authority metadata. It distinguishes valid, unsigned,
+legacy-resource-signature and failed-verification states. For failed verification,
+a bounded `signature_issue` separates common integrity, nested-code, requirement,
+bundle-format, revocation, certificate-expiry and strict-validation conditions.
+Apple's obsolete resource-envelope/custom-omit diagnostics are represented as
+`signature=legacy`, not as generic evidence of code modification. Signer metadata
+is retained when `codesign --display` can still read it. Hash/signature work is
+deduplicated by stable on-disk file identity within each snapshot.
 
 On macOS, system-wide psutil socket enumeration can be denied to an unprivileged
 process. In that case jevproc falls back to fixed-path `/usr/sbin/lsof` and marks
