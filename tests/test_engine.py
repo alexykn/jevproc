@@ -162,3 +162,53 @@ def test_request_contains_all_applicable_questions_for_one_process(config, snaps
     request = make_request(snapshot, process, config)
     assert request.process.pid == process.pid
     assert set(request.questions) == {"p7700_JPR001"}
+
+
+async def test_assessment_callback_streams_before_scan_completes(config, snapshot):
+    source = snapshot.model_copy(update={"processes": snapshot.processes[:2]})
+    release_slow = asyncio.Event()
+    fast_emitted = asyncio.Event()
+    emitted = []
+
+    async def handler(request):
+        payload = json.loads(request.content)
+        pid = payload["state"]["process"]["pid"]
+        if pid == 4819:
+            await release_slow.wait()
+        answers = {
+            key: {"type": "noul", "noul": 0.08}
+            for key in payload["questions"]
+        }
+        return httpx.Response(
+            200,
+            json={
+                "model": payload["model"],
+                "answers": answers,
+                "usage": {"input_tokens": 10, "output_tokens": 1},
+            },
+        )
+
+    def on_assessment(assessment):
+        emitted.append(assessment.process.pid)
+        if assessment.process.pid == 3101:
+            fast_emitted.set()
+
+    async with JevClient(
+        config.jev, "demo", transport=httpx.MockTransport(handler)
+    ) as client:
+        task = asyncio.create_task(
+            Engine(config, client).scan(
+                source,
+                "demo",
+                on_assessment=on_assessment,
+            )
+        )
+        await asyncio.wait_for(fast_emitted.wait(), timeout=1)
+        assert not task.done()
+        assert 3101 in emitted
+        assert 4819 not in emitted
+        release_slow.set()
+        report = await task
+
+    assert report.summary["evaluated"] == 2
+    assert set(emitted) == {3101, 4819}
