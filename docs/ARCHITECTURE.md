@@ -86,7 +86,7 @@ messages come from the local rubric and observed facts, not invented model prose
 Cache identity hashes the exact canonical request and endpoint, so it includes
 model, policy, shared state and bound questions. It expires quickly and never
 learns an allowlist from repeated observations. Changing a process's PID/start
-identity, age band, evidence or batch context changes the key. Responses are
+identity, age band, evidence or snapshot context changes the key. Responses are
 stored; raw requests and process evidence are not.
 
 The transport pacing lock and attempt budget include retries and watch cycles.
