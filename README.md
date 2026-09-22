@@ -101,17 +101,13 @@ A shortened excerpt from the synthetic demo:
   system-update  PID 4819  UID 1000
     /tmp/.session/update
     Parents: document-viewer (4801)
-      ! JPR001  Overall process assessment
-        probably_malicious  p=0.950  conf=0.900
-      ! JPR003  Executable provenance
-        noul=0.930
+      ! JPR001  Process risk
+        noul=0.950
 
   build-helper  PID 6120  UID 1000
     /tmp/build/helper
-      ? JPR001  Overall process assessment
-        suspicious  p=0.650  conf=0.430  [uncertain warning]
-      ? JPR003  Executable provenance
-        noul=0.660  [uncertain warning]
+      ? JPR001  Process risk
+        noul=0.650  [uncertain warning]
 ```
 
 Text uses small ANSI styles with Unicode-cell-aware wrapping and hanging
@@ -140,31 +136,42 @@ and **130** for Ctrl-C. `--fail-on any` also returns 1 for uncertain warnings;
 bill of health. Exited/reused/changed processes are reported and skipped rather
 than being interpreted as malicious or as transport failures.
 
-## Built-in rules and Jev integration
+## Built-in rule and Jev integration
 
-Five independent questions cover overall assessment (`JPR001`, Choice), execution
-misuse (`JPR002`, Noul), executable provenance (`JPR003`, Noul), masquerading
-(`JPR004`, Noul), and network misuse (`JPR005`, Noul). Rules lacking their declared
-prerequisites are not sent. Score questions are supported for custom rubrics.
+The default classifier asks **one Noul question per process**: does this specific
+process instance have concrete evidence of malicious or abusive behavior in the
+observed snapshot? The local policy maps high probability to `warning`, the review
+band to `uncertain_warning`, and sufficiently low probability with complete basic
+evidence to `probably_legitimate`. This is triage, not a malware verdict. Custom
+Choice, Score and additional Noul rules remain supported through YAML.
 
-The transport follows the [TypeSafe API](https://docs.typesafe.ai/api):
-`POST /v1/systemone` with `model`, shared structured `state`, and independent
-`questions`. Each question binds its target in the actual instructions, not only
-in its dictionary key. The default model is pinned to `jev-1.13.0`; aliases are
-allowed but explicit versioning is preferred. See the provider's
-[model documentation](https://docs.typesafe.ai/models).
+The transport follows the [TypeSafe API](https://docs.typesafe.ai/api): one
+`POST /v1/systemone` per snapshot with a small shared `state` (host context,
+policy, rubric and compact field legends) and one independent question per
+process. Each question carries its own compact process evidence and explicit
+target binding because question IDs are not used in inference. The full local
+report still retains the richer process schema.
+
+Jev 1.13 documents a 64k-token total request budget and a separate 32k-token
+budget for `state` plus the single longest question. It ingests state once and
+evaluates questions in parallel; TypeSafe recommends putting the questions a
+system needs into one request. `jevproc` therefore does **not** implement process
+batches, a worker pool, recursive splitting, or byte-based pseudo-token guards.
+A provider context rejection makes the snapshot explicitly incomplete instead of
+silently changing the context in which subsets of processes are judged. Use
+`--pid` or reduce optional evidence if an unusually large snapshot exceeds the
+provider limit.
 
 Noul is one scalar, not a score plus invented confidence. Choice and Score retain
-the provider's confidence and probability fields. Values must be finite, in range,
-and have exactly the required labels, but they are **not normalized or rejected
-merely because their sum differs from one**, matching jevscan's existing contract.
-Model confidence is not severity or an empirically calibrated malware probability.
+the provider's confidence and probability fields for custom rules. Values must be
+finite, in range, and have exactly the required labels, but they are **not
+normalized or rejected merely because their sum differs from one**, matching
+jevscan's existing response contract. Model confidence is not severity or an
+empirically calibrated malware probability.
 
-Defaults: four API workers, four processes per batch, 120 request starts/minute,
-two retries, and a 1,000-attempt invocation budget. Retries and watch cycles share
-that budget. Context limits are byte-based guards, not exact token accounting;
-recognized provider size rejections split batches, and oversized single processes
-are explicitly not evaluated. HTTP failures never become benign judgments.
+The default model is pinned to `jev-1.13.0`; aliases are allowed but explicit
+versioning is preferred. Retries and watch cycles share the hard request-attempt
+budget. HTTP failures never become benign judgments.
 
 ## Configuration and development
 
