@@ -37,6 +37,12 @@ jobs:
         run: uv sync --python '${{ matrix.python }}'
       - name: Contract and collector tests (no API keys)
         run: uv run --no-sync pytest -q
+      - name: Type-check source contracts
+        run: uv run --no-sync ty check src
+      - name: Offline behavior fingerprints (synthetic HTTP only)
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync python tools/behavior_fingerprint.py
       - name: Compile source
         run: uv run --no-sync python -m compileall -q src
       - name: Build wheel and source distribution
