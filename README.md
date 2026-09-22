@@ -118,8 +118,13 @@ jevproc falls back to `/usr/sbin/lsof` and marks that socket view `partial`
 rather than pretending it is complete. Other OS permission gaps remain explicit.
 
 macOS signature inspection uses fixed-path `codesign` verification plus display
-metadata (identifier, team ID and bounded authority chain). Valid signatures are
-not a trusted-signer allowlist, notarization result, or safety verdict. Hashes are
+metadata (identifier, team ID and bounded authority chain). The collector
+distinguishes valid, unsigned, legacy-resource-signature and failed-verification
+states; common failure reasons are normalized instead of treating every nonzero
+`codesign` result as equivalent. Obsolete version-1/custom-omit resource envelopes
+are reported as legacy signing evidence rather than code modification. Valid
+signatures are not a trusted-signer allowlist, notarization result, or safety
+verdict. Hashes are
 computed only for bounded regular executable files and expensive file inspection
 is deduplicated per stable on-disk file identity within a snapshot. Hashes describe
 the disk file, not the in-memory executable image. No inspected binary is executed.
