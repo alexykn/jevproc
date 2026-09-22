@@ -15,9 +15,9 @@ collection:
   max_processes: 2048
   ancestry_depth: 4
   connections: true
-  command_line: false
-  hashes: false
-  signatures: false
+  command_line: true
+  hashes: true
+  signatures: true
   max_hash_bytes: 67108864
 cache:
   enabled: true
