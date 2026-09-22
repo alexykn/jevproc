@@ -159,6 +159,8 @@ def _process_state(process: Process) -> dict[str, Any]:
     }
     if process.command_line:
         state["c"] = process.command_line
+    if process.ancestors:
+        state["r"] = [[parent.pid, parent.name, parent.executable] for parent in process.ancestors]
     if process.connections:
         state["s"] = [
             [c.protocol, c.local_address, c.local_port, c.remote_address, c.remote_port, c.status]
@@ -198,12 +200,14 @@ def make_request(snapshot: Snapshot, processes: list[Process], config: Config) -
         ),
         "process_keys": {
             "t": "created_at", "p": "parent_pid", "u": "uid", "n": "name", "x": "executable",
-            "a": "age_band", "c": "command_line", "s": "sockets", "f": "file", "o": "observations",
+            "a": "age_band", "c": "command_line", "r": "ancestors", "s": "sockets",
+            "f": "file", "o": "observations",
         },
         "file_keys": {
             "e": "exists", "z": "size", "m": "mode", "u": "owner_uid", "t": "modified_ns",
             "h": "sha256", "d": "deleted", "s": "signature",
         },
+        "ancestor_fields": ["pid", "name", "executable"],
         "socket_fields": ["protocol", "local_address", "local_port", "remote_address", "remote_port", "status"],
         "rules": {
             rule_id: {
