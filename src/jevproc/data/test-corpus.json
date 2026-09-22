@@ -47,9 +47,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271100002711000027110000271100002711000027110000271100002711",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.configd",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -62,7 +68,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -119,9 +125,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271200002712000027120000271200002712000027120000271200002712",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.mdnsresponder",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -134,7 +146,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -191,9 +203,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271300002713000027130000271300002713000027130000271300002713",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -206,7 +221,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -263,9 +278,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271400002714000027140000271400002714000027140000271400002714",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -278,7 +296,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -329,9 +347,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271500002715000027150000271500002715000027150000271500002715",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.clang",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -344,7 +368,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -394,9 +418,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271600002716000027160000271600002716000027160000271600002716",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -409,7 +436,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -467,9 +494,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271700002717000027170000271700002717000027170000271700002717",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -482,7 +512,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -532,9 +562,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271800002718000027180000271800002718000027180000271800002718",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -547,7 +580,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -595,9 +628,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271900002719000027190000271900002719000027190000271900002719",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.zsh",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -610,7 +649,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -658,9 +697,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271a0000271a0000271a0000271a0000271a0000271a0000271a0000271a",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.ssh.agent",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -673,7 +718,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -721,9 +766,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271b0000271b0000271b0000271b0000271b0000271b0000271b0000271b",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -736,7 +784,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -785,9 +833,12 @@
           "mode": 448,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271c0000271c0000271c0000271c0000271c0000271c0000271c0000271c",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -800,7 +851,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -857,9 +908,14 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271d0000271d0000271d0000271d0000271d0000271d0000271d0000271d",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.example.nextcloud",
+          "signature_team_id": "EXAMPLE1234",
+          "signature_authorities": [
+            "Developer ID Application: Example Vendor (EXAMPLE1234)"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -872,7 +928,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -928,9 +984,14 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271e0000271e0000271e0000271e0000271e0000271e0000271e0000271e",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.example.google.chrome.helper.renderer",
+          "signature_team_id": "EXAMPLE1234",
+          "signature_authorities": [
+            "Developer ID Application: Example Vendor (EXAMPLE1234)"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -943,7 +1004,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1000,9 +1061,14 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000271f0000271f0000271f0000271f0000271f0000271f0000271f0000271f",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.example.vpnagent",
+          "signature_team_id": "EXAMPLE1234",
+          "signature_authorities": [
+            "Developer ID Application: Example Vendor (EXAMPLE1234)"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -1015,7 +1081,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1063,9 +1129,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272000002720000027200000272000002720000027200000272000002720",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.backupd",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -1078,7 +1150,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1130,9 +1202,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272100002721000027210000272100002721000027210000272100002721",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.installer",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -1145,7 +1223,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1192,9 +1270,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272200002722000027220000272200002722000027220000272200002722",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.com.apple.codesigninghelper",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -1207,7 +1291,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1264,9 +1348,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272300002723000027230000272300002723000027230000272300002723",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1279,7 +1366,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1335,9 +1422,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272400002724000027240000272400002724000027240000272400002724",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1350,7 +1440,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1399,9 +1489,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272500002725000027250000272500002725000027250000272500002725",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1414,7 +1507,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -1465,7 +1558,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": true,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1478,8 +1574,8 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [
           "Executable disappeared during an application update; process is expected to exit shortly."
@@ -1529,9 +1625,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272700002727000027270000272700002727000027270000272700002727",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1544,7 +1643,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1593,9 +1692,12 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272800002728000027280000272800002728000027280000272800002728",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1608,7 +1710,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1667,9 +1769,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272900002729000027290000272900002729000027290000272900002729",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.rsync",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -1682,7 +1790,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1740,9 +1848,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272a0000272a0000272a0000272a0000272a0000272a0000272a0000272a",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.curl",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -1755,7 +1869,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1804,9 +1918,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272b0000272b0000272b0000272b0000272b0000272b0000272b0000272b",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1819,7 +1936,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1867,9 +1984,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272c0000272c0000272c0000272c0000272c0000272c0000272c0000272c",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.mtlcompilerservice",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -1882,7 +2005,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -1944,9 +2067,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272d0000272d0000272d0000272d0000272d0000272d0000272d0000272d",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -1959,7 +2085,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -2019,9 +2145,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272e0000272e0000272e0000272e0000272e0000272e0000272e0000272e",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2034,7 +2163,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -2092,9 +2221,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000272f0000272f0000272f0000272f0000272f0000272f0000272f0000272f",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2107,7 +2239,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2176,9 +2308,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273000002730000027300000273000002730000027300000273000002730",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2191,7 +2326,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2254,7 +2389,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": true,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2267,8 +2405,8 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [
           "Executable image is deleted while the root process remains running.",
@@ -2328,9 +2466,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273200002732000027320000273200002732000027320000273200002732",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2343,7 +2484,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2410,9 +2551,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273300002733000027330000273300002733000027330000273300002733",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2425,7 +2569,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2482,9 +2626,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273400002734000027340000273400002734000027340000273400002734",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2497,7 +2644,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2557,9 +2704,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273500002735000027350000273500002735000027350000273500002735",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2572,7 +2722,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2624,9 +2774,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273600002736000027360000273600002736000027360000273600002736",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2639,7 +2792,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2698,9 +2851,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273700002737000027370000273700002737000027370000273700002737",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2713,7 +2869,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2773,9 +2929,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273800002738000027380000273800002738000027380000273800002738",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2788,7 +2947,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2847,9 +3006,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273900002739000027390000273900002739000027390000273900002739",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2862,7 +3024,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2912,9 +3074,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273a0000273a0000273a0000273a0000273a0000273a0000273a0000273a",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -2927,7 +3092,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -2988,9 +3153,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273b0000273b0000273b0000273b0000273b0000273b0000273b0000273b",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3003,7 +3171,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3054,9 +3222,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273c0000273c0000273c0000273c0000273c0000273c0000273c0000273c",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.sh",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -3069,7 +3243,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3119,9 +3293,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273d0000273d0000273d0000273d0000273d0000273d0000273d0000273d",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3134,7 +3311,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3195,7 +3372,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": true,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3208,8 +3388,8 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [
           "Executable is deleted while process remains active and connected outbound."
@@ -3258,9 +3438,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000273f0000273f0000273f0000273f0000273f0000273f0000273f0000273f",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3273,7 +3456,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3332,9 +3515,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274000002740000027400000274000002740000027400000274000002740",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3347,7 +3533,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3397,9 +3583,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274100002741000027410000274100002741000027410000274100002741",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3412,7 +3601,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3471,9 +3660,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274200002742000027420000274200002742000027420000274200002742",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3486,7 +3678,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3536,9 +3728,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274300002743000027430000274300002743000027430000274300002743",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3551,7 +3746,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3610,9 +3805,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274400002744000027440000274400002744000027440000274400002744",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3625,7 +3823,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3684,9 +3882,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274500002745000027450000274500002745000027450000274500002745",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3699,7 +3900,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3749,9 +3950,12 @@
           "mode": 511,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274600002746000027460000274600002746000027460000274600002746",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3764,7 +3968,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3823,9 +4027,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274700002747000027470000274700002747000027470000274700002747",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3838,7 +4045,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3889,9 +4096,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274800002748000027480000274800002748000027480000274800002748",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -3904,7 +4114,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -3957,9 +4167,15 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274900002749000027490000274900002749000027490000274900002749",
           "deleted": false,
-          "signature": "valid"
+          "signature": "valid",
+          "signature_identifier": "com.apple.sh",
+          "signature_team_id": "APPLE12345",
+          "signature_authorities": [
+            "Apple Software Signing",
+            "Apple Code Signing Certification Authority"
+          ]
         },
         "coverage": {
           "identity": "observed",
@@ -3972,7 +4188,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -4030,9 +4246,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274a0000274a0000274a0000274a0000274a0000274a0000274a0000274a",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4045,7 +4264,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -4106,7 +4325,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": true,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4119,8 +4341,8 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [
           "Executable may have been replaced during an update."
@@ -4171,9 +4393,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274c0000274c0000274c0000274c0000274c0000274c0000274c0000274c",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4186,7 +4411,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -4237,9 +4462,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274d0000274d0000274d0000274d0000274d0000274d0000274d0000274d",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4252,7 +4480,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -4313,9 +4541,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274e0000274e0000274e0000274e0000274e0000274e0000274e0000274e",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4328,7 +4559,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -4377,9 +4608,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000274f0000274f0000274f0000274f0000274f0000274f0000274f0000274f",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4392,7 +4626,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [
@@ -4453,9 +4687,12 @@
           "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000275000002750000027500000275000002750000027500000275000002750",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4468,7 +4705,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -4528,9 +4765,12 @@
           "mode": 493,
           "owner_uid": 501,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
+          "sha256": "0000275100002751000027510000275100002751000027510000275100002751",
           "deleted": false,
-          "signature": "verification_failed"
+          "signature": "verification_failed",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4543,7 +4783,7 @@
           "connections": "observed",
           "file": "observed",
           "ancestry": "observed",
-          "hash": "not_requested",
+          "hash": "observed",
           "signature": "observed"
         },
         "observations": [],
@@ -4581,7 +4821,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": null,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4590,12 +4833,12 @@
           "parent": "observed",
           "uid": "observed",
           "status": "observed",
-          "command_line": "not_requested",
+          "command_line": "unavailable",
           "connections": "observed",
           "file": "denied",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [],
         "freshness": "observed"
@@ -4632,7 +4875,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": null,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4641,12 +4887,12 @@
           "parent": "observed",
           "uid": "observed",
           "status": "observed",
-          "command_line": "not_requested",
+          "command_line": "unavailable",
           "connections": "observed",
           "file": "unavailable",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [],
         "freshness": "observed"
@@ -4683,7 +4929,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": null,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4692,12 +4941,12 @@
           "parent": "observed",
           "uid": "observed",
           "status": "observed",
-          "command_line": "not_requested",
+          "command_line": "unavailable",
           "connections": "observed",
           "file": "denied",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [],
         "freshness": "observed"
@@ -4734,7 +4983,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": null,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "partial",
@@ -4743,12 +4995,12 @@
           "parent": "observed",
           "uid": "observed",
           "status": "observed",
-          "command_line": "not_requested",
+          "command_line": "unavailable",
           "connections": "observed",
           "file": "unavailable",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [],
         "freshness": "observed"
@@ -4785,7 +5037,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": null,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4794,12 +5049,12 @@
           "parent": "observed",
           "uid": "observed",
           "status": "observed",
-          "command_line": "not_requested",
+          "command_line": "unavailable",
           "connections": "observed",
           "file": "unavailable",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [],
         "freshness": "observed"
@@ -4836,7 +5091,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": null,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4845,12 +5103,12 @@
           "parent": "observed",
           "uid": "observed",
           "status": "observed",
-          "command_line": "not_requested",
+          "command_line": "unavailable",
           "connections": "observed",
           "file": "unavailable",
           "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [],
         "freshness": "observed"
@@ -4888,7 +5146,10 @@
           "modified_ns": null,
           "sha256": null,
           "deleted": null,
-          "signature": "not_requested"
+          "signature": "not_requested",
+          "signature_identifier": null,
+          "signature_team_id": null,
+          "signature_authorities": []
         },
         "coverage": {
           "identity": "observed",
@@ -4897,12 +5158,12 @@
           "parent": "observed",
           "uid": "observed",
           "status": "observed",
-          "command_line": "not_requested",
+          "command_line": "unavailable",
           "connections": "observed",
           "file": "denied",
           "ancestry": "partial",
-          "hash": "not_requested",
-          "signature": "not_requested"
+          "hash": "unavailable",
+          "signature": "unavailable"
         },
         "observations": [],
         "freshness": "observed"
