@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "captured_at": 1790070050.0,
+  "host": {
+    "platform": "fixture",
+    "architecture": "synthetic",
+    "privileged": false
+  },
+  "processes": [
+    {
+      "pid": 3101,
+      "created_at": 1790000000.0,
+      "ppid": 1,
+      "uid": 1000,
+      "name": "backup-worker",
+      "executable": "/usr/local/bin/backup-worker",
+      "status": "sleeping",
+      "age_band": "older",
+      "command_line": [
+        "backup-worker",
+        "--scheduled"
+      ],
+      "connections": [],
+      "ancestors": [],
+      "file": {
+        "exists": true,
+        "size": null,
+        "mode": 493,
+        "owner_uid": null,
+        "modified_ns": null,
+        "sha256": null,
+        "deleted": null,
+        "signature": "not_requested"
+      },
+      "coverage": {
+        "identity": "observed",
+        "name": "observed",
+        "executable": "observed",
+        "parent": "observed",
+        "uid": "observed",
+        "status": "observed",
+        "command_line": "observed",
+        "connections": "observed",
+        "file": "observed",
+        "ancestry": "observed",
+        "hash": "not_requested",
+        "signature": "not_requested"
+      },
+      "observations": [],
+      "freshness": "observed"
+    },
+    {
+      "pid": 4819,
+      "created_at": 1790070020.0,
+      "ppid": 4801,
+      "uid": 1000,
+      "name": "system-update",
+      "executable": "/tmp/.session/update",
+      "status": "sleeping",
+      "age_band": "under_minute",
+      "command_line": [
+        "/tmp/.session/update",
+        "--service"
+      ],
+      "connections": [
+        {
+          "protocol": "tcp",
+          "local_address": "127.0.0.1",
+          "local_port": 51322,
+          "remote_address": "192.0.2.40",
+          "remote_port": 443,
+          "status": "ESTABLISHED"
+        }
+      ],
+      "ancestors": [
+        {
+          "pid": 4801,
+          "created_at": 1790070000.0,
+          "name": "document-viewer",
+          "executable": "/opt/document-viewer"
+        }
+      ],
+      "file": {
+        "exists": true,
+        "size": null,
+        "mode": 511,
+        "owner_uid": null,
+        "modified_ns": null,
+        "sha256": null,
+        "deleted": null,
+        "signature": "not_requested"
+      },
+      "coverage": {
+        "identity": "observed",
+        "name": "observed",
+        "executable": "observed",
+        "parent": "observed",
+        "uid": "observed",
+        "status": "observed",
+        "command_line": "observed",
+        "connections": "observed",
+        "file": "observed",
+        "ancestry": "observed",
+        "hash": "not_requested",
+        "signature": "not_requested"
+      },
+      "observations": [
+        "Synthetic fixture: executable path is temporary and on-disk mode is world-writable."
+      ],
+      "freshness": "observed"
+    },
+    {
+      "pid": 6120,
+      "created_at": 1790070000.0,
+      "ppid": 6100,
+      "uid": 1000,
+      "name": "build-helper",
+      "executable": "/tmp/build/helper",
+      "status": "sleeping",
+      "age_band": "under_minute",
+      "command_line": [
+        "/tmp/build/helper",
+        "--worker"
+      ],
+      "connections": [],
+      "ancestors": [],
+      "file": {
+        "exists": true,
+        "size": null,
+        "mode": 493,
+        "owner_uid": null,
+        "modified_ns": null,
+        "sha256": null,
+        "deleted": null,
+        "signature": "not_requested"
+      },
+      "coverage": {
+        "identity": "observed",
+        "name": "observed",
+        "executable": "observed",
+        "parent": "observed",
+        "uid": "observed",
+        "status": "observed",
+        "command_line": "observed",
+        "connections": "observed",
+        "file": "observed",
+        "ancestry": "observed",
+        "hash": "not_requested",
+        "signature": "not_requested"
+      },
+      "observations": [
+        "Synthetic fixture: this temporary executable may be a legitimate build artifact."
+      ],
+      "freshness": "observed"
+    },
+    {
+      "pid": 7700,
+      "created_at": 1790000200.0,
+      "ppid": 1,
+      "uid": 0,
+      "name": "restricted-worker",
+      "executable": null,
+      "status": "sleeping",
+      "age_band": "unknown",
+      "command_line": null,
+      "connections": [],
+      "ancestors": [],
+      "file": {
+        "exists": null,
+        "size": null,
+        "mode": null,
+        "owner_uid": null,
+        "modified_ns": null,
+        "sha256": null,
+        "deleted": null,
+        "signature": "not_requested"
+      },
+      "coverage": {
+        "identity": "observed",
+        "name": "observed",
+        "executable": "denied",
+        "parent": "observed",
+        "uid": "observed",
+        "status": "observed",
+        "command_line": "denied",
+        "connections": "observed",
+        "file": "denied",
+        "ancestry": "observed",
+        "hash": "not_requested",
+        "signature": "not_requested"
+      },
+      "observations": [],
+      "freshness": "observed"
+    }
+  ],
+  "omitted": 0,
+  "synthetic": true
+}

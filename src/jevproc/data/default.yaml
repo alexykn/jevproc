@@ -1,0 +1,99 @@
+schema_version: 1
+host_context: >-
+  General-purpose Unix workstation or server. Its exact purpose is unknown.
+  Developer tools, package managers, interpreters, containers and administrative
+  shells may be legitimate. Unusual does not mean malicious.
+jev:
+  model: jev-1.13.0
+  concurrency: 4
+  requests_per_minute: 120
+  timeout_seconds: 30
+  retries: 2
+  max_retry_delay: 30
+  max_requests: 1000
+  batch_size: 4
+  max_request_bytes: 48000
+  max_state_question_bytes: 24000
+collection:
+  max_processes: 2048
+  ancestry_depth: 4
+  connections: true
+  command_line: false
+  hashes: false
+  signatures: false
+  max_hash_bytes: 67108864
+cache:
+  enabled: true
+  ttl_seconds: 60
+  max_entries: 4096
+ignore: []
+rulesets:
+  process:
+    - id: JPR001
+      title: Overall process assessment
+      message: Review the executable and invocation before taking action. This is model-assisted triage, not a malware verdict.
+      question:
+        type: choice
+        instructions: >-
+          Classify only the explicitly bound process instance using the supplied
+          snapshot. Select unknown when evidence is insufficient. Names, paths,
+          root ownership, signature validity, and use of temporary directories
+          alone cannot establish legitimacy or maliciousness. A legitimate binary
+          can be used maliciously. Do not invent event history, reputation,
+          persistence, user consent, script contents, or network intent.
+        criteria:
+          probably_legitimate: The observed invocation has a coherent legitimate explanation and no concrete evidence of misuse; this is not a safety guarantee.
+          suspicious: There is concrete evidence of possible misuse, but a legitimate explanation remains plausible and investigation is warranted.
+          probably_malicious: Multiple concrete contextual observations strongly support malicious use, not merely an unfamiliar binary or missing information.
+          unknown: Missing, ambiguous, conflicting, or insufficient evidence prevents a supported conclusion.
+      policy:
+        warning_choices: [suspicious, probably_malicious]
+        legitimate_choices: [probably_legitimate]
+        warning_at: 0.85
+        uncertain_at: 0.60
+        confidence_min: 0.70
+    - id: JPR002
+      title: Execution misuse
+      message: The observed invocation may be abusing an interpreter or administrative tool. Check the sanitized arguments and parent context.
+      requires: [command_line]
+      question:
+        type: noul
+        instructions: >-
+          Does this specific invocation contain concrete evidence of malicious
+          command execution or misuse? Ordinary shell scripts, installers, remote
+          administration and development commands are not sufficient by themselves.
+          Treat missing or redacted arguments as unknown, not suspicious content.
+    - id: JPR003
+      title: Executable provenance
+      message: Review the executable location and observed file metadata. An unsigned, deleted or temporary executable can be legitimate.
+      requires: [executable, file]
+      question:
+        type: noul
+        instructions: >-
+          Do the observed executable metadata and execution context together provide
+          concrete evidence of malicious provenance? A temporary path, missing
+          signature, writable file, recently modified executable or deleted image
+          alone is insufficient. Do not assume a hash is known-good or known-bad.
+    - id: JPR004
+      title: Process masquerading
+      message: The process identity may conflict with its executable and context. Verify the actual binary; process names are untrusted.
+      requires: [executable]
+      question:
+        type: noul
+        instructions: >-
+          Does the observed name, executable and available parent context provide
+          concrete evidence of deceptive impersonation? Normal argv names,
+          symlinks, wrapper scripts, renamed applications and interpreter processes
+          are not malicious by themselves. Do not invent signature identities.
+    - id: JPR005
+      title: Network misuse
+      message: Review the observed endpoints together with the process context. A socket snapshot does not show who initiated a connection or its contents.
+      requires: [connections]
+      question:
+        type: noul
+        instructions: >-
+          Do the observed sockets and execution context together provide concrete
+          evidence of malicious network activity? An unfamiliar IP, port number,
+          established connection, listener or public address alone is insufficient.
+          No traffic content, DNS history, reputation, connection direction or
+          data transfer history is supplied. Do not invent any of these facts.

@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jevproc"
+version = "0.1.0rc1"
+description = "Read-only, evidence-aware process triage with Jev"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{name = "jevproc contributors"}]
+dependencies = [
+  "httpx>=0.28,<1",
+  "psutil>=6.0,<8",
+  "pydantic>=2.10,<3",
+  "PyYAML>=6.0,<7",
+  "wcwidth>=0.2.13,<1",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+]
+
+[project.scripts]
+jevproc = "jevproc.cli.main:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1", "ty>=0.0.1,<1", "build>=1.2,<2", "radon>=6,<7"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+jevproc = ["data/*.yaml", "data/*.json", "py.typed"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["E501"]
+
+[tool.ty.environment]
+python-version = "3.12"
