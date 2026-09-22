@@ -932,7 +932,9 @@ def _collect_processes_parallel(
     for completed, future in enumerate(as_completed(futures), start=1):
         pid = futures[future]
         by_pid[pid] = future.result()
-        if on_progress is not None:
+        if on_progress is not None and completed < len(selected):
+            # The last unit is reserved until file/network/ancestry/child evidence
+            # is attached, so the TTY never claims collection is complete early.
             on_progress(completed, len(selected))
     return [by_pid[pid] for pid in selected]
 
@@ -1006,32 +1008,73 @@ def collect(
     selected = candidates[:settings.max_processes]
     resource_probes = _prime_resource_probes(selected, settings)
 
-    file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] = {}
-    processes: list[Process] = []
-    if on_progress is not None:
-        on_progress(0, len(selected))
-    for completed, pid in enumerate(selected, start=1):
-        processes.append(
-            _process(
-                pid,
-                settings,
-                now,
-                file_cache,
-                resource_probe=resource_probes.get(pid),
-            )
+    # Collection is blocking OS/file work, so a bounded thread pool is a better fit
+    # than event-loop tasks. Phase ordering still preserves the identity/socket
+    # safety contract: identities first, socket snapshot second, revalidation last.
+    worker_count = min(settings.workers, max(1, len(selected)))
+    with ThreadPoolExecutor(
+        max_workers=worker_count,
+        thread_name_prefix="jevproc-collect",
+    ) as executor:
+        processes = _collect_processes_parallel(
+            selected,
+            settings,
+            now,
+            resource_probes,
+            executor,
+            on_progress,
         )
-        if on_progress is not None:
-            on_progress(completed, len(selected))
-    # Capture sockets AFTER process identities and revalidate those identities afterwards.
-    # Otherwise a reused PID could inherit the previous process's network evidence.
-    network, coverage = _network(settings)
-    processes = attach_network(processes, network, coverage)
-    processes = attach_ancestry(
-        processes,
-        settings.ancestry_depth,
-        resolve_missing=True,
-    )
-    processes = attach_children(processes, settings.child_limit)
+
+        # These operations are independent once the process identities are captured.
+        network_future = executor.submit(_network, settings)
+        child_future = (
+            executor.submit(_child_index)
+            if settings.child_limit > 0
+            else None
+        )
+        file_futures = _file_evidence_futures(processes, settings, executor)
+
+        file_evidence = {
+            path: future.result()
+            for path, future in file_futures.items()
+        }
+        processes = _apply_file_evidence(processes, file_evidence)
+
+        # Capture sockets after the initial identity snapshot, then revalidate every
+        # process in parallel so PID reuse/exec changes cannot inherit socket evidence.
+        network, network_coverage = network_future.result()
+        processes = _attach_network_parallel(
+            processes,
+            network,
+            network_coverage,
+            executor,
+        )
+
+        processes = attach_ancestry(
+            processes,
+            settings.ancestry_depth,
+            resolve_missing=True,
+        )
+
+        if child_future is None:
+            processes = _attach_children_from_index(
+                processes,
+                settings.child_limit,
+                {},
+                "not_requested",
+            )
+        else:
+            by_parent, child_coverage = child_future.result()
+            processes = _attach_children_from_index(
+                processes,
+                settings.child_limit,
+                by_parent,
+                child_coverage,
+            )
+
+    if on_progress is not None:
+        on_progress(len(selected), len(selected))
+
     snapshot = Snapshot(
         captured_at=now,
         host=Host(
@@ -1043,7 +1086,6 @@ def collect(
         omitted=omitted,
     )
     return sanitize_snapshot(snapshot, settings.command_line)
-
 
 def load_snapshot(path: Path, include_command_line: bool = False) -> Snapshot:
     with path.open("rb") as handle:
