@@ -1459,10 +1459,10 @@
         ],
         "file": {
           "exists": false,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
           "deleted": true,
           "signature": "not_requested"
@@ -2245,13 +2245,13 @@
         ],
         "file": {
           "exists": false,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 0,
-          "modified_ns": 1790000000000000000,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
           "deleted": true,
-          "signature": "verification_failed"
+          "signature": "not_requested"
         },
         "coverage": {
           "identity": "observed",
@@ -2265,7 +2265,7 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "not_requested",
-          "signature": "observed"
+          "signature": "not_requested"
         },
         "observations": [
           "Executable image is deleted while the root process remains running.",
@@ -3173,10 +3173,10 @@
         ],
         "file": {
           "exists": false,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
           "deleted": true,
           "signature": "not_requested"
@@ -4067,10 +4067,10 @@
         ],
         "file": {
           "exists": false,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
           "deleted": true,
           "signature": "not_requested"
@@ -4522,22 +4522,20 @@
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": "/usr/bin/true",
+        "executable": null,
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/true"
-        ],
+        "command_line": null,
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": true,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
-          "deleted": false,
+          "deleted": null,
           "signature": "not_requested"
         },
         "coverage": {
@@ -4575,22 +4573,20 @@
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": "/usr/bin/true",
+        "executable": null,
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/true"
-        ],
+        "command_line": null,
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": true,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
-          "deleted": false,
+          "deleted": null,
           "signature": "not_requested"
         },
         "coverage": {
@@ -4628,22 +4624,20 @@
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": "/usr/bin/true",
+        "executable": null,
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/true"
-        ],
+        "command_line": null,
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": true,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
-          "deleted": false,
+          "deleted": null,
           "signature": "not_requested"
         },
         "coverage": {
@@ -4681,22 +4675,20 @@
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": "/usr/bin/true",
+        "executable": null,
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/true"
-        ],
+        "command_line": null,
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": true,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
-          "deleted": false,
+          "deleted": null,
           "signature": "not_requested"
         },
         "coverage": {
@@ -4734,22 +4726,20 @@
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": "/usr/bin/true",
+        "executable": null,
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/true"
-        ],
+        "command_line": null,
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": true,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
-          "deleted": false,
+          "deleted": null,
           "signature": "not_requested"
         },
         "coverage": {
@@ -4787,22 +4777,20 @@
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": "/usr/bin/true",
+        "executable": null,
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/true"
-        ],
+        "command_line": null,
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": true,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
-          "deleted": false,
+          "deleted": null,
           "signature": "not_requested"
         },
         "coverage": {
@@ -4841,22 +4829,20 @@
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": "/usr/bin/true",
+        "executable": null,
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/true"
-        ],
+        "command_line": null,
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": true,
-          "size": 131072,
-          "mode": 493,
-          "owner_uid": 501,
-          "modified_ns": 1790000000000000000,
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
           "sha256": null,
-          "deleted": false,
+          "deleted": null,
           "signature": "not_requested"
         },
         "coverage": {
