@@ -48,7 +48,14 @@ def test_match_policy_is_explicit():
     ambiguous = next(case for case in corpus.cases if case.id == "ambig-shell-from-ide")
     assert matches(ambiguous, "warning")
     assert matches(ambiguous, "uncertain_warning")
-    assert not matches(ambiguous, "probably_legitimate")
+    assert matches(ambiguous, "probably_legitimate")
+    assert matches(ambiguous, "no_warning")
+    assert not matches(ambiguous, "unknown")
+
+    suspicious = next(case for case in corpus.cases if case.label == "suspicious")
+    assert matches(suspicious, "warning")
+    assert matches(suspicious, "uncertain_warning")
+    assert not matches(suspicious, "probably_legitimate")
 
 
 def test_list_does_not_require_api_key(capsys, monkeypatch):
@@ -126,7 +133,7 @@ def test_calibration_mode_measures_raw_scores_not_current_statuses(capsys, monke
             "unknown": 0.04,
         }[label],
     )
-    # Current 0.60/0.85 policy will mismatch suspicious cases, but calibration is observational.
+    # Calibration is observational even when the active policy classifies samples differently.
     assert corpus_cli.main(["--calibrate", "--runs", "2", "--format", "json"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["summary"]["samples"] == 144
@@ -141,6 +148,10 @@ def test_calibration_mode_measures_raw_scores_not_current_statuses(capsys, monke
     assert balanced["exact_accuracy"] == 1
     assert balanced["benign_false_positive_rate"] == 0
     assert balanced["suspicious_warning_recall"] == 1
+    assert balanced["suspicious_surface_recall"] == 1
+    warnings_first = calibration["candidates"]["warnings_first"]
+    assert warnings_first["benign_hard_warning_rate"] == 0
+    assert warnings_first["suspicious_surface_recall"] == 1
 
 
 def test_calibration_requires_relevant_labels(capsys, monkeypatch):
@@ -181,3 +192,5 @@ def test_calibration_statistics_and_pair_metrics():
     )
     assert metrics.exact_accuracy == 1
     assert metrics.benign_false_positive_rate == 0
+    assert metrics.benign_hard_warning_rate == 0
+    assert metrics.suspicious_surface_recall == 1
