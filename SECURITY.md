@@ -46,7 +46,7 @@ forge every observation on which this program depends.
 The collector does not terminate, suspend, attach to or alter processes. The only
 inspection subprocess is an explicitly requested, fixed-path macOS `codesign`
 verification with no shell and a timeout. Target executables are never run.
-Retries, context splitting, concurrency and request-attempt budgets are bounded.
+Retries, rate pacing and request-attempt budgets are bounded. Context failures are reported without splitting the snapshot.
 HTTP errors, bad answers and budget exhaustion do not produce benign results.
 
 Filesystem calls and process enumeration are still OS operations: a stalled mount
