@@ -585,7 +585,11 @@ def _live_parent(pid: int) -> tuple[Parent, int | None] | None:
         proc = psutil.Process(pid)
         created = proc.create_time()
         try:
-            name = proc.name()
+            if sys.platform == "linux":
+                with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as handle:
+                    name = handle.read(513).strip()[:512] or "<unavailable>"
+            else:
+                name = proc.name()
         except (psutil.AccessDenied, OSError):
             name = "<unavailable>"
         try:
