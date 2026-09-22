@@ -43,7 +43,21 @@ collection:
   command_line: true
   hashes: true
   signatures: true
+  resources: true
+  resource_sample_seconds: 0.10
+  child_limit: 16
 ```
+
+Resource evidence is a short shared sampling window, not a profiler: CPU percent,
+RSS, memory percent, thread count and file-descriptor count are collected when
+available. Direct children are summarized with bounded PID/name/path/status context;
+`child_limit` caps the submitted list while preserving the observed total count.
+High resource use or many children are explicitly not treated as malicious by
+themselves.
+
+`--pid PID` evaluates only that selected process while still resolving its parent
+chain and bounded direct children for context. `--family PID` evaluates the root
+PID plus all currently observed descendants, bounded by `max_processes`.
 
 Command arguments are bounded and redacted before submission. Hashing reads only
 bounded regular executable files and sends the SHA-256, never file contents.
