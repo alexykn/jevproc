@@ -24,7 +24,6 @@ rulesets:
     - id: JPR001
       policy:
         warning_at: 0.90
-        confidence_min: 0.80
 ```
 
 The `process` override patches the built-in JPR001 classifier by ID. An empty
