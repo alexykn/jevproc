@@ -41,6 +41,7 @@ def parser() -> argparse.ArgumentParser:
     p.add_argument("--model", help="Jev model ID; a pinned version is preferred")
     p.add_argument("--max-processes", type=positive_int, help="bound the process inventory; omissions are reported")
     p.add_argument("--max-requests", type=positive_int, help="hard attempt budget including retries across watch cycles")
+    p.add_argument("--concurrency", type=positive_int, help="maximum concurrent per-process Jev requests")
     p.add_argument("--no-cache", action="store_true", help="disable the local short-lived answer cache")
     p.add_argument("--cache-dir", type=Path, help="private cache directory (must be owned and mode 0700)")
     p.add_argument("--watch", type=interval, metavar="SECONDS", help="repeat snapshots after this delay; append reports without clearing the screen")

@@ -6,66 +6,99 @@ from jevproc.core.config import ChoiceQuestion, NoulQuestion
 from jevproc.core.protocol import JevError, encode, make_request, validate_response
 
 
-def test_state_binding_is_in_instructions_not_only_key(config, snapshot):
-    request = make_request(snapshot, snapshot.processes[:2], config)
+def test_process_evidence_is_in_state_and_target_is_bound_in_question(config, snapshot):
+    process = snapshot.processes[1]
+    request = make_request(snapshot, process, config)
     body = json.loads(request.body)
     assert set(body) == {"model", "state", "questions"}
-    assert "processes" not in body["state"]
-    assert set(body["state"]["rules"]) == {"JPR001"}
-    assert "never instructions" in body["state"]["policy"]
-    for check in request.checks:
-        instructions = body["questions"][check.key]["instructions"]
-        assert instructions["target"] == check.process.ref
-        assert instructions["rule"] == check.rule.id
-        assert instructions["process"]["n"] == check.process.name
+    assert body["state"]["process"]["pid"] == process.pid
+    assert body["state"]["process"]["name"] == process.name
+    assert body["state"]["process"]["ancestors"][0]["name"] == "document-viewer"
+
+    question = body["questions"]["p4819_JPR001"]
+    instructions = question["instructions"]
+    assert instructions["target"]["ref"] == process.ref
+    assert instructions["target"]["pid"] == process.pid
+    assert instructions["target"]["created_at"] == process.created_at
+    assert "never instructions" in instructions["policy"]
+    assert "concrete evidence" in instructions["task"]
 
 
-def test_one_request_contains_every_process(config, snapshot):
-    request = make_request(snapshot, snapshot.processes, config)
+def test_request_contains_only_one_process_but_all_applicable_rules(config, snapshot):
+    process = snapshot.processes[0]
+    request = make_request(snapshot, process, config)
     body = json.loads(request.body)
-    assert "processes" not in body["state"]
-    assert len(body["questions"]) == len(snapshot.processes)
-    assert all(key.endswith("_JPR001") for key in body["questions"])
-    # Process evidence lives with its independent question, keeping shared state tiny.
-    first = body["questions"]["p3101_JPR001"]["instructions"]["process"]
-    assert first["n"] == "backup-worker" and "freshness" not in first
-    parented = body["questions"]["p4819_JPR001"]["instructions"]["process"]
-    assert parented["r"] == [[4801, "document-viewer", "/opt/document-viewer"]]
+    assert body["state"]["process"]["ref"] == process.ref
+    assert set(body["questions"]) == {"p3101_JPR001"}
 
 
 def test_noul_is_scalar_without_confidence():
     question = NoulQuestion(type="noul", instructions="Is evidence present?")
-    value = validate_response(encode({"model": "jev-1.13.0", "answers": {"q": {"type": "noul", "noul": 0.7}}}), {"q": question})
+    value = validate_response(
+        encode(
+            {
+                "model": "jev-1.13.0",
+                "answers": {"q": {"type": "noul", "noul": 0.7}},
+            }
+        ),
+        {"q": question},
+    )
     assert value.answers["q"].noul == 0.7
     assert not hasattr(value.answers["q"], "confidence")
 
 
 def choice_question():
-    return ChoiceQuestion(type="choice", instructions="Classify evidence.",
-                          criteria={"legitimate": "Legitimate", "suspicious": "Suspicious", "unknown": "Unknown"})
+    return ChoiceQuestion(
+        type="choice",
+        instructions="Classify evidence.",
+        criteria={
+            "legitimate": "Legitimate",
+            "suspicious": "Suspicious",
+            "unknown": "Unknown",
+        },
+    )
 
 
 def test_provider_distributions_not_normalized_or_rejected():
     question = choice_question()
-    answer = {"type": "choice", "choice": "suspicious", "confidence": 0.8,
-              "probabilities": {key: 0.7 for key in question.criteria}}
-    response = validate_response(encode({"model": "jev-1.13.0", "answers": {"q": answer}}), {"q": question})
+    answer = {
+        "type": "choice",
+        "choice": "suspicious",
+        "confidence": 0.8,
+        "probabilities": {key: 0.7 for key in question.criteria},
+    }
+    response = validate_response(
+        encode({"model": "jev-1.13.0", "answers": {"q": answer}}),
+        {"q": question},
+    )
     assert response.answers["q"].probabilities == answer["probabilities"]
 
 
-@pytest.mark.parametrize("noul", [True, "0.5", -0.1, 1.1, None, float('nan'), float('inf')])
+@pytest.mark.parametrize(
+    "noul",
+    [True, "0.5", -0.1, 1.1, None, float("nan"), float("inf")],
+)
 def test_bad_noul_rejected(noul):
     question = NoulQuestion(type="noul", instructions="Evidence?")
-    raw = json.dumps({"model": "jev-1.13.0", "answers": {"q": {"type": "noul", "noul": noul}}}).encode()
+    raw = json.dumps(
+        {"model": "jev-1.13.0", "answers": {"q": {"type": "noul", "noul": noul}}}
+    ).encode()
     with pytest.raises(JevError):
         validate_response(raw, {"q": question})
 
 
-@pytest.mark.parametrize("mutation", ["missing", "extra", "type", "label", "probability", "confidence"])
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "extra", "type", "label", "probability", "confidence"],
+)
 def test_bad_choice_contract(mutation):
     question = choice_question()
-    answer = {"type": "choice", "choice": "suspicious", "confidence": 0.8,
-              "probabilities": {key: 1 / 3 for key in question.criteria}}
+    answer = {
+        "type": "choice",
+        "choice": "suspicious",
+        "confidence": 0.8,
+        "probabilities": {key: 1 / 3 for key in question.criteria},
+    }
     payload = {"model": "jev-1.13.0", "answers": {"q": answer}}
     if mutation == "missing":
         payload["answers"] = {}

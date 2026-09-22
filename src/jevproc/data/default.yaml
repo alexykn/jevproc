@@ -5,7 +5,8 @@ host_context: >-
   shells may be legitimate. Unusual does not mean malicious.
 jev:
   model: jev-1.13.0
-  requests_per_minute: 120
+  concurrency: 16
+  requests_per_minute: 600
   timeout_seconds: 30
   retries: 2
   max_retry_delay: 30

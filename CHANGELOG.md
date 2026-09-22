@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Evaluate each process in its own Jev request, with every applicable rule for that process in the same call.
+- Restore bounded concurrency/rate pacing without reintroducing multi-process batching.
+- Align the request state/question contract with jevscan and make cache/failures process-local.
+- Surface safe structured metadata for HTTP 400/422 provider rejections.
+
 - Evaluate the selected process snapshot in one Jev request instead of fixed four-process batches.
 - Compact the inference wire and move per-process evidence into independent questions, matching Jev 1.13 context semantics.
 - Replace the five built-in dimensions with one default process-risk Noul; custom rules remain supported.

@@ -32,7 +32,7 @@ def _settings(args: argparse.Namespace) -> Config:
         data["collection"]["connections"] = False
     if args.max_processes is not None:
         data["collection"]["max_processes"] = args.max_processes
-    for name in ("model", "max_requests"):
+    for name in ("model", "max_requests", "concurrency"):
         if (value := getattr(args, name)) is not None:
             data["jev"][name] = value
     data["ignore"] = list(set(data["ignore"] + args.ignore))

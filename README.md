@@ -54,6 +54,7 @@ jevproc --pid 1234 --pid 1235     # Selected processes; repeat --pid as needed
 jevproc --include-command-line  # Explicitly collect and submit redacted arguments
 jevproc --hashes --signatures   # Optional on-disk SHA-256 and macOS codesign checks
 jevproc --watch 30 --max-requests 200
+jevproc --concurrency 8
 jevproc --format json
 jevproc --format jsonl --watch 30
 ```
@@ -145,22 +146,18 @@ band to `uncertain_warning`, and sufficiently low probability with complete basi
 evidence to `probably_legitimate`. This is triage, not a malware verdict. Custom
 Choice, Score and additional Noul rules remain supported through YAML.
 
-The transport follows the [TypeSafe API](https://docs.typesafe.ai/api): one
-`POST /v1/systemone` per snapshot with a small shared `state` (host context,
-policy, rubric and compact field legends) and one independent question per
-process. Each question carries its own compact process evidence and explicit
-target binding because question IDs are not used in inference. The full local
-report still retains the richer process schema.
+The transport follows the [TypeSafe API](https://docs.typesafe.ai/api): each
+selected process gets one `POST /v1/systemone` request. That request puts the
+process evidence in `state.process` once and includes every applicable rule as an
+independent question. This mirrors jevscan's working state/question contract and
+keeps a provider rejection local to one process instead of invalidating the whole
+machine snapshot.
 
-Jev 1.13 documents a 64k-token total request budget and a separate 32k-token
-budget for `state` plus the single longest question. It ingests state once and
-evaluates questions in parallel; TypeSafe recommends putting the questions a
-system needs into one request. `jevproc` therefore does **not** implement process
-batches, a worker pool, recursive splitting, or byte-based pseudo-token guards.
-A provider context rejection makes the snapshot explicitly incomplete instead of
-silently changing the context in which subsets of processes are judged. Use
-`--pid` or reduce optional evidence if an unusually large snapshot exceeds the
-provider limit.
+Requests are concurrent but bounded (16 by default) and paced at 600 starts/minute,
+matching jevscan's operational defaults. There is no multi-process batching or
+recursive context splitting. `--concurrency` can lower or raise the number of
+simultaneous per-process calls; `jev.concurrency` and
+`jev.requests_per_minute` are the corresponding YAML controls.
 
 Noul is one scalar, not a score plus invented confidence. Choice and Score retain
 the provider's confidence and probability fields for custom rules. Values must be
