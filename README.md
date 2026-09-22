@@ -55,13 +55,26 @@ jevproc-test --case root-user-writable-masquerade
 jevproc-test --format json
 ```
 
-The corpus contains strong warning-positive cases, an ambiguous
-warning/uncertain-warning case, a benign build-tool control, and an
-evidence-limited unknown control. All cases are synthetic metadata; TEST-NET
-addresses and inert placeholders are used instead of live malicious infrastructure
-or executable payloads. Exit 0 means all declared expectations matched, 1 means a
-classification mismatch, and 2 means an operational failure. See
-[the corpus documentation](docs/CORPUS.md).
+The packaged corpus now contains **72 labeled synthetic cases**: 30 benign
+hard-negative controls, 25 suspicious cases, 10 ambiguous cases, and 7
+evidence-limited controls. All cases are metadata only; TEST-NET addresses and
+inert placeholders are used instead of live malicious infrastructure or executable
+payloads.
+
+For threshold work, use the calibration mode:
+
+```sh
+jevproc-test --calibrate             # 3 runs/case by default
+jevproc-test --calibrate --runs 5
+jevproc-test --calibrate --format json
+```
+
+Calibration analyzes raw JPR001 Noul values by corpus label, reports distributions,
+case-to-case separation and repeated-run stability, and calculates descriptive
+candidate threshold pairs (balanced, zero-benign-FP, and high-suspicious-recall).
+It never writes those thresholds back into configuration automatically. Regular
+regression mode still exits 0 for matching declared statuses, 1 for a mismatch,
+and 2 for operational failure. See [the corpus documentation](docs/CORPUS.md).
 
 ## Live triage
 
