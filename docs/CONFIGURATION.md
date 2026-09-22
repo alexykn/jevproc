@@ -13,7 +13,7 @@ host_context: >-
   not an automatic allowlist or evidence that an invocation was authorized.
 jev:
   concurrency: 8
-  requests_per_minute: 300
+  requests_per_minute: 0
   max_requests: 200
 collection:
   command_line: false
@@ -92,10 +92,11 @@ below that threshold remains ordinary unknown.
 ## Limits and cache
 
 Each selected process produces one Jev request containing all applicable questions
-for that process. Requests are scheduled concurrently but bounded by
-`jev.concurrency` and paced by `jev.requests_per_minute`. Defaults are 16 and
-600 respectively, matching jevscan's working transport defaults. Retries and watch
-cycles share the hard `max_requests` attempt budget.
+for that process. Requests are scheduled concurrently and bounded by
+`jev.concurrency` (16 by default). `jev.requests_per_minute: 0` disables proactive
+local pacing; provider `429`/`529` responses trigger backoff. Set a positive value
+only when you explicitly want a local start-rate cap. Retries and watch cycles
+share the hard `max_requests` attempt budget.
 
 A provider context rejection affects only that process request. Generic 400/422
 rejections expose only bounded machine-readable fields and the provider request ID;
