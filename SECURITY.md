@@ -7,19 +7,20 @@ quarantine, block network access or delete files based on its output.
 ## Data handling
 
 Live mode submits sanitized process metadata to TypeSafe, or to the explicitly
-configured `TYPESAFE_BASE_URL`. This includes process paths and socket IP addresses.
-Command-line arguments are opt-in, including through an explicit YAML config.
-Environment variables of inspected processes and process memory are never read.
-Optional hashing reads bounded executable bytes locally but sends only the hash.
-No binary or script contents are submitted. The API key is used only for transport
+configured `TYPESAFE_BASE_URL`. By default this includes process paths, redacted
+command arguments, socket endpoints, bounded executable hashes, file metadata and
+macOS signature identity where available. Environment variables of inspected
+processes and process memory are never read. Hashing reads bounded executable
+bytes locally but sends only the hash; no binary or script contents are submitted.
+The API key is used only for transport
 headers; it is not included in logs, request bodies, snapshots or cache keys.
 
 Redaction recognizes common credential flags, authorization strings, URL userinfo,
 well-known token formats and home-directory usernames. It is best effort and can
 miss arbitrary positional secrets, novel formats, secrets in names or paths, and
-sensitive business information. Do not enable argument collection on workloads
-that prohibit external disclosure. `--offline` avoids the external API entirely;
-`--no-connections` alone does not.
+sensitive business information. Use `--no-command-line` or a stricter explicit
+configuration on workloads that prohibit argument disclosure. `--offline` avoids
+the external API entirely; `--no-connections` alone does not.
 
 Saved snapshots are new, exclusive 0600 files. Existing paths are not overwritten.
 Redirected stdout reports follow the shell's umask and can be less private. The
@@ -43,9 +44,10 @@ forge every observation on which this program depends.
 
 ## Operational behavior
 
-The collector does not terminate, suspend, attach to or alter processes. The only
-inspection subprocess is an explicitly requested, fixed-path macOS `codesign`
-verification with no shell and a timeout. Target executables are never run.
+The collector does not terminate, suspend, attach to or alter processes. Inspection
+subprocesses are fixed-path macOS `codesign` calls and, when psutil socket
+enumeration is denied on macOS, fixed-path `lsof`; both use explicit argv, no
+shell and bounded timeouts. Target executables are never run.
 Retries, rate pacing and request-attempt budgets are bounded. Context failures
 are reported without splitting the snapshot.
 HTTP errors, bad answers and budget exhaustion do not produce benign results.
