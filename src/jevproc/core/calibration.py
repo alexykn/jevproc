@@ -110,7 +110,11 @@ def evaluate_pair(
             if score >= uncertain_at
             else "benign"
         )
-        target = "ambiguous" if label == "ambiguous" else label
+        target = {
+            "benign": "benign",
+            "ambiguous": "ambiguous",
+            "suspicious": "warning",
+        }[label]
         correct[label] += predicted == target
         if label == "benign":
             benign_fp += predicted != "benign"
