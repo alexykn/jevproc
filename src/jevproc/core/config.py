@@ -109,7 +109,7 @@ class JevSettings(Settings):
     concurrency: int = Field(default=16, ge=1, le=128)
     timeout_seconds: float = Field(default=30, ge=0.1, le=300)
     retries: int = Field(default=2, ge=0, le=8)
-    requests_per_minute: float = Field(default=600, ge=0, le=100000)
+    requests_per_minute: float = Field(default=0, ge=0, le=100000)
     max_retry_delay: float = Field(default=30, ge=0, le=300)
     max_requests: int = Field(default=1000, ge=1, le=100000)
 

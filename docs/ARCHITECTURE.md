@@ -27,9 +27,10 @@ state/question shape used successfully by jevscan while preventing a large proce
 table or hundreds of process questions from sharing one provider request.
 
 A bounded worker pool schedules process requests. The transport semaphore and
-shared rate limiter cap concurrency and request starts; defaults are 16 concurrent
-requests and 600 starts/minute. This is scheduling, not semantic batching: a
-process is never split across requests and two processes never share one request.
+shared limiter cap concurrency and, when configured, request starts. The default is
+16 concurrent requests with no fixed local start-rate throttle; provider overload
+responses drive backoff. This is scheduling, not semantic batching: a process is
+never split across requests and two processes never share one request.
 
 Cache identity is per process request, so unchanged processes can be reused even
 when another process changes. Provider context or request-validation failures are

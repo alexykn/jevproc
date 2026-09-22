@@ -6,7 +6,7 @@ host_context: >-
 jev:
   model: jev-1.13.0
   concurrency: 16
-  requests_per_minute: 600
+  requests_per_minute: 0
   timeout_seconds: 30
   retries: 2
   max_retry_delay: 30
