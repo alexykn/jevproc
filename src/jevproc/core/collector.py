@@ -404,12 +404,35 @@ def _prime_resource_probes(
     return probes
 
 
+def _process_name_without_cmdline(proc: psutil.Process, pid: int) -> str:
+    try:
+        if sys.platform == "linux":
+            with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as handle:
+                return handle.read(513).strip()[:512] or "<unavailable>"
+        return proc.name()[:512]
+    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
+        return "<unavailable>"
+
+
+def _process_executable_without_cmdline(proc: psutil.Process, pid: int) -> str | None:
+    try:
+        if sys.platform == "linux":
+            value = os.readlink(f"/proc/{pid}/exe")
+            if value.endswith(" (deleted)"):
+                value = value[:-10]
+            return value[:8192] or None
+        value = proc.exe() or None
+        return value[:8192] if value else None
+    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
+        return None
+
+
 def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
     by_parent: dict[int, list[Child]] = defaultdict(list)
     incomplete = False
     try:
         iterator = psutil.process_iter(
-            ["pid", "ppid", "name", "exe", "create_time", "status"],
+            ["pid", "ppid", "create_time", "status"],
             ad_value=None,
         )
         for item in iterator:
@@ -419,17 +442,18 @@ def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
             if ppid is None or pid is None:
                 incomplete = True
                 continue
-            name = info.get("name") or "<unavailable>"
-            executable = info.get("exe")
+            pid = int(pid)
+            name = _process_name_without_cmdline(item, pid)
+            executable = _process_executable_without_cmdline(item, pid)
             status = info.get("status") or "unknown"
             created = info.get("create_time")
-            if created is None or executable is None:
+            if created is None or executable is None or name == "<unavailable>":
                 incomplete = True
             by_parent[int(ppid)].append(Child(
-                pid=int(pid),
+                pid=pid,
                 created_at=created,
-                name=str(name)[:512],
-                executable=str(executable)[:8192] if executable else None,
+                name=name,
+                executable=executable,
                 status=str(status)[:512],
             ))
     except (OSError, NotImplementedError):
@@ -584,18 +608,8 @@ def _live_parent(pid: int) -> tuple[Parent, int | None] | None:
     try:
         proc = psutil.Process(pid)
         created = proc.create_time()
-        try:
-            if sys.platform == "linux":
-                with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as handle:
-                    name = handle.read(513).strip()[:512] or "<unavailable>"
-            else:
-                name = proc.name()
-        except (psutil.AccessDenied, OSError):
-            name = "<unavailable>"
-        try:
-            executable = proc.exe() or None
-        except (psutil.AccessDenied, OSError):
-            executable = None
+        name = _process_name_without_cmdline(proc, pid)
+        executable = _process_executable_without_cmdline(proc, pid)
         return (
             Parent(
                 pid=pid,
