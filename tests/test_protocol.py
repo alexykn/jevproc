@@ -29,6 +29,8 @@ def test_one_request_contains_every_process(config, snapshot):
     # Process evidence lives with its independent question, keeping shared state tiny.
     first = body["questions"]["p3101_JPR001"]["instructions"]["process"]
     assert first["n"] == "backup-worker" and "freshness" not in first
+    parented = body["questions"]["p4819_JPR001"]["instructions"]["process"]
+    assert parented["r"] == [[4801, "document-viewer", "/opt/document-viewer"]]
 
 
 def test_noul_is_scalar_without_confidence():
