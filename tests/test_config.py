@@ -76,3 +76,12 @@ def test_rich_evidence_is_enabled_by_default():
     assert collection.signatures is True
     assert collection.resources is True
     assert collection.child_limit == 16
+
+
+def test_packaged_jpr001_operating_point_and_prompt():
+    rule = load_config().active_rules[0]
+    assert rule.id == "JPR001"
+    assert rule.policy.uncertain_at == pytest.approx(0.08)
+    assert rule.policy.warning_at == pytest.approx(0.12)
+    assert "High CPU" not in rule.question.instructions
+    assert "child processes alone" not in rule.question.instructions
