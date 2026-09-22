@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Calibrate JPR001 defaults to `uncertain_at=0.08` and `warning_at=0.10` from the 72-case synthetic corpus.
+- Simplify Noul policy mapping to direct benign/review/warning bands and remove inverse-threshold symmetry.
+- Track suspicious surfaced recall separately from hard-warning recall and benign hard-warning false positives.
+- Treat suspicious corpus cases as passing when surfaced and ambiguous cases as non-failing boundary probes.
+
 - Expand the synthetic process corpus to 72 labeled benign/suspicious/ambiguous/evidence-limited cases.
 - Add repeated-run raw-Noul calibration with quantiles, stability analysis and descriptive threshold-pair candidates.
 
