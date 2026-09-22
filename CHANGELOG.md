@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Evaluate the selected process snapshot in one Jev request instead of fixed four-process batches.
+- Compact the inference wire and move per-process evidence into independent questions, matching Jev 1.13 context semantics.
+- Replace the five built-in dimensions with one default process-risk Noul; custom rules remain supported.
+- Remove batching, worker-pool, concurrency and byte-budget configuration.
+
+
 ## 0.1.0rc1 — 2026-09-22
 
 Initial integration release candidate:
