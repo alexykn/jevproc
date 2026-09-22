@@ -71,6 +71,17 @@ def sanitize_process(process: Process, include_command_line: bool) -> Process:
     data["status"] = clean(process.status, 512, "status")
     if process.executable is not None:
         data["executable"] = clean(process.executable, 8192, "executable")
+    if process.file.signature_identifier is not None:
+        data["file"]["signature_identifier"] = clean(
+            process.file.signature_identifier, 512, "signature"
+        )
+    if process.file.signature_team_id is not None:
+        data["file"]["signature_team_id"] = clean(
+            process.file.signature_team_id, 512, "signature"
+        )
+    data["file"]["signature_authorities"] = [
+        clean(value, 512, "signature") for value in process.file.signature_authorities
+    ]
     for parent in data["ancestors"]:
         parent["name"] = clean(parent["name"], 512, "ancestry")
         if parent["executable"] is not None:

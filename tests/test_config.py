@@ -66,3 +66,11 @@ def test_duplicate_yaml_mapping_keys_are_rejected(tmp_path):
     path.write_text("jev:\n  max_requests: 10\n  max_requests: 10000\n")
     with pytest.raises(ConfigError):
         load_config(path)
+
+
+def test_rich_evidence_is_enabled_by_default():
+    collection = load_config().collection
+    assert collection.command_line is True
+    assert collection.connections is True
+    assert collection.hashes is True
+    assert collection.signatures is True

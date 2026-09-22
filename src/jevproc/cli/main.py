@@ -28,6 +28,9 @@ def _settings(args: argparse.Namespace) -> Config:
     for flag, key in (("include_command_line", "command_line"), ("hashes", "hashes"), ("signatures", "signatures")):
         if getattr(args, flag):
             data["collection"][key] = True
+    for flag, key in (("no_command_line", "command_line"), ("no_hashes", "hashes"), ("no_signatures", "signatures")):
+        if getattr(args, flag):
+            data["collection"][key] = False
     if args.no_connections:
         data["collection"]["connections"] = False
     if args.max_processes is not None:

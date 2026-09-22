@@ -22,6 +22,28 @@ def test_packaged_corpus_shape_and_labels():
     assert corpus.host.platform == "fixture"
 
 
+def test_corpus_matches_rich_default_evidence_profile():
+    corpus = load_corpus()
+    for case in corpus.cases:
+        process = case.process
+        if case.label == "unknown":
+            assert process.coverage["hash"] == "unavailable"
+            assert process.coverage["signature"] == "unavailable"
+            assert process.coverage["command_line"] in {"denied", "unavailable"}
+            continue
+        assert process.command_line is not None
+        assert process.coverage["command_line"] == "observed"
+        assert process.coverage["connections"] == "observed"
+        if process.file.exists is True:
+            assert process.file.sha256 is not None
+            assert process.coverage["hash"] == "observed"
+            if process.file.signature == "valid":
+                assert process.file.signature_identifier
+                assert process.file.signature_team_id
+                assert process.file.signature_authorities
+                assert process.coverage["signature"] == "observed"
+
+
 def test_corpus_evidence_limited_cases_are_internally_consistent():
     corpus = load_corpus()
     for case in corpus.cases:

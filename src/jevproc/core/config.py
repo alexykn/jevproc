@@ -118,9 +118,9 @@ class CollectionSettings(Settings):
     max_processes: int = Field(default=2048, ge=1, le=10000)
     ancestry_depth: int = Field(default=4, ge=0, le=8)
     connections: bool = True
-    command_line: bool = False
-    hashes: bool = False
-    signatures: bool = False
+    command_line: bool = True
+    hashes: bool = True
+    signatures: bool = True
     max_hash_bytes: int = Field(default=64 * 1024 * 1024, ge=1, le=1024 * 1024 * 1024)
 
 
