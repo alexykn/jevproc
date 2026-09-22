@@ -13,6 +13,7 @@ jev:
   max_requests: 1000
 collection:
   max_processes: 2048
+  workers: 16
   ancestry_depth: 4
   connections: true
   command_line: true
