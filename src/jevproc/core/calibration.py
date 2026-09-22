@@ -1,6 +1,8 @@
 """Raw Noul calibration statistics for the synthetic corpus.
 
-This module never changes policy. It only reports empirical candidate operating points.
+This module never changes policy. It reports both run-level operational metrics
+and case-mean stability metrics. Operational threshold candidates are selected
+from individual samples so repeated-run tails cannot be hidden by averaging.
 """
 
 from __future__ import annotations
@@ -47,14 +49,18 @@ def describe(values: list[float]) -> dict[str, float | int]:
     }
 
 
-def _midpoints(values: Iterable[float]) -> list[float]:
+def _thresholds(values: Iterable[float]) -> list[float]:
+    """Include observed values as well as midpoints.
+
+    Scores are often quantized to hundredths. An observed boundary such as 0.08
+    therefore has operational meaning and must be eligible as a candidate.
+    """
     unique = sorted(set(values))
     if not unique:
         return []
-    candidates = [0.0]
-    candidates.extend((left + right) / 2 for left, right in zip(unique, unique[1:]))
-    candidates.append(1.0)
-    return sorted(set(max(0.0, min(1.0, value)) for value in candidates))
+    candidates = {0.0, 1.0, *unique}
+    candidates.update((left + right) / 2 for left, right in zip(unique, unique[1:]))
+    return sorted(max(0.0, min(1.0, value)) for value in candidates)
 
 
 @dataclass(frozen=True)
@@ -91,9 +97,8 @@ def _rate(matches: int, total: int) -> float:
     return matches / total if total else 0.0
 
 
-def evaluate_pair(
-    case_means: dict[str, float],
-    cases: dict[str, CorpusCase],
+def _evaluate_observations(
+    observations: Iterable[tuple[str, float]],
     uncertain_at: float,
     warning_at: float,
 ) -> PairMetrics:
@@ -104,10 +109,11 @@ def evaluate_pair(
     correct = {"benign": 0, "ambiguous": 0, "suspicious": 0}
     benign_fp = benign_warning = suspicious_surface = 0
 
-    for case_id, score in case_means.items():
-        label = cases[case_id].label
+    for label, score in observations:
         if label == "unknown":
             continue
+        if label not in totals:
+            raise ValueError(f"unsupported calibration label: {label}")
         totals[label] += 1
         predicted = (
             "warning"
@@ -145,20 +151,49 @@ def evaluate_pair(
     )
 
 
-def candidate_pairs(
+def evaluate_pair(
     case_means: dict[str, float],
     cases: dict[str, CorpusCase],
+    uncertain_at: float,
+    warning_at: float,
+) -> PairMetrics:
+    """Evaluate one score per case.
+
+    Kept for case-mean stability analysis and backwards-compatible callers.
+    Operational calibration should use evaluate_samples().
+    """
+    observations = [
+        (cases[case_id].label, score)
+        for case_id, score in case_means.items()
+        if cases[case_id].label != "unknown"
+    ]
+    return _evaluate_observations(observations, uncertain_at, warning_at)
+
+
+def evaluate_samples(
+    samples: dict[str, list[float]],
+    cases: dict[str, CorpusCase],
+    uncertain_at: float,
+    warning_at: float,
+) -> PairMetrics:
+    """Evaluate every repeated run independently."""
+    observations = [
+        (cases[case_id].label, score)
+        for case_id, values in samples.items()
+        for score in values
+        if cases[case_id].label != "unknown"
+    ]
+    return _evaluate_observations(observations, uncertain_at, warning_at)
+
+
+def _candidate_pairs_from_observations(
+    observations: list[tuple[str, float]],
     current_uncertain: float,
     current_warning: float,
 ) -> dict[str, Any]:
-    labelled = {
-        case_id: value
-        for case_id, value in case_means.items()
-        if cases[case_id].label in {"benign", "ambiguous", "suspicious"}
-    }
-    thresholds = _midpoints(labelled.values())
+    thresholds = _thresholds(score for _, score in observations)
     pairs = [
-        evaluate_pair(labelled, cases, uncertain, warning)
+        _evaluate_observations(observations, uncertain, warning)
         for uncertain in thresholds
         for warning in thresholds
         if uncertain < warning
@@ -174,6 +209,8 @@ def candidate_pairs(
             -item.benign_false_positive_rate,
             item.suspicious_warning_recall,
             item.ambiguous_band_recall,
+            item.uncertain_at,
+            item.warning_at,
         ),
     )
 
@@ -185,6 +222,7 @@ def candidate_pairs(
             item.ambiguous_band_recall,
             item.macro_recall,
             -item.warning_at,
+            item.uncertain_at,
         ),
     )
 
@@ -197,6 +235,7 @@ def candidate_pairs(
             item.suspicious_warning_recall,
             item.ambiguous_band_recall,
             item.macro_recall,
+            item.uncertain_at,
             item.warning_at,
         ),
     )
@@ -209,10 +248,11 @@ def candidate_pairs(
             item.benign_warning_rate,
             -item.ambiguous_band_recall,
             -item.macro_recall,
+            -item.uncertain_at,
         ),
     )
 
-    current = evaluate_pair(labelled, cases, current_uncertain, current_warning)
+    current = _evaluate_observations(observations, current_uncertain, current_warning)
     return {
         "current": current.as_dict(),
         "balanced": balanced.as_dict(),
@@ -220,6 +260,43 @@ def candidate_pairs(
         "warnings_first": warnings_first.as_dict(),
         "high_suspicious_recall": recall_first.as_dict(),
     }
+
+
+def candidate_pairs(
+    case_means: dict[str, float],
+    cases: dict[str, CorpusCase],
+    current_uncertain: float,
+    current_warning: float,
+) -> dict[str, Any]:
+    observations = [
+        (cases[case_id].label, value)
+        for case_id, value in case_means.items()
+        if cases[case_id].label in {"benign", "ambiguous", "suspicious"}
+    ]
+    return _candidate_pairs_from_observations(
+        observations,
+        current_uncertain=current_uncertain,
+        current_warning=current_warning,
+    )
+
+
+def sample_candidate_pairs(
+    samples: dict[str, list[float]],
+    cases: dict[str, CorpusCase],
+    current_uncertain: float,
+    current_warning: float,
+) -> dict[str, Any]:
+    observations = [
+        (cases[case_id].label, value)
+        for case_id, values in samples.items()
+        for value in values
+        if cases[case_id].label in {"benign", "ambiguous", "suspicious"}
+    ]
+    return _candidate_pairs_from_observations(
+        observations,
+        current_uncertain=current_uncertain,
+        current_warning=current_warning,
+    )
 
 
 def calibration_report(
@@ -253,7 +330,13 @@ def calibration_report(
             case_means[case.id] = statistics.fmean(values)
 
     distributions = {label: describe(values) for label, values in label_samples.items()}
-    candidates = candidate_pairs(
+    candidates = sample_candidate_pairs(
+        samples,
+        case_map,
+        current_uncertain=current_uncertain,
+        current_warning=current_warning,
+    )
+    case_mean_candidates = candidate_pairs(
         case_means,
         case_map,
         current_uncertain=current_uncertain,
@@ -263,6 +346,9 @@ def calibration_report(
     benign_means = [case_means[c.id] for c in cases if c.label == "benign" and c.id in case_means]
     ambiguous_means = [case_means[c.id] for c in cases if c.label == "ambiguous" and c.id in case_means]
     suspicious_means = [case_means[c.id] for c in cases if c.label == "suspicious" and c.id in case_means]
+    benign_samples = label_samples["benign"]
+    ambiguous_samples = label_samples["ambiguous"]
+    suspicious_samples = label_samples["suspicious"]
 
     separation = {
         "max_benign_mean": max(benign_means) if benign_means else None,
@@ -276,6 +362,19 @@ def calibration_report(
         "benign_to_suspicious_gap": (
             min(suspicious_means) - max(benign_means)
             if benign_means and suspicious_means
+            else None
+        ),
+        "max_benign_sample": max(benign_samples) if benign_samples else None,
+        "min_ambiguous_sample": min(ambiguous_samples) if ambiguous_samples else None,
+        "min_suspicious_sample": min(suspicious_samples) if suspicious_samples else None,
+        "benign_to_ambiguous_sample_gap": (
+            min(ambiguous_samples) - max(benign_samples)
+            if benign_samples and ambiguous_samples
+            else None
+        ),
+        "benign_to_suspicious_sample_gap": (
+            min(suspicious_samples) - max(benign_samples)
+            if benign_samples and suspicious_samples
             else None
         ),
     }
@@ -307,6 +406,12 @@ def calibration_report(
         "cases": case_stats,
         "separation": separation,
         "candidates": candidates,
+        "case_mean_candidates": case_mean_candidates,
+        "candidate_basis": "individual_samples",
         "most_unstable": unstable[:10],
-        "note": "Candidate thresholds are descriptive synthetic-corpus operating points and are never applied automatically.",
+        "note": (
+            "Operational candidate thresholds use individual repeated-run samples. "
+            "Case-mean candidates are retained only as a stability view. "
+            "All candidates are descriptive synthetic-corpus operating points and are never applied automatically."
+        ),
     }
