@@ -20,7 +20,12 @@ The corpus has **72 cases**:
   evidence that should remain unknown rather than being promoted to legitimate.
 
 All addresses are IANA documentation/Test-Net values and command-line attack-like
-content is represented only by inert descriptive markers.
+content is represented only by inert descriptive markers. The corpus also mirrors
+the default resource/child evidence shape: normal cases include synthetic CPU,
+RSS, memory-percent, thread and FD measurements plus bounded child summaries where
+appropriate. Resource profiles deliberately cross labels—some benign compiler,
+installer, browser and backup cases are heavy, while some suspicious cases are
+low-resource—to prevent calibration from learning "resource hog = malicious."
 
 ## Regression mode
 
