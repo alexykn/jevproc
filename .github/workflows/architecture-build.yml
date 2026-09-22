@@ -15,6 +15,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -30,10 +32,12 @@ jobs:
           cat /tmp/jevproc-before.json
           uv run --no-sync radon cc src -j > /tmp/jevproc-radon-before.json
           uv run --no-sync ruff check src --output-format json > /tmp/jevproc-ruff-before.json || true
+          uv run --no-sync ty check src > /tmp/jevproc-ty-before.txt 2>&1 || true
           cp tools/_architecture_contract.py /tmp/jevproc-contract.py
       - name: Apply cohesive refactor and format changed Python files
         run: |
           uv run --no-sync python tools/_architecture_refactor.py
+          uv run --no-sync python tools/_architecture_refine.py
           uv run --no-sync python - <<'PY'
           import json, subprocess
           paths = [p for p in json.load(open('/tmp/jevproc-refactor-files.json')) if p.endswith('.py')]
@@ -57,22 +61,28 @@ jobs:
           uv run --no-sync radon cc src -j > /tmp/jevproc-radon-after.json
           uv run --no-sync ruff check src --output-format json > /tmp/jevproc-ruff-after.json || true
           uv run --no-sync ty check src > /tmp/jevproc-ty-after.txt 2>&1 || true
-          tail -45 /tmp/jevproc-ty-after.txt
+          cat /tmp/jevproc-ty-after.txt
           uv run --no-sync python - <<'PY'
           import json
+          from pathlib import Path
           def blocks(report):
+              found={}
               for path, items in report.items():
                   for item in items:
-                      if item['type'] == 'class':
-                          yield from ((path, child) for child in item.get('methods', []))
-                      else:
-                          yield path, item
+                      for row in (item.get('methods', []) if item['type'] == 'class' else [item]):
+                          found[(path,row['lineno'],row['name'])]=row
+              return found
+          targets={'_run','judge','load_config','redact_argv','_post','evaluate','_evaluate','scan','_file_info','_process','attach_ancestry','_child_index','__init__'}
           for when in ('before','after'):
-              rows=list(blocks(json.load(open(f'/tmp/jevproc-radon-{when}.json'))))
-              print('RADON',when,'blocks=',len(rows),'max=',max(row['complexity'] for _,row in rows))
-              for path,row in sorted(rows,key=lambda x:x[1]['complexity'],reverse=True)[:15]:
-                  print(path,row['name'],row['complexity'])
-              print('RUFF',when,len(json.load(open(f'/tmp/jevproc-ruff-{when}.json'))))
+              rows=blocks(json.load(open(f'/tmp/jevproc-radon-{when}.json')))
+              print('RADON',when,'max=',max(row['complexity'] for row in rows.values()))
+              for (path,_,name),row in rows.items():
+                  if name in targets:
+                      print(path,name,row['complexity'])
+              diagnostics=json.load(open(f'/tmp/jevproc-ruff-{when}.json'))
+              print('RUFF',when,len(diagnostics))
+              for d in diagnostics:
+                  print(Path(d['filename']).relative_to(Path.cwd()),d['location']['row'],d['code'],d['message'])
           PY
       - name: Publish tested source as one commit on a separate feature branch
         env:
