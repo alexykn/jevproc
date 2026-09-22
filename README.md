@@ -87,21 +87,26 @@ workflow. `jevproc` never loads a `.env` file automatically.
 ```sh
 jevproc                         # Warnings and uncertain warnings only
 jevproc -v                      # Every process, all checks, available metadata
-jevproc --pid 1234 --pid 1235     # Selected processes; repeat --pid as needed
+jevproc --pid 1234 --pid 1235     # Evaluate only selected PIDs
+jevproc --family 1234              # Evaluate PID 1234 plus its descendants
 jevproc --no-command-line      # Opt out of redacted argv collection
 jevproc --no-hashes             # Skip bounded executable SHA-256
 jevproc --no-signatures         # Skip macOS code-signature inspection
+jevproc --no-resources          # Skip CPU/memory/thread/fd evidence
 jevproc --watch 30 --max-requests 200
 jevproc --concurrency 8
 jevproc --format json
 jevproc --format jsonl --watch 30
 ```
 
-Live mode sends process names, paths, UID, parent context, redacted command
-arguments, file metadata, bounded executable SHA-256 values, available socket
-endpoints and (on macOS) code-signature identity to the configured TypeSafe API by
-default. Home-directory usernames and recognizable credentials are redacted on a
-best-effort basis. Binary contents themselves are never submitted.
+Live mode sends process names, paths, UID, parent/child context, a short
+CPU/memory/thread/FD sample, redacted command arguments, file metadata, bounded
+executable SHA-256 values, available socket endpoints and (on macOS) code-signature
+identity to the configured TypeSafe API by default. Resource usage and bounded
+child summaries are **evidence for Jev/JSON only**; the normal text report does not
+print them because top/htop/Activity Monitor are better resource interfaces.
+
+Home-directory usernames and recognizable credentials are redacted on a best-effort basis. Binary contents themselves are never submitted.
 **Metadata and internal IP addresses can still be sensitive.** Review your
 organization's data-handling requirements before using live mode.
 
