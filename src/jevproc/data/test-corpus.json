@@ -69,10 +69,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -147,10 +158,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 3.4,
+          "rss_bytes": 96468992,
+          "memory_percent": 0.54,
+          "thread_count": 4,
+          "fd_count": 14
+        }
       }
     },
     {
@@ -222,10 +244,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 5.1,
+          "rss_bytes": 119537664,
+          "memory_percent": 0.66,
+          "thread_count": 5,
+          "fd_count": 17
+        }
       }
     },
     {
@@ -297,10 +330,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 6.8,
+          "rss_bytes": 142606336,
+          "memory_percent": 0.78,
+          "thread_count": 6,
+          "fd_count": 20
+        }
       }
     },
     {
@@ -369,10 +413,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 185,
+          "rss_bytes": 671088640,
+          "memory_percent": 3.5,
+          "thread_count": 12,
+          "fd_count": 41
+        }
       }
     },
     {
@@ -437,10 +492,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 142,
+          "rss_bytes": 1027604480,
+          "memory_percent": 5.3,
+          "thread_count": 18,
+          "fd_count": 52
+        }
       }
     },
     {
@@ -513,10 +579,36 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11008,
+            "created_at": 1790072001,
+            "name": "node-worker",
+            "executable": "/opt/homebrew/bin/node",
+            "status": "sleeping"
+          },
+          {
+            "pid": 11009,
+            "created_at": 1790072002,
+            "name": "node-worker",
+            "executable": "/opt/homebrew/bin/node",
+            "status": "sleeping"
+          }
+        ],
+        "child_count": 2,
+        "resources": {
+          "cpu_percent": 44,
+          "rss_bytes": 1310720000,
+          "memory_percent": 6.8,
+          "thread_count": 22,
+          "fd_count": 112
+        }
       }
     },
     {
@@ -581,10 +673,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 13.6,
+          "rss_bytes": 234881024,
+          "memory_percent": 1.26,
+          "thread_count": 10,
+          "fd_count": 32
+        }
       }
     },
     {
@@ -650,10 +753,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 15.3,
+          "rss_bytes": 257949696,
+          "memory_percent": 1.38,
+          "thread_count": 11,
+          "fd_count": 35
+        }
       }
     },
     {
@@ -719,10 +833,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -785,10 +910,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 3.4,
+          "rss_bytes": 96468992,
+          "memory_percent": 0.54,
+          "thread_count": 4,
+          "fd_count": 14
+        }
       }
     },
     {
@@ -852,10 +988,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 5.1,
+          "rss_bytes": 119537664,
+          "memory_percent": 0.66,
+          "thread_count": 5,
+          "fd_count": 17
+        }
       }
     },
     {
@@ -929,10 +1076,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 6.8,
+          "rss_bytes": 142606336,
+          "memory_percent": 0.78,
+          "thread_count": 6,
+          "fd_count": 20
+        }
       }
     },
     {
@@ -1005,10 +1163,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 82,
+          "rss_bytes": 1610612736,
+          "memory_percent": 8.4,
+          "thread_count": 34,
+          "fd_count": 88
+        }
       }
     },
     {
@@ -1082,10 +1251,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 10.2,
+          "rss_bytes": 188743680,
+          "memory_percent": 1.02,
+          "thread_count": 8,
+          "fd_count": 26
+        }
       }
     },
     {
@@ -1151,10 +1331,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 11.9,
+          "rss_bytes": 211812352,
+          "memory_percent": 1.14,
+          "thread_count": 9,
+          "fd_count": 29
+        }
       }
     },
     {
@@ -1224,10 +1415,29 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11018,
+            "created_at": 1790072001,
+            "name": "installer-helper",
+            "executable": "/System/Library/PrivateFrameworks/PackageKit.framework/Resources/installer-helper",
+            "status": "running"
+          }
+        ],
+        "child_count": 1,
+        "resources": {
+          "cpu_percent": 96,
+          "rss_bytes": 440401920,
+          "memory_percent": 2.2,
+          "thread_count": 15,
+          "fd_count": 64
+        }
       }
     },
     {
@@ -1292,10 +1502,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 15.3,
+          "rss_bytes": 257949696,
+          "memory_percent": 1.38,
+          "thread_count": 11,
+          "fd_count": 35
+        }
       }
     },
     {
@@ -1367,10 +1588,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -1441,10 +1673,43 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "truncated"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11021,
+            "created_at": 1790072001,
+            "name": "gvproxy",
+            "executable": "/opt/homebrew/bin/gvproxy",
+            "status": "sleeping"
+          },
+          {
+            "pid": 11022,
+            "created_at": 1790072002,
+            "name": "qemu-system-aarch64",
+            "executable": "/opt/homebrew/bin/qemu-system-aarch64",
+            "status": "running"
+          },
+          {
+            "pid": 11023,
+            "created_at": 1790072003,
+            "name": "helper",
+            "executable": "/opt/homebrew/bin/podman-helper",
+            "status": "sleeping"
+          }
+        ],
+        "child_count": 6,
+        "resources": {
+          "cpu_percent": 31,
+          "rss_bytes": 754974720,
+          "memory_percent": 3.9,
+          "thread_count": 26,
+          "fd_count": 126
+        }
       }
     },
     {
@@ -1508,12 +1773,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Executable is in a temporary directory; the observed parent is a build tool."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 118,
+          "rss_bytes": 796917760,
+          "memory_percent": 4.1,
+          "thread_count": 10,
+          "fd_count": 29
+        }
       }
     },
     {
@@ -1575,12 +1851,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Executable disappeared during an application update; process is expected to exit shortly."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 6.8,
+          "rss_bytes": 142606336,
+          "memory_percent": 0.78,
+          "thread_count": 6,
+          "fd_count": 20
+        }
       }
     },
     {
@@ -1644,10 +1931,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 8.5,
+          "rss_bytes": 165675008,
+          "memory_percent": 0.9,
+          "thread_count": 7,
+          "fd_count": 23
+        }
       }
     },
     {
@@ -1711,10 +2009,36 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11025,
+            "created_at": 1790072001,
+            "name": "rsync",
+            "executable": "/usr/bin/rsync",
+            "status": "running"
+          },
+          {
+            "pid": 11026,
+            "created_at": 1790072002,
+            "name": "ssh",
+            "executable": "/usr/bin/ssh",
+            "status": "sleeping"
+          }
+        ],
+        "child_count": 2,
+        "resources": {
+          "cpu_percent": 76,
+          "rss_bytes": 933232640,
+          "memory_percent": 4.8,
+          "thread_count": 14,
+          "fd_count": 73
+        }
       }
     },
     {
@@ -1791,10 +2115,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 11.9,
+          "rss_bytes": 211812352,
+          "memory_percent": 1.14,
+          "thread_count": 9,
+          "fd_count": 29
+        }
       }
     },
     {
@@ -1870,10 +2205,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 13.6,
+          "rss_bytes": 234881024,
+          "memory_percent": 1.26,
+          "thread_count": 10,
+          "fd_count": 32
+        }
       }
     },
     {
@@ -1937,10 +2283,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 15.3,
+          "rss_bytes": 257949696,
+          "memory_percent": 1.38,
+          "thread_count": 11,
+          "fd_count": 35
+        }
       }
     },
     {
@@ -2006,10 +2363,36 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11029,
+            "created_at": 1790072001,
+            "name": "clang",
+            "executable": "/usr/bin/clang",
+            "status": "running"
+          },
+          {
+            "pid": 11030,
+            "created_at": 1790072002,
+            "name": "ld",
+            "executable": "/usr/bin/ld",
+            "status": "sleeping"
+          }
+        ],
+        "child_count": 2,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -2086,10 +2469,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 3.4,
+          "rss_bytes": 96468992,
+          "memory_percent": 0.54,
+          "thread_count": 4,
+          "fd_count": 14
+        }
       }
     },
     {
@@ -2164,10 +2558,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 5.1,
+          "rss_bytes": 119537664,
+          "memory_percent": 0.66,
+          "thread_count": 5,
+          "fd_count": 17
+        }
       }
     },
     {
@@ -2240,14 +2645,25 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "UID 0 process executes a user-owned world-writable file.",
           "Name resembles a system update daemon but path is a hidden user cache.",
           "Code-signature verification failed."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 4,
+          "rss_bytes": 100663296,
+          "memory_percent": 0.5,
+          "thread_count": 4,
+          "fd_count": 18
+        }
       }
     },
     {
@@ -2327,13 +2743,32 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Temporary executable is world-writable and signature-invalid.",
           "Observed ancestry contains a document application followed by a shell."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11033,
+            "created_at": 1790072001,
+            "name": "sh",
+            "executable": "/bin/sh",
+            "status": "running"
+          }
+        ],
+        "child_count": 1,
+        "resources": {
+          "cpu_percent": 1.2,
+          "rss_bytes": 56623104,
+          "memory_percent": 0.3,
+          "thread_count": 2,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -2406,13 +2841,24 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Executable image is deleted while the root process remains running.",
           "Executable path is temporary."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 10.2,
+          "rss_bytes": 188743680,
+          "memory_percent": 1.02,
+          "thread_count": 8,
+          "fd_count": 26
+        }
       }
     },
     {
@@ -2485,13 +2931,24 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "UID 0 process executes a user-owned world-writable file from a hidden directory.",
           "Name resembles a protected OS security service."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 8,
+          "rss_bytes": 125829120,
+          "memory_percent": 0.7,
+          "thread_count": 5,
+          "fd_count": 24
+        }
       }
     },
     {
@@ -2570,13 +3027,32 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Observed ancestry contains a browser followed by a shell.",
           "Executable is hidden under a user cache and signature verification failed."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11036,
+            "created_at": 1790072001,
+            "name": "curl",
+            "executable": "/usr/bin/curl",
+            "status": "running"
+          }
+        ],
+        "child_count": 1,
+        "resources": {
+          "cpu_percent": 63,
+          "rss_bytes": 534773760,
+          "memory_percent": 2.8,
+          "thread_count": 16,
+          "fd_count": 77
+        }
       }
     },
     {
@@ -2645,13 +3121,24 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Observed office application -> shell ancestry precedes a temporary executable.",
           "Temporary executable is world-writable."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 15.3,
+          "rss_bytes": 257949696,
+          "memory_percent": 1.38,
+          "thread_count": 11,
+          "fd_count": 35
+        }
       }
     },
     {
@@ -2723,13 +3210,24 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Executable is hidden in user Application Support while its name resembles an Apple service.",
           "Code-signature verification failed."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -2793,12 +3291,31 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "UID 0 process executes a user-owned world-writable temporary binary."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11039,
+            "created_at": 1790072001,
+            "name": "helper",
+            "executable": "/private/tmp/.jobs/.helper",
+            "status": "sleeping"
+          }
+        ],
+        "child_count": 1,
+        "resources": {
+          "cpu_percent": 3.4,
+          "rss_bytes": 96468992,
+          "memory_percent": 0.54,
+          "thread_count": 4,
+          "fd_count": 14
+        }
       }
     },
     {
@@ -2870,13 +3387,24 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Process name matches a system SSH daemon but executable is user-owned and hidden.",
           "Executable is world-writable and signature-invalid."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 5.1,
+          "rss_bytes": 119537664,
+          "memory_percent": 0.66,
+          "thread_count": 5,
+          "fd_count": 17
+        }
       }
     },
     {
@@ -2948,12 +3476,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Name resembles a macOS system indexing worker but executable is in a hidden user cache."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 6.8,
+          "rss_bytes": 142606336,
+          "memory_percent": 0.78,
+          "thread_count": 6,
+          "fd_count": 20
+        }
       }
     },
     {
@@ -3025,12 +3564,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Hidden executable under Downloads started recently and opened an outbound connection."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 8.5,
+          "rss_bytes": 165675008,
+          "memory_percent": 0.9,
+          "thread_count": 7,
+          "fd_count": 23
+        }
       }
     },
     {
@@ -3093,13 +3643,24 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "UID 0 process executes a user-owned hidden cache file.",
           "Executable is world-writable."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 10.2,
+          "rss_bytes": 188743680,
+          "memory_percent": 1.02,
+          "thread_count": 8,
+          "fd_count": 26
+        }
       }
     },
     {
@@ -3172,12 +3733,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Sanitized command line contains a synthetic credential-collection marker; no real credential action is executed."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 11.9,
+          "rss_bytes": 211812352,
+          "memory_percent": 1.14,
+          "thread_count": 9,
+          "fd_count": 29
+        }
       }
     },
     {
@@ -3244,12 +3816,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Document application is the observed parent of a shell with a synthetic payload-execution marker."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 13.6,
+          "rss_bytes": 234881024,
+          "memory_percent": 1.26,
+          "thread_count": 10,
+          "fd_count": 32
+        }
       }
     },
     {
@@ -3312,12 +3895,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "UID 0 process executes a user-owned world-writable temporary binary."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 0.4,
+          "rss_bytes": 29360128,
+          "memory_percent": 0.2,
+          "thread_count": 1,
+          "fd_count": 6
+        }
       }
     },
     {
@@ -3389,12 +3983,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Executable is deleted while process remains active and connected outbound."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -3457,12 +4062,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "UID 0 process executes a user-owned home-directory binary with failed signature verification."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 3.4,
+          "rss_bytes": 96468992,
+          "memory_percent": 0.54,
+          "thread_count": 4,
+          "fd_count": 14
+        }
       }
     },
     {
@@ -3534,12 +4150,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Name resembles a system trust daemon but executable is a hidden non-system file."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 5.1,
+          "rss_bytes": 119537664,
+          "memory_percent": 0.66,
+          "thread_count": 5,
+          "fd_count": 17
+        }
       }
     },
     {
@@ -3602,12 +4229,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Name resembles a privileged OS service while executable is a user-owned temporary file."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 6.8,
+          "rss_bytes": 142606336,
+          "memory_percent": 0.78,
+          "thread_count": 6,
+          "fd_count": 20
+        }
       }
     },
     {
@@ -3679,12 +4317,31 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Privileged process executes a user-owned hidden file under a LaunchDaemons-related directory."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11051,
+            "created_at": 1790072001,
+            "name": "network-helper",
+            "executable": "/Library/LaunchDaemons/.cache/network-helper",
+            "status": "running"
+          }
+        ],
+        "child_count": 1,
+        "resources": {
+          "cpu_percent": 8.5,
+          "rss_bytes": 165675008,
+          "memory_percent": 0.9,
+          "thread_count": 7,
+          "fd_count": 23
+        }
       }
     },
     {
@@ -3747,12 +4404,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Privileged helper path is backed by a user-owned world-writable file with failed signature verification."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 22,
+          "rss_bytes": 272629760,
+          "memory_percent": 1.4,
+          "thread_count": 9,
+          "fd_count": 39
+        }
       }
     },
     {
@@ -3824,12 +4492,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Hidden recently started unsigned user agent has an outbound high-port connection."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 11.9,
+          "rss_bytes": 211812352,
+          "memory_percent": 1.14,
+          "thread_count": 9,
+          "fd_count": 29
+        }
       }
     },
     {
@@ -3901,12 +4580,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "System scripting host is the observed ancestor of a temporary unsigned networked executable."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 13.6,
+          "rss_bytes": 234881024,
+          "memory_percent": 1.26,
+          "thread_count": 10,
+          "fd_count": 32
+        }
       }
     },
     {
@@ -3969,12 +4659,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Process name imitates a built-in security component while executable is user-owned and hidden."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 2.5,
+          "rss_bytes": 75497472,
+          "memory_percent": 0.4,
+          "thread_count": 3,
+          "fd_count": 13
+        }
       }
     },
     {
@@ -4046,12 +4747,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "System-service-like process name does not match its temporary executable basename."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -4115,12 +4827,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Temporary executable is associated with an observed build-tool parent."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 130,
+          "rss_bytes": 713031680,
+          "memory_percent": 3.7,
+          "thread_count": 11,
+          "fd_count": 33
+        }
       }
     },
     {
@@ -4189,10 +4912,29 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11058,
+            "created_at": 1790072001,
+            "name": "git",
+            "executable": "/usr/bin/git",
+            "status": "running"
+          }
+        ],
+        "child_count": 1,
+        "resources": {
+          "cpu_percent": 0.8,
+          "rss_bytes": 18874368,
+          "memory_percent": 0.1,
+          "thread_count": 1,
+          "fd_count": 5
+        }
       }
     },
     {
@@ -4265,10 +5007,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 6.8,
+          "rss_bytes": 142606336,
+          "memory_percent": 0.78,
+          "thread_count": 6,
+          "fd_count": 20
+        }
       }
     },
     {
@@ -4342,12 +5095,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Executable may have been replaced during an update."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 8.5,
+          "rss_bytes": 165675008,
+          "memory_percent": 0.9,
+          "thread_count": 7,
+          "fd_count": 23
+        }
       }
     },
     {
@@ -4412,12 +5176,31 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Non-system Homebrew daemon is running as UID 0."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [
+          {
+            "pid": 11061,
+            "created_at": 1790072001,
+            "name": "worker",
+            "executable": "/opt/homebrew/libexec/customd-worker",
+            "status": "sleeping"
+          }
+        ],
+        "child_count": 1,
+        "resources": {
+          "cpu_percent": 28,
+          "rss_bytes": 356515840,
+          "memory_percent": 1.8,
+          "thread_count": 9,
+          "fd_count": 48
+        }
       }
     },
     {
@@ -4481,12 +5264,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Executable is hidden under the user's local data directory."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 11.9,
+          "rss_bytes": 211812352,
+          "memory_percent": 1.14,
+          "thread_count": 9,
+          "fd_count": 29
+        }
       }
     },
     {
@@ -4560,10 +5354,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 13.6,
+          "rss_bytes": 234881024,
+          "memory_percent": 1.26,
+          "thread_count": 10,
+          "fd_count": 32
+        }
       }
     },
     {
@@ -4627,12 +5432,23 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [
           "Process name is generic and system-like but executable is a user tool."
         ],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 15.3,
+          "rss_bytes": 257949696,
+          "memory_percent": 1.38,
+          "thread_count": 11,
+          "fd_count": 35
+        }
       }
     },
     {
@@ -4706,10 +5522,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 1.7,
+          "rss_bytes": 73400320,
+          "memory_percent": 0.42,
+          "thread_count": 3,
+          "fd_count": 11
+        }
       }
     },
     {
@@ -4784,10 +5611,21 @@
           "file": "observed",
           "ancestry": "observed",
           "hash": "observed",
-          "signature": "observed"
+          "signature": "observed",
+          "resources": "observed",
+          "children": "observed"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": 3.4,
+          "rss_bytes": 96468992,
+          "memory_percent": 0.54,
+          "thread_count": 4,
+          "fd_count": 14
+        }
       }
     },
     {
@@ -4838,10 +5676,21 @@
           "file": "denied",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "unavailable",
+          "children": "unavailable"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": null,
+          "rss_bytes": null,
+          "memory_percent": null,
+          "thread_count": null,
+          "fd_count": null
+        }
       }
     },
     {
@@ -4892,10 +5741,21 @@
           "file": "unavailable",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "unavailable",
+          "children": "unavailable"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": null,
+          "rss_bytes": null,
+          "memory_percent": null,
+          "thread_count": null,
+          "fd_count": null
+        }
       }
     },
     {
@@ -4946,10 +5806,21 @@
           "file": "denied",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "unavailable",
+          "children": "unavailable"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": null,
+          "rss_bytes": null,
+          "memory_percent": null,
+          "thread_count": null,
+          "fd_count": null
+        }
       }
     },
     {
@@ -5000,10 +5871,21 @@
           "file": "unavailable",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "unavailable",
+          "children": "unavailable"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": null,
+          "rss_bytes": null,
+          "memory_percent": null,
+          "thread_count": null,
+          "fd_count": null
+        }
       }
     },
     {
@@ -5054,10 +5936,21 @@
           "file": "unavailable",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "unavailable",
+          "children": "unavailable"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": null,
+          "rss_bytes": null,
+          "memory_percent": null,
+          "thread_count": null,
+          "fd_count": null
+        }
       }
     },
     {
@@ -5108,10 +6001,21 @@
           "file": "unavailable",
           "ancestry": "observed",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "unavailable",
+          "children": "unavailable"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": null,
+          "rss_bytes": null,
+          "memory_percent": null,
+          "thread_count": null,
+          "fd_count": null
+        }
       }
     },
     {
@@ -5163,10 +6067,21 @@
           "file": "denied",
           "ancestry": "partial",
           "hash": "unavailable",
-          "signature": "unavailable"
+          "signature": "unavailable",
+          "resources": "unavailable",
+          "children": "unavailable"
         },
         "observations": [],
-        "freshness": "observed"
+        "freshness": "observed",
+        "children": [],
+        "child_count": 0,
+        "resources": {
+          "cpu_percent": null,
+          "rss_bytes": null,
+          "memory_percent": null,
+          "thread_count": null,
+          "fd_count": null
+        }
       }
     }
   ]
