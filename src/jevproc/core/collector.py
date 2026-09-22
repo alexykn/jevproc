@@ -271,6 +271,7 @@ def _file_info(
         regular = stat.S_ISREG(info.st_mode)
         before = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
         cache_key = (
+            path,
             *before,
             settings.hashes,
             settings.signatures,
