@@ -19,7 +19,7 @@ def demo_transport() -> httpx.MockTransport:
         payload = json.loads(request.content)
         answers = {}
         for key, question in payload["questions"].items():
-            target = question["instructions"]["target"]
+            target = question["instructions"]["target"]["ref"]
             rule = key.removeprefix(target + "_")
             answer = fixtures.get(target, {}).get(rule)
             if answer is None or answer["type"] != question["type"]:
