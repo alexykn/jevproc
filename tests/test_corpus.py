@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 import jevproc.cli.corpus as corpus_cli
-from jevproc.core.calibration import calibration_report, describe, evaluate_pair
+from jevproc.core.calibration import calibration_report, describe, evaluate_pair, evaluate_samples
 from jevproc.core.client import JevClient as RealJevClient
 from jevproc.core.corpus import load_corpus, matches, selected_cases, snapshot_for
 
@@ -186,9 +186,10 @@ def test_calibration_mode_measures_raw_scores_not_current_statuses(capsys, monke
     assert calibration["distributions"]["benign"]["mean"] == pytest.approx(0.04)
     assert calibration["distributions"]["ambiguous"]["mean"] == pytest.approx(0.12)
     assert calibration["distributions"]["suspicious"]["mean"] == pytest.approx(0.30)
+    assert calibration["candidate_basis"] == "individual_samples"
     balanced = calibration["candidates"]["balanced"]
-    assert balanced["uncertain_at"] == pytest.approx(0.08)
-    assert balanced["warning_at"] == pytest.approx(0.21)
+    assert 0.04 < balanced["uncertain_at"] <= 0.12
+    assert 0.12 < balanced["warning_at"] <= 0.30
     assert balanced["exact_accuracy"] == 1
     assert balanced["benign_false_positive_rate"] == 0
     assert balanced["suspicious_warning_recall"] == 1
@@ -196,6 +197,60 @@ def test_calibration_mode_measures_raw_scores_not_current_statuses(capsys, monke
     warnings_first = calibration["candidates"]["warnings_first"]
     assert warnings_first["benign_hard_warning_rate"] == 0
     assert warnings_first["suspicious_surface_recall"] == 1
+
+
+def test_sample_level_calibration_does_not_hide_outliers_in_case_means():
+    corpus = load_corpus()
+    selected = [
+        next(case for case in corpus.cases if case.label == "benign"),
+        next(case for case in corpus.cases if case.label == "ambiguous"),
+        next(case for case in corpus.cases if case.label == "suspicious"),
+    ]
+    samples = {
+        selected[0].id: [0.04, 0.04, 0.11],
+        selected[1].id: [0.08, 0.09, 0.10],
+        selected[2].id: [0.08, 0.12, 0.30],
+    }
+    report = calibration_report(
+        selected,
+        samples,
+        current_uncertain=0.08,
+        current_warning=0.10,
+    )
+
+    # The benign case mean is below 0.10, but one real run crosses it.
+    assert report["case_mean_candidates"]["current"]["benign_hard_warning_rate"] == 0
+    assert report["candidates"]["current"]["benign_hard_warning_rate"] == pytest.approx(1 / 3)
+    assert report["candidates"]["current"]["suspicious_surface_recall"] == 1
+    assert report["separation"]["max_benign_sample"] == pytest.approx(0.11)
+    assert report["separation"]["min_suspicious_sample"] == pytest.approx(0.08)
+
+    cases = {case.id: case for case in selected}
+    sample_metrics = evaluate_samples(samples, cases, uncertain_at=0.08, warning_at=0.12)
+    assert sample_metrics.benign_hard_warning_rate == 0
+    assert sample_metrics.suspicious_surface_recall == 1
+
+
+def test_warnings_first_search_can_select_observed_boundaries():
+    corpus = load_corpus()
+    benign = next(case for case in corpus.cases if case.label == "benign")
+    ambiguous = next(case for case in corpus.cases if case.label == "ambiguous")
+    suspicious = next(case for case in corpus.cases if case.label == "suspicious")
+    report = calibration_report(
+        [benign, ambiguous, suspicious],
+        {
+            benign.id: [0.03, 0.08, 0.11],
+            ambiguous.id: [0.06, 0.09, 0.14],
+            suspicious.id: [0.08, 0.12, 0.30],
+        },
+        current_uncertain=0.08,
+        current_warning=0.12,
+    )
+    candidate = report["candidates"]["warnings_first"]
+    assert candidate["uncertain_at"] == pytest.approx(0.08)
+    assert candidate["warning_at"] == pytest.approx(0.12)
+    assert candidate["benign_hard_warning_rate"] == 0
+    assert candidate["suspicious_surface_recall"] == 1
 
 
 def test_calibration_requires_relevant_labels(capsys, monkeypatch):
