@@ -31,9 +31,9 @@ class Parent(Record):
 
 
 class ResourceUsage(Record):
-    cpu_percent: float | None = Field(default=None, ge=0, le=10000)
+    cpu_percent: float | None = Field(default=None, ge=0)
     rss_bytes: int | None = Field(default=None, ge=0)
-    memory_percent: float | None = Field(default=None, ge=0, le=100)
+    memory_percent: float | None = Field(default=None, ge=0)
     thread_count: int | None = Field(default=None, ge=0)
     fd_count: int | None = Field(default=None, ge=0)
 
