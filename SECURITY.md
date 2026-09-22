@@ -46,9 +46,10 @@ forge every observation on which this program depends.
 ## Operational behavior
 
 The collector does not terminate, suspend, attach to or alter processes. Inspection
-subprocesses are fixed-path macOS `codesign` calls and, when psutil socket
-enumeration is denied on macOS, fixed-path `lsof`; both use explicit argv, no
-shell and bounded timeouts. Target executables are never run.
+subprocesses are fixed-path macOS `codesign` calls, fixed-path `lsof` when
+psutil socket enumeration is denied, and fixed-path `ps` metadata reads used to
+preserve the `--no-command-line` guarantee; all use explicit argv, no shell and
+bounded timeouts. Target executables are never run.
 Retries, rate pacing and request-attempt budgets are bounded. Context failures
 are reported without splitting the snapshot.
 HTTP errors, bad answers and budget exhaustion do not produce benign results.
