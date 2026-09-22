@@ -35,12 +35,8 @@ def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
             status = "uncertain_warning"
         elif limited:
             status = "unknown"
-        elif value <= 1 - policy.warning_at:
-            status = "probably_legitimate"
-        elif value > 1 - policy.uncertain_at:
-            status = "unknown"
         else:
-            status = "no_warning"
+            status = "probably_legitimate"
     elif isinstance(answer, ChoiceAnswer):
         value, confidence = answer.choice, answer.confidence
         probability = answer.probabilities[answer.choice]

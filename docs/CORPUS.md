@@ -33,8 +33,14 @@ jevproc-test --format json
 ```
 
 Regression mode compares jevproc's policy result with each case's declared accepted
-statuses. Exit codes are 0 when all samples match, 1 for classification mismatches,
-2 for operational/config/provider failures, and 130 for Ctrl-C.
+statuses. Suspicious cases are considered successfully **surfaced** when they land
+in either `warning` or `uncertain_warning`. Ambiguous cases are boundary probes:
+they may legitimately land on either side of the alert boundary and therefore do
+not fail regression merely for being benign-band versus review-band. Their raw
+scores still participate in calibration analysis. Evidence-limited controls must
+remain `unknown`. Exit codes are 0 when required expectations match, 1 for
+classification mismatches, 2 for operational/config/provider failures, and 130
+for Ctrl-C.
 
 ## Calibration mode
 
@@ -62,12 +68,16 @@ extracts the raw JPR001 Noul value for every sample and reports:
   and suspicious means;
 - repeated-run variance and the most unstable cases;
 - how the **current** `uncertain_at / warning_at` pair performs on the corpus;
-- three descriptive candidate pairs:
+- explicit **suspicious surfaced recall** (warning or uncertain warning),
+  suspicious hard-warning recall, benign surfaced rate, and benign hard-warning
+  rate;
+- descriptive candidate pairs:
+  - **warnings first** — among pairs with zero benign hard warnings, maximize
+    suspicious surfaced recall, then minimize benign surfaced alerts;
   - **balanced** — maximizes macro recall across benign / ambiguous / suspicious;
-  - **zero benign FP** — prefers no benign case crossing the uncertain boundary,
-    then maximizes suspicious and ambiguous recall;
-  - **high suspicious recall** — targets at least 95% suspicious-warning recall
-    when possible, then minimizes benign false positives.
+  - **zero benign FP** — prefers no benign case crossing the uncertain boundary;
+  - **high suspicious recall** — targets at least 95% suspicious hard-warning
+    recall when possible, then minimizes benign alerts.
 
 The three-band calibration model is:
 
@@ -83,8 +93,11 @@ evidence rather than score alone.
 
 Candidate thresholds are **descriptive synthetic-corpus operating points**.
 `jevproc-test` never edits `jevproc.yaml`, packaged defaults or runtime policy.
-A human should review corpus composition, false-positive behavior and repeated-run
-stability before changing thresholds.
+The current packaged JPR001 defaults (`0.08 / 0.10`) were selected from the
+warnings-first tradeoff observed on the synthetic corpus: tolerate a small review
+band to surface weak suspicious signals while avoiding benign hard warnings. A
+human should still review corpus composition, false-positive behavior and
+repeated-run stability before future threshold changes.
 
 ## Why the corpus is deliberately difficult
 

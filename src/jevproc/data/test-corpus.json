@@ -2053,7 +2053,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10031,
@@ -2130,7 +2131,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10032,
@@ -2211,7 +2213,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10033,
@@ -2286,7 +2289,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10034,
@@ -2361,7 +2365,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10035,
@@ -2441,7 +2446,8 @@
         "temp"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10036,
@@ -2512,7 +2518,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10037,
@@ -2587,7 +2594,8 @@
         "writable"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10038,
@@ -2651,7 +2659,8 @@
         "ssh"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10039,
@@ -2725,7 +2734,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10040,
@@ -2798,7 +2808,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10041,
@@ -2871,7 +2882,8 @@
         "ownership"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10042,
@@ -2936,7 +2948,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10043,
@@ -3009,7 +3022,8 @@
         "document"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10044,
@@ -3075,7 +3089,8 @@
         "writable"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10045,
@@ -3139,7 +3154,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10046,
@@ -3212,7 +3228,8 @@
         "unsigned"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10047,
@@ -3276,7 +3293,8 @@
         "hidden"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10048,
@@ -3349,7 +3367,8 @@
         "temp"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10049,
@@ -3413,7 +3432,8 @@
         "hidden"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10050,
@@ -3486,7 +3506,8 @@
         "ownership"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10051,
@@ -3550,7 +3571,8 @@
         "recent"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10052,
@@ -3623,7 +3645,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10053,
@@ -3696,7 +3719,8 @@
         "hidden"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10054,
@@ -3760,7 +3784,8 @@
         "network"
       ],
       "expected_statuses": [
-        "warning"
+        "warning",
+        "uncertain_warning"
       ],
       "process": {
         "pid": 10055,
@@ -3833,7 +3858,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10056,
@@ -3897,7 +3924,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10057,
@@ -3961,7 +3990,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10058,
@@ -4033,7 +4064,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10059,
@@ -4107,7 +4140,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10060,
@@ -4171,7 +4206,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10061,
@@ -4235,7 +4272,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10062,
@@ -4307,7 +4346,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10063,
@@ -4372,7 +4413,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10064,
@@ -4445,7 +4488,9 @@
       ],
       "expected_statuses": [
         "warning",
-        "uncertain_warning"
+        "uncertain_warning",
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
         "pid": 10065,

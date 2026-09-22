@@ -5,12 +5,22 @@ from jevproc.core.config import Rule
 from jevproc.core.protocol import ChoiceAnswer, NoulAnswer, ScoreAnswer
 
 
-@pytest.mark.parametrize("value,status", [(0.1,"probably_legitimate"),(.2,"no_warning"),(.5,"unknown"),(.6,"uncertain_warning"),(.849,"uncertain_warning"),(.85,"warning"),(.99,"warning")])
+@pytest.mark.parametrize(
+    "value,status",
+    [
+        (0.03, "probably_legitimate"),
+        (0.079, "probably_legitimate"),
+        (0.08, "uncertain_warning"),
+        (0.099, "uncertain_warning"),
+        (0.10, "warning"),
+        (0.40, "warning"),
+        (0.99, "warning"),
+    ],
+)
 def test_noul_boundaries(config, snapshot, value, status):
     result = judge(config.active_rules[0], snapshot.processes[0], NoulAnswer(type="noul", noul=value))
     assert result.status == status
     assert result.confidence is None
-
 
 def test_high_probability_with_partial_evidence_is_only_tentative(config, snapshot):
     p = snapshot.processes[0]

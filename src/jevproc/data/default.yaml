@@ -41,5 +41,5 @@ rulesets:
           Do not invent event history, reputation, persistence, user consent,
           script contents, network direction, traffic contents, or intent.
       policy:
-        warning_at: 0.85
-        uncertain_at: 0.60
+        warning_at: 0.10
+        uncertain_at: 0.08

@@ -1,6 +1,26 @@
 {
-  "p3101": {"JPR001": {"type": "noul", "noul": 0.08}},
-  "p4819": {"JPR001": {"type": "noul", "noul": 0.95}},
-  "p6120": {"JPR001": {"type": "noul", "noul": 0.65}},
-  "p7700": {"JPR001": {"type": "noul", "noul": 0.50}}
+  "p3101": {
+    "JPR001": {
+      "type": "noul",
+      "noul": 0.03
+    }
+  },
+  "p4819": {
+    "JPR001": {
+      "type": "noul",
+      "noul": 0.95
+    }
+  },
+  "p6120": {
+    "JPR001": {
+      "type": "noul",
+      "noul": 0.09
+    }
+  },
+  "p7700": {
+    "JPR001": {
+      "type": "noul",
+      "noul": 0.04
+    }
+  }
 }
