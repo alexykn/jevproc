@@ -153,11 +153,11 @@ independent question. This mirrors jevscan's working state/question contract and
 keeps a provider rejection local to one process instead of invalidating the whole
 machine snapshot.
 
-Requests are concurrent but bounded (16 by default) and paced at 600 starts/minute,
-matching jevscan's operational defaults. There is no multi-process batching or
-recursive context splitting. `--concurrency` can lower or raise the number of
-simultaneous per-process calls; `jev.concurrency` and
-`jev.requests_per_minute` are the corresponding YAML controls.
+Requests are asynchronous and bounded to 16 concurrent calls by default. There is
+no fixed local start-rate throttle unless `jev.requests_per_minute` is configured;
+provider `429`/`529` responses trigger backoff instead. There is no multi-process
+batching or recursive context splitting. `--concurrency` can lower or raise the
+number of simultaneous per-process calls.
 
 Noul is one scalar, not a score plus invented confidence. Choice and Score retain
 the provider's confidence and probability fields for custom rules. Values must be
