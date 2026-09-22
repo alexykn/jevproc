@@ -48,6 +48,19 @@ occurs between initial identity capture and that recheck, reducing misattributio
 across PID reuse. This does **not** make the snapshot atomic or detect every exec,
 in-place binary replacement, injected module, or memory-only compromise.
 
+Ancestry is bounded and checks chronology/cycles. Live collection can resolve
+parents outside the selected evaluation set, which lets `--pid PID` retain parent
+context without submitting those parents as separate Jev requests. Direct child
+summaries are collected in one process-table pass, capped by `child_limit`, and
+carry the full observed child count separately. `--family PID` selects the root
+plus descendants for independent evaluation.
+
+Resource evidence uses one shared short CPU sampling window across selected
+processes rather than one blocking interval per PID. CPU percent, RSS, memory
+percent, thread count and FD count are bounded typed evidence sent to Jev/JSON but
+not rendered in the human text view. They are behavioral context only, not a
+malware heuristic.
+
 Ancestry is bounded, drawn from selected snapshot records, and checks chronology
 and cycles. Parents outside that selection are missing evidence. Network data is
 a local/remote socket snapshot, with neither traffic direction nor contents.
