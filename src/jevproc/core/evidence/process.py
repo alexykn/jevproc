@@ -296,6 +296,7 @@ def _process_file(
     if executable and coverage["executable"] != "truncated":
         file_info, file_coverage = _file_info(executable, settings, file_cache)
     else:
-        file_info, file_coverage = Executable(), {"file": "unavailable"}
+        file_info = Executable()
+        file_coverage = {"file": "unavailable"}
     coverage.update(file_coverage)
     return file_info.model_copy(update={"deleted": deleted})
