@@ -53,12 +53,20 @@ and cycles. Parents outside that selection are missing evidence. Network data is
 a local/remote socket snapshot, with neither traffic direction nor contents.
 Limited-access enumeration is marked partial; absent entries are not safe entries.
 
-File evidence is obtained afresh per process rather than trusted by pathname.
-Optional hashes require a regular file, a size limit and stable before/after file
-metadata during the read. The final file component is not followed as a symlink.
-This is not a cryptographic binding to the loaded image or the complete filesystem
-path. macOS signature checks have a subprocess timeout and fixed executable/argv;
-failed verification is not equivalent to detected malware.
+File evidence is bound to stable device/inode/size/time metadata rather than
+trusted by pathname alone. Bounded SHA-256 and macOS signature inspection are
+enabled by default and deduplicated for processes that reference the same stable
+on-disk file identity. Hashing requires a regular file, a size limit and stable
+before/after metadata during the read; the final file component is not followed as
+a symlink. This is not a cryptographic binding to the loaded image or complete
+filesystem path. macOS signature checks use fixed executable/argv and timeouts,
+and collect bounded identifier/team/authority metadata; failed verification is
+not equivalent to detected malware.
+
+Socket enumeration uses psutil first. On macOS, an unprivileged system-wide
+`AccessDenied` falls back to fixed-path `/usr/sbin/lsof` numeric field output.
+That fallback is marked `partial`, because useful visible sockets are not proof
+that every other-user/system socket was observable.
 
 ## Progressive reporting
 
