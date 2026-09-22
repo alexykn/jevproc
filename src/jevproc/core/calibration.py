@@ -233,9 +233,9 @@ def _candidate_pairs_from_observations(
             item.suspicious_surface_recall,
             -item.benign_surface_rate,
             item.suspicious_warning_recall,
+            item.uncertain_at,
             item.ambiguous_band_recall,
             item.macro_recall,
-            item.uncertain_at,
             item.warning_at,
         ),
     )
