@@ -59,7 +59,17 @@ class ScoreQuestion(Settings):
 
 
 Question = Annotated[NoulQuestion | ChoiceQuestion | ScoreQuestion, Field(discriminator="type")]
-Source = Literal["executable", "command_line", "connections", "ancestry", "file", "signature", "hash"]
+Source = Literal[
+    "executable",
+    "command_line",
+    "connections",
+    "ancestry",
+    "children",
+    "resources",
+    "file",
+    "signature",
+    "hash",
+]
 
 
 class Policy(Settings):
@@ -121,6 +131,9 @@ class CollectionSettings(Settings):
     command_line: bool = True
     hashes: bool = True
     signatures: bool = True
+    resources: bool = True
+    resource_sample_seconds: float = Field(default=0.10, ge=0.05, le=1.0)
+    child_limit: int = Field(default=16, ge=0, le=32)
     max_hash_bytes: int = Field(default=64 * 1024 * 1024, ge=1, le=1024 * 1024 * 1024)
 
 

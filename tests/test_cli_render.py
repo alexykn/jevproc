@@ -12,6 +12,7 @@ from jevproc.cli.render import Reporter, Terminal, render
 from jevproc.core.client import JevClient
 from jevproc.core.demo import demo_transport
 from jevproc.core.engine import Engine
+from jevproc.core.models import Child, ResourceUsage
 
 
 @pytest.fixture
@@ -96,12 +97,51 @@ def test_live_offline_cli_smoke(capsys):
         '--no-connections',
         '--no-hashes',
         '--no-signatures',
+        '--no-resources',
         '--format',
         'json',
     ])==0
     data=json.loads(capsys.readouterr().out)
     assert data['summary']['requests']==0 and data['summary']['evaluated']==0
     assert data['assessments'][0]['process']['command_line'] is None
+
+
+def test_resources_and_children_are_json_only_not_text(report):
+    process = report.assessments[0].process.model_copy(update={
+        "resources": ResourceUsage(
+            cpu_percent=88.0,
+            rss_bytes=3221225472,
+            memory_percent=12.5,
+            thread_count=42,
+            fd_count=99,
+        ),
+        "children": [
+            Child(
+                pid=99999,
+                created_at=1790071000.0,
+                name="worker-child",
+                executable="/tmp/worker-child",
+                status="running",
+            )
+        ],
+        "child_count": 1,
+    })
+    assessment = report.assessments[0].model_copy(update={"process": process})
+    changed = report.model_copy(update={"assessments": [assessment]})
+
+    stream = io.StringIO()
+    render(changed, stream, verbose=True, color="never")
+    text = stream.getvalue()
+    assert "88.0" not in text
+    assert "3221225472" not in text
+    assert "worker-child" not in text
+
+    stream = io.StringIO()
+    render(changed, stream, format_name="json")
+    payload = json.loads(stream.getvalue())
+    evidence = payload["assessments"][0]["process"]
+    assert evidence["resources"]["cpu_percent"] == 88.0
+    assert evidence["children"][0]["name"] == "worker-child"
 
 
 def test_invalid_input_errors_do_not_echo_secrets(tmp_path,capsys):
@@ -111,7 +151,14 @@ def test_invalid_input_errors_do_not_echo_secrets(tmp_path,capsys):
     assert 'PRIVATE-EXAMPLE-TOKEN' not in capsys.readouterr().err
 
 
-@pytest.mark.parametrize('args',[['--watch','nan'],['--watch','inf'],['--watch','0'],['--demo','--watch','1'],['--pid','-1']])
+@pytest.mark.parametrize('args',[
+    ['--watch','nan'],
+    ['--watch','inf'],
+    ['--watch','0'],
+    ['--demo','--watch','1'],
+    ['--pid','-1'],
+    ['--pid','1','--family','1'],
+])
 def test_bad_cli_combinations_rejected(args):
     with pytest.raises(SystemExit) as exc:
         main(args)

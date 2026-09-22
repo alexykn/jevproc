@@ -9,13 +9,16 @@ import pytest
 from pydantic import ValidationError
 
 from jevproc.core.collector import (
+    _family_pids,
     _file_info,
     _get,
     _hash_file,
     _network,
     _parse_lsof_network,
+    _resource_usage,
     _signature,
     attach_ancestry,
+    attach_children,
     attach_network,
     collect,
     load_snapshot,
@@ -311,3 +314,92 @@ def test_file_inspection_cache_deduplicates_hash_and_signature(tmp_path, monkeyp
     assert calls == {"hash": 1, "signature": 1}
     assert first[0].sha256 == "a" * 64
     assert first[0].signature_identifier == "com.example.binary"
+
+
+def test_resource_usage_collects_short_sample_context():
+    proc = SimpleNamespace(
+        cpu_percent=lambda interval=None: 87.5,
+        memory_info=lambda: SimpleNamespace(rss=3 * 1024 * 1024 * 1024),
+        memory_percent=lambda: 12.5,
+        num_threads=lambda: 42,
+        num_fds=lambda: 99,
+    )
+    resources, coverage = _resource_usage(proc, cpu_primed=True)
+    assert coverage == "observed"
+    assert resources.cpu_percent == 87.5
+    assert resources.rss_bytes == 3 * 1024 * 1024 * 1024
+    assert resources.memory_percent == 12.5
+    assert resources.thread_count == 42
+    assert resources.fd_count == 99
+
+
+def test_resource_usage_is_partial_when_one_measure_is_denied():
+    proc = SimpleNamespace(
+        cpu_percent=lambda interval=None: 10.0,
+        memory_info=lambda: SimpleNamespace(rss=128 * 1024 * 1024),
+        memory_percent=lambda: 1.2,
+        num_threads=lambda: 8,
+        num_fds=lambda: (_ for _ in ()).throw(psutil.AccessDenied()),
+    )
+    resources, coverage = _resource_usage(proc, cpu_primed=True)
+    assert coverage == "partial"
+    assert resources.cpu_percent == 10.0
+    assert resources.fd_count is None
+
+
+def test_children_are_bounded_and_total_count_is_preserved(monkeypatch):
+    import jevproc.core.collector as module
+    from jevproc.core.models import Child
+
+    children = [
+        Child(pid=100 + index, created_at=10 + index, name=f"child-{index}")
+        for index in range(5)
+    ]
+    monkeypatch.setattr(module, "_child_index", lambda: ({42: children}, "observed"))
+    process = Process(pid=42, created_at=1)
+    result = attach_children([process], 2)[0]
+    assert [child.pid for child in result.children] == [100, 101]
+    assert result.child_count == 5
+    assert result.coverage["children"] == "truncated"
+
+
+def test_family_selection_walks_descendants_only(monkeypatch):
+    import jevproc.core.collector as module
+
+    table = [
+        SimpleNamespace(info={"pid": 1, "ppid": 0}),
+        SimpleNamespace(info={"pid": 10, "ppid": 1}),
+        SimpleNamespace(info={"pid": 11, "ppid": 10}),
+        SimpleNamespace(info={"pid": 12, "ppid": 10}),
+        SimpleNamespace(info={"pid": 13, "ppid": 11}),
+        SimpleNamespace(info={"pid": 20, "ppid": 1}),
+    ]
+    monkeypatch.setattr(module.psutil, "pid_exists", lambda pid: pid in {1, 10, 11, 12, 13, 20})
+    monkeypatch.setattr(module.psutil, "process_iter", lambda *args, **kwargs: iter(table))
+    assert _family_pids(10) == [10, 11, 12, 13]
+
+
+def test_live_missing_parent_can_be_resolved_for_single_pid(monkeypatch):
+    import jevproc.core.collector as module
+
+    child = Process(pid=42, created_at=20, ppid=7, name="child")
+    parent_proc = SimpleNamespace(
+        create_time=lambda: 10,
+        name=lambda: "parent",
+        exe=lambda: "/bin/parent",
+        ppid=lambda: 1,
+    )
+    grandparent_proc = SimpleNamespace(
+        create_time=lambda: 1,
+        name=lambda: "launchd",
+        exe=lambda: "/sbin/launchd",
+        ppid=lambda: 0,
+    )
+    monkeypatch.setattr(
+        module.psutil,
+        "Process",
+        lambda pid: parent_proc if pid == 7 else grandparent_proc,
+    )
+    result = attach_ancestry([child], 4, resolve_missing=True)[0]
+    assert [parent.pid for parent in result.ancestors] == [7, 1]
+    assert result.coverage["ancestry"] == "observed"

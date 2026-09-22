@@ -28,7 +28,12 @@ def _settings(args: argparse.Namespace) -> Config:
     for flag, key in (("include_command_line", "command_line"), ("hashes", "hashes"), ("signatures", "signatures")):
         if getattr(args, flag):
             data["collection"][key] = True
-    for flag, key in (("no_command_line", "command_line"), ("no_hashes", "hashes"), ("no_signatures", "signatures")):
+    for flag, key in (
+        ("no_command_line", "command_line"),
+        ("no_hashes", "hashes"),
+        ("no_signatures", "signatures"),
+        ("no_resources", "resources"),
+    ):
         if getattr(args, flag):
             data["collection"][key] = False
     if args.no_connections:
@@ -51,7 +56,7 @@ def _snapshot(args: argparse.Namespace, config: Config) -> Snapshot:
         return demo_snapshot()
     if args.input is not None:
         return load_snapshot(args.input, include_command_line=config.collection.command_line)
-    return collect(config.collection, args.pid)
+    return collect(config.collection, args.pid, family_pid=args.family)
 
 
 def exit_code(report: Report, fail_on: str) -> int:
@@ -129,10 +134,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.watch and (args.demo or args.input or args.save_snapshot or args.format == "json"):
         p.error("--watch requires live collection, text/jsonl output, and no --save-snapshot")
-    if args.demo and (args.input or args.pid or args.save_snapshot):
-        p.error("--demo cannot be combined with --input, --pid or --save-snapshot")
-    if args.input and args.pid:
-        p.error("--pid cannot be combined with --input")
+    if args.demo and (args.input or args.pid or args.family or args.save_snapshot):
+        p.error("--demo cannot be combined with --input, --pid, --family or --save-snapshot")
+    if args.input and (args.pid or args.family):
+        p.error("--pid/--family cannot be combined with --input")
     try:
         config = _settings(args)
         return asyncio.run(_run(args, config, sys.stdout, sys.stderr))

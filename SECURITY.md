@@ -8,8 +8,9 @@ quarantine, block network access or delete files based on its output.
 
 Live mode submits sanitized process metadata to TypeSafe, or to the explicitly
 configured `TYPESAFE_BASE_URL`. By default this includes process paths, redacted
-command arguments, socket endpoints, bounded executable hashes, file metadata and
-macOS signature identity where available. Environment variables of inspected
+command arguments, parent/child summaries, short CPU/memory/thread/FD resource
+samples, socket endpoints, bounded executable hashes, file metadata and macOS
+signature identity where available. Environment variables of inspected
 processes and process memory are never read. Hashing reads bounded executable
 bytes locally but sends only the hash; no binary or script contents are submitted.
 The API key is used only for transport
@@ -45,9 +46,10 @@ forge every observation on which this program depends.
 ## Operational behavior
 
 The collector does not terminate, suspend, attach to or alter processes. Inspection
-subprocesses are fixed-path macOS `codesign` calls and, when psutil socket
-enumeration is denied on macOS, fixed-path `lsof`; both use explicit argv, no
-shell and bounded timeouts. Target executables are never run.
+subprocesses are fixed-path macOS `codesign` calls, fixed-path `lsof` when
+psutil socket enumeration is denied, and fixed-path `ps` metadata reads used to
+preserve the `--no-command-line` guarantee; all use explicit argv, no shell and
+bounded timeouts. Target executables are never run.
 Retries, rate pacing and request-attempt budgets are bounded. Context failures
 are reported without splitting the snapshot.
 HTTP errors, bad answers and budget exhaustion do not produce benign results.

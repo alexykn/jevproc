@@ -30,6 +30,22 @@ class Parent(Record):
     executable: Text | None = None
 
 
+class ResourceUsage(Record):
+    cpu_percent: float | None = Field(default=None, ge=0)
+    rss_bytes: int | None = Field(default=None, ge=0)
+    memory_percent: float | None = Field(default=None, ge=0)
+    thread_count: int | None = Field(default=None, ge=0)
+    fd_count: int | None = Field(default=None, ge=0)
+
+
+class Child(Record):
+    pid: int = Field(ge=0)
+    created_at: float | None = Field(default=None, ge=0)
+    name: Name = "<unavailable>"
+    executable: Text | None = None
+    status: Name = "unknown"
+
+
 class Executable(Record):
     exists: bool | None = None
     size: int | None = Field(default=None, ge=0)
@@ -56,6 +72,9 @@ class Process(Record):
     command_line: list[Name] | None = Field(default=None, max_length=64)
     connections: list[Connection] = Field(default_factory=list, max_length=128)
     ancestors: list[Parent] = Field(default_factory=list, max_length=8)
+    children: list[Child] = Field(default_factory=list, max_length=32)
+    child_count: int = Field(default=0, ge=0)
+    resources: ResourceUsage = Field(default_factory=ResourceUsage)
     file: Executable = Field(default_factory=Executable)
     coverage: dict[str, Coverage] = Field(default_factory=dict, max_length=20)
     observations: list[Name] = Field(default_factory=list, max_length=32)

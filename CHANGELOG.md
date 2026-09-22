@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add CPU/RSS/memory/thread/FD context and bounded direct-child summaries to Jev process evidence without adding them to text output.
+- Resolve parent context for single-PID checks and add `--family PID` for root-plus-descendant evaluation.
+- Update the 72-case calibration corpus with non-correlated resource profiles and benign/suspicious child-process examples.
+
 - Enable redacted command lines, bounded executable hashes and macOS signature inspection by default.
 - Deduplicate expensive hash/signature work per stable file identity and include bounded signer metadata.
 - Fall back to partial numeric `lsof` socket collection on macOS when psutil system-wide enumeration is denied.

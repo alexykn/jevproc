@@ -18,6 +18,9 @@ collection:
   command_line: true
   hashes: true
   signatures: true
+  resources: true
+  resource_sample_seconds: 0.10
+  child_limit: 16
   max_hash_bytes: 67108864
 cache:
   enabled: true
@@ -38,6 +41,10 @@ rulesets:
           not merely an unfamiliar name, unusual path, unsigned binary, interpreter,
           root ownership, temporary directory, unknown IP address, or missing data.
           Legitimate software can be abused, and unusual software can be benign.
+          High CPU, memory use, thread counts, file-descriptor counts, or many
+          child processes alone are not evidence of maliciousness; use them only
+          as behavioral context. Parent and child relationships are point-in-time
+          observations, not proof of a historical action chain.
           Do not invent event history, reputation, persistence, user consent,
           script contents, network direction, traffic contents, or intent.
       policy:
