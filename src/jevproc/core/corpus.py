@@ -12,9 +12,16 @@ class CorpusRecord(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True, allow_inf_nan=False)
 
 
+CorpusLabel = Literal["benign", "suspicious", "ambiguous", "unknown"]
+CorpusTier = Literal["control", "weak", "moderate", "strong", "evidence_limited"]
+
+
 class CorpusCase(CorpusRecord):
     id: str = Field(pattern=r"^[a-z][a-z0-9-]{2,63}$")
     description: str = Field(min_length=1, max_length=1000)
+    label: CorpusLabel
+    tier: CorpusTier
+    tags: list[str] = Field(default_factory=list, max_length=16)
     expected_statuses: list[Status] = Field(min_length=1, max_length=8)
     process: Process
 
@@ -23,7 +30,7 @@ class Corpus(CorpusRecord):
     schema_version: Literal[1] = 1
     captured_at: float
     host: Host
-    cases: list[CorpusCase] = Field(min_length=1, max_length=100)
+    cases: list[CorpusCase] = Field(min_length=1, max_length=256)
 
     @model_validator(mode="after")
     def unique_cases(self) -> "Corpus":
