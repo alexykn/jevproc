@@ -252,8 +252,18 @@ class Reporter:
             details.append(f"owner-uid={process.file.owner_uid}")
         if process.file.signature != "not_requested":
             details.append(f"signature={process.file.signature}")
+        if process.file.signature_identifier:
+            details.append(f"identifier={process.file.signature_identifier}")
+        if process.file.signature_team_id:
+            details.append(f"team-id={process.file.signature_team_id}")
         if details:
             self.term.line("On disk: " + "  ".join(details), indent=6, style="\x1b[2m")
+        if process.file.signature_authorities:
+            self.term.line(
+                "Signing authority: " + " -> ".join(process.file.signature_authorities),
+                indent=6,
+                style="\x1b[2m",
+            )
         if process.file.sha256:
             self.term.line("SHA-256 (on disk): " + process.file.sha256, indent=6, style="\x1b[2m")
         for connection in process.connections:
