@@ -33,7 +33,7 @@ def main() -> None:
         timeout=30,
     )
     cases = json.loads(corpus.stdout)
-    assert len(cases) >= 7
+    assert len(cases) == 72
     assert any(case["id"] == "root-user-writable-masquerade" for case in cases)
     print("Installed wheel: resources, entry points, synthetic pipeline, corpus and JSON contract passed.")
 
