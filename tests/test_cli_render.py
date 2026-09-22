@@ -88,7 +88,17 @@ def test_missing_api_key_fails_before_collection(capsys,monkeypatch):
 
 
 def test_live_offline_cli_smoke(capsys):
-    assert main(['--offline','--pid',str(os.getpid()),'--no-connections','--format','json'])==0
+    assert main([
+        '--offline',
+        '--pid',
+        str(os.getpid()),
+        '--no-command-line',
+        '--no-connections',
+        '--no-hashes',
+        '--no-signatures',
+        '--format',
+        'json',
+    ])==0
     data=json.loads(capsys.readouterr().out)
     assert data['summary']['requests']==0 and data['summary']['evaluated']==0
     assert data['assessments'][0]['process']['command_line'] is None
