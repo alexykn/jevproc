@@ -53,7 +53,7 @@ regression testing the classifier, not for executing malware.
 ```sh
 jevproc-test --list
 jevproc-test
-jevproc-test --case root-user-writable-masquerade
+jevproc-test --case susp-root-user-writable-masquerade
 jevproc-test --format json
 ```
 
@@ -88,29 +88,34 @@ workflow. `jevproc` never loads a `.env` file automatically.
 jevproc                         # Warnings and uncertain warnings only
 jevproc -v                      # Every process, all checks, available metadata
 jevproc --pid 1234 --pid 1235     # Selected processes; repeat --pid as needed
-jevproc --include-command-line  # Explicitly collect and submit redacted arguments
-jevproc --hashes --signatures   # Optional on-disk SHA-256 and macOS codesign checks
+jevproc --no-command-line      # Opt out of redacted argv collection
+jevproc --no-hashes             # Skip bounded executable SHA-256
+jevproc --no-signatures         # Skip macOS code-signature inspection
 jevproc --watch 30 --max-requests 200
 jevproc --concurrency 8
 jevproc --format json
 jevproc --format jsonl --watch 30
 ```
 
-Live mode sends process names, paths, UID, parent context, file metadata and
-available socket endpoints to the configured TypeSafe API. Arguments are excluded
-unless enabled by the flag or an explicitly selected config file. Home-directory
-usernames and recognizable credentials are redacted on a best-effort basis.
+Live mode sends process names, paths, UID, parent context, redacted command
+arguments, file metadata, bounded executable SHA-256 values, available socket
+endpoints and (on macOS) code-signature identity to the configured TypeSafe API by
+default. Home-directory usernames and recognizable credentials are redacted on a
+best-effort basis. Binary contents themselves are never submitted.
 **Metadata and internal IP addresses can still be sensitive.** Review your
 organization's data-handling requirements before using live mode.
 
 Do not run as root merely to make coverage counts disappear. Start with your
-normal account. macOS and restricted Linux environments may deny process or
-socket access. The tool reports this rather than claiming a clean result.
+normal account. On macOS, if psutil cannot enumerate system sockets without root,
+jevproc falls back to `/usr/sbin/lsof` and marks that socket view `partial`
+rather than pretending it is complete. Other OS permission gaps remain explicit.
 
-`--signatures` uses `/usr/bin/codesign --verify --strict` only on macOS; elsewhere
-its coverage is unavailable. Valid signatures are not a trusted-signer allowlist,
-notarization result, or safety verdict. Hashes describe a bounded regular file on
-disk, not the in-memory executable image. No inspected binary is ever executed.
+macOS signature inspection uses fixed-path `codesign` verification plus display
+metadata (identifier, team ID and bounded authority chain). Valid signatures are
+not a trusted-signer allowlist, notarization result, or safety verdict. Hashes are
+computed only for bounded regular executable files and expensive file inspection
+is deduplicated per stable on-disk file identity within a snapshot. Hashes describe
+the disk file, not the in-memory executable image. No inspected binary is executed.
 
 ### Local-only inventory and saved snapshots
 
@@ -145,7 +150,7 @@ A shortened excerpt from the synthetic demo:
   build-helper  PID 6120  UID 1000
     /tmp/build/helper
       ? JPR001  Process risk
-        noul=0.650  [uncertain warning]
+        noul=0.090  [uncertain warning]
 ```
 
 Text uses small ANSI styles with Unicode-cell-aware wrapping and hanging
