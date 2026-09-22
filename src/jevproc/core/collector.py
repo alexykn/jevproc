@@ -9,6 +9,7 @@ import subprocess
 import sys
 import time
 from collections import defaultdict
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Callable
 
@@ -609,7 +610,12 @@ def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
     return dict(by_parent), "partial" if incomplete else "observed"
 
 
-def attach_children(processes: list[Process], limit: int) -> list[Process]:
+def _attach_children_from_index(
+    processes: list[Process],
+    limit: int,
+    by_parent: dict[int, list[Child]],
+    global_coverage: Coverage,
+) -> list[Process]:
     if limit == 0:
         return [
             process.model_copy(update={
@@ -619,7 +625,6 @@ def attach_children(processes: list[Process], limit: int) -> list[Process]:
             })
             for process in processes
         ]
-    by_parent, global_coverage = _child_index()
     result = []
     for process in processes:
         entries = by_parent.get(process.pid, [])
@@ -634,6 +639,13 @@ def attach_children(processes: list[Process], limit: int) -> list[Process]:
             "coverage": {**process.coverage, "children": state},
         }))
     return result
+
+
+def attach_children(processes: list[Process], limit: int) -> list[Process]:
+    if limit == 0:
+        return _attach_children_from_index(processes, limit, {}, "not_requested")
+    by_parent, global_coverage = _child_index()
+    return _attach_children_from_index(processes, limit, by_parent, global_coverage)
 
 
 def _family_pids(root_pid: int) -> list[int]:
@@ -839,34 +851,136 @@ def attach_ancestry(
     return result
 
 
-def attach_network(processes: list[Process], network: dict[int, list[Connection]], coverage: Coverage) -> list[Process]:
-    results = []
-    for process in processes:
-        freshness = process.freshness
-        entries = network.get(process.pid, [])
-        state = coverage
-        if freshness != "observed" or process.created_at is None:
-            entries, state = [], "unavailable"
-        else:
-            try:
-                # Fresh objects avoid psutil's cached executable/start-time attributes.
-                current = psutil.Process(process.pid)
-                if current.create_time() != process.created_at:
-                    freshness, entries, state = "reused", [], "unavailable"
-                elif process.executable and current.exe() != process.executable:
-                    freshness, entries, state = "changed", [], "unavailable"
-            except psutil.NoSuchProcess:
-                freshness, entries, state = "gone", [], "gone"
-            except (psutil.AccessDenied, OSError):
-                freshness, entries, state = "unverified", [], "unavailable"
-        if len(entries) > 128:
-            state = "truncated"
-        results.append(process.model_copy(update={
-            "connections": entries[:128], "freshness": freshness,
-            "coverage": {**process.coverage, "connections": state},
-        }))
-    return results
+def _attach_network_one(
+    process: Process,
+    network: dict[int, list[Connection]],
+    coverage: Coverage,
+) -> Process:
+    freshness = process.freshness
+    entries = network.get(process.pid, [])
+    state = coverage
+    if freshness != "observed" or process.created_at is None:
+        entries, state = [], "unavailable"
+    else:
+        try:
+            # Fresh objects avoid psutil's cached executable/start-time attributes.
+            current = psutil.Process(process.pid)
+            if current.create_time() != process.created_at:
+                freshness, entries, state = "reused", [], "unavailable"
+            elif process.executable and current.exe() != process.executable:
+                freshness, entries, state = "changed", [], "unavailable"
+        except psutil.NoSuchProcess:
+            freshness, entries, state = "gone", [], "gone"
+        except (psutil.AccessDenied, OSError):
+            freshness, entries, state = "unverified", [], "unavailable"
+    if len(entries) > 128:
+        state = "truncated"
+    return process.model_copy(update={
+        "connections": entries[:128],
+        "freshness": freshness,
+        "coverage": {**process.coverage, "connections": state},
+    })
 
+
+def attach_network(
+    processes: list[Process],
+    network: dict[int, list[Connection]],
+    coverage: Coverage,
+) -> list[Process]:
+    return [_attach_network_one(process, network, coverage) for process in processes]
+
+
+def _attach_network_parallel(
+    processes: list[Process],
+    network: dict[int, list[Connection]],
+    coverage: Coverage,
+    executor: ThreadPoolExecutor,
+) -> list[Process]:
+    return list(
+        executor.map(
+            lambda process: _attach_network_one(process, network, coverage),
+            processes,
+        )
+    )
+
+
+def _collect_processes_parallel(
+    selected: list[int],
+    settings: CollectionSettings,
+    now: float,
+    resource_probes: dict[int, psutil.Process],
+    executor: ThreadPoolExecutor,
+    on_progress: Callable[[int, int], None] | None,
+) -> list[Process]:
+    # Expensive hash/signature inspection is deliberately split into the next phase.
+    # This phase captures identity, argv, resources and cheap file metadata only.
+    base_settings = settings.model_copy(update={"hashes": False, "signatures": False})
+    if on_progress is not None:
+        on_progress(0, len(selected))
+    futures: dict[Future[Process], int] = {
+        executor.submit(
+            _process,
+            pid,
+            base_settings,
+            now,
+            None,
+            resource_probes.get(pid),
+        ): pid
+        for pid in selected
+    }
+    by_pid: dict[int, Process] = {}
+    for completed, future in enumerate(as_completed(futures), start=1):
+        pid = futures[future]
+        by_pid[pid] = future.result()
+        if on_progress is not None:
+            on_progress(completed, len(selected))
+    return [by_pid[pid] for pid in selected]
+
+
+def _file_evidence_futures(
+    processes: list[Process],
+    settings: CollectionSettings,
+    executor: ThreadPoolExecutor,
+) -> dict[str, Future[tuple[Executable, dict[str, Coverage]]]]:
+    if not (settings.hashes or settings.signatures):
+        return {}
+    paths = {
+        process.executable
+        for process in processes
+        if process.executable
+        and process.coverage.get("executable") != "truncated"
+    }
+    return {
+        path: executor.submit(_file_info, path, settings, None)
+        for path in sorted(paths)
+    }
+
+
+def _apply_file_evidence(
+    processes: list[Process],
+    evidence: dict[str, tuple[Executable, dict[str, Coverage]]],
+) -> list[Process]:
+    if not evidence:
+        return processes
+    result = []
+    for process in processes:
+        path = process.executable
+        item = evidence.get(path) if path else None
+        if item is None:
+            result.append(process)
+            continue
+        file_info, file_coverage = item
+        # Deleted-image state belongs to the process instance, while the remaining
+        # file evidence is shared by every process referencing this inspected path.
+        file_info = file_info.model_copy(update={"deleted": process.file.deleted})
+        result.append(
+            process.model_copy(update={
+                "file": file_info,
+                "coverage": {**process.coverage, **file_coverage},
+                "observations": _observations(path, file_info),
+            })
+        )
+    return result
 
 def collect(
     settings: CollectionSettings,
