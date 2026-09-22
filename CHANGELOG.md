@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Separate evidence backends from parallel collection orchestration.
+- Separate synthetic experiment execution/accounting from corpus CLI rendering.
+- Clarify answer-type policy dispatch, configuration merging, redaction, and transport retry paths.
+- Close SQLite connections if cache initialization fails before ownership transfer.
+
 - Remove the local evidence-gathering progress line now that parallel collection completes fast enough to make it flicker.
 
 

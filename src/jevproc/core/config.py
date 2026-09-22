@@ -146,7 +146,9 @@ class CacheSettings(Settings):
 
 class Config(Settings):
     schema_version: Literal[1] = 1
-    host_context: str = Field(default="General-purpose Unix workstation or server; purpose is not otherwise known.", max_length=8000)
+    host_context: str = Field(
+        default="General-purpose Unix workstation or server; purpose is not otherwise known.", max_length=8000
+    )
     jev: JevSettings = Field(default_factory=JevSettings)
     collection: CollectionSettings = Field(default_factory=CollectionSettings)
     cache: CacheSettings = Field(default_factory=CacheSettings)
@@ -169,7 +171,13 @@ class Config(Settings):
 
     @property
     def active_rules(self) -> list[Rule]:
-        return [r for name, rules in self.rulesets.items() if name not in self.ignore for r in rules if r.id not in self.ignore]
+        return [
+            r
+            for name, rules in self.rulesets.items()
+            if name not in self.ignore
+            for r in rules
+            if r.id not in self.ignore
+        ]
 
 
 def default_yaml() -> str:
@@ -188,32 +196,47 @@ def _merge(base: dict, override: dict) -> dict:
 
 
 def load_config(path: Path | None = None) -> Config:
-    """Never implicitly trust a YAML file in an arbitrary working directory (especially as root)."""
+    """Load packaged defaults and only an explicitly selected operator override."""
     try:
         data = yaml.load(default_yaml(), Loader=UniqueSafeLoader)
         if path is not None:
-            with path.open("rb") as handle:
-                raw = handle.read(262145)
-            if len(raw) > 262144:
-                raise ConfigError("configuration exceeds 256 KiB")
-            override = yaml.load(raw, Loader=UniqueSafeLoader)
-            if not isinstance(override, dict):
-                raise ConfigError("configuration must be a YAML mapping")
-            additions = override.pop("rulesets", {})
-            if not isinstance(additions, dict):
-                raise ConfigError("rulesets must be a mapping")
-            for name, rules in additions.items():
-                if not isinstance(rules, list) or not all(isinstance(r, dict) and isinstance(r.get("id"), str) for r in rules):
-                    raise ConfigError("each ruleset must contain rule mappings with an id")
-                if len({r["id"] for r in rules}) != len(rules):
-                    raise ConfigError("duplicate rule ID in a ruleset override")
-                existing = {r["id"]: r for r in data["rulesets"].get(name, [])}
-                for rule in rules:
-                    existing[rule["id"]] = _merge(existing.get(rule["id"], {}), rule)
-                # Patches are additive by ID. An empty override never erases built-ins.
-                data["rulesets"][name] = list(existing.values())
-            data = _merge(data, override)
+            data = _apply_override(data, _read_override(path))
         return Config.model_validate(data)
     except (OSError, yaml.YAMLError, ValidationError, UnicodeError, RecursionError) as exc:
-        # Do not echo config values: a user may have accidentally pasted a secret.
+        # Config values may contain accidental secrets; report the failure type only.
         raise ConfigError(f"invalid or unreadable configuration ({type(exc).__name__})") from exc
+
+
+def _read_override(path: Path) -> dict:
+    with path.open("rb") as handle:
+        raw = handle.read(262145)
+    if len(raw) > 262144:
+        raise ConfigError("configuration exceeds 256 KiB")
+    override = yaml.load(raw, Loader=UniqueSafeLoader)
+    if not isinstance(override, dict):
+        raise ConfigError("configuration must be a YAML mapping")
+    return override
+
+
+def _patch_rules(existing: list[dict], patches: object) -> list[dict]:
+    if not isinstance(patches, list) or not all(
+        isinstance(rule, dict) and isinstance(rule.get("id"), str) for rule in patches
+    ):
+        raise ConfigError("each ruleset must contain rule mappings with an id")
+    if len({rule["id"] for rule in patches}) != len(patches):
+        raise ConfigError("duplicate rule ID in a ruleset override")
+    by_id = {rule["id"]: rule for rule in existing}
+    for rule in patches:
+        by_id[rule["id"]] = _merge(by_id.get(rule["id"], {}), rule)
+    return list(by_id.values())
+
+
+def _apply_override(defaults: dict, override: dict) -> dict:
+    additions = override.get("rulesets", {})
+    if not isinstance(additions, dict):
+        raise ConfigError("rulesets must be a mapping")
+    rulesets = dict(defaults["rulesets"])
+    for name, rules in additions.items():
+        rulesets[name] = _patch_rules(rulesets.get(name, []), rules)
+    settings = {key: value for key, value in override.items() if key != "rulesets"}
+    return _merge({**defaults, "rulesets": rulesets}, settings)

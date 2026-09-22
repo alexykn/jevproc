@@ -87,9 +87,7 @@ percent, thread count and FD count are bounded typed evidence sent to Jev/JSON b
 not rendered in the human text view. They are behavioral context only, not a
 malware heuristic.
 
-Ancestry is bounded, drawn from selected snapshot records, and checks chronology
-and cycles. Parents outside that selection are missing evidence. Network data is
-a local/remote socket snapshot, with neither traffic direction nor contents.
+Network data is a local/remote socket snapshot, with neither traffic direction nor contents.
 Limited-access enumeration is marked partial; absent entries are not safe entries.
 
 File evidence is bound to stable device/inode/size/time metadata rather than
@@ -164,3 +162,39 @@ same-user tampering and provider compromise are outside its security boundary.
 
 These contracts were reviewed on 2026-09-22. Real provider integration and native
 macOS validation remain release gates, as recorded in VALIDATION.md.
+
+
+
+
+## Maintaining the small-project boundaries
+
+The CLI owns arguments, terminal formatting, and application composition. Core
+owns evidence, typed provider contracts, policy decisions, and result accounting.
+Keep that dependency direction; core must not import the CLI.
+
+- `core/collector.py` coordinates the existing bounded parallel phases. It does
+  not implement signing diagnostics, argument reads, or relationship traversal.
+- `core/evidence/process.py` owns identity, redacted invocation, and resource reads.
+- `core/evidence/files.py` owns on-disk metadata, hash limits, signing diagnostics,
+  and stable-file checks. It never infers a process risk verdict.
+- `core/evidence/network.py` owns socket collection and instance revalidation.
+- `core/evidence/relationships.py` owns ancestry, children, and family selection.
+- `core/experiments.py` records every synthetic sample, repeats scans, and prepares
+  calibration inputs. `cli/corpus_render.py` only presents those results.
+- `core/client.py` separates response buffering, permanent error interpretation,
+  retry scheduling, and successful-answer validation/accounting.
+- `core/assessment.py` has independent Noul, Choice, and Score decision functions;
+  `judge` adds the common evidence qualification and result envelope.
+- `core/storage.py` validates filesystem ownership before acquiring SQLite and
+  transfers connection ownership only after initialization succeeds. Setup errors
+  close the connection; they do not delete an existing cache or suppress errors.
+
+There is deliberately no plugin system, dependency-injection container, generic
+repository layer, event bus, or parallel implementation of the detector. Private
+backend tests patch the backend that owns an operation. `collect`, `load_config`,
+`judge`, `Engine.scan`, `JevClient.evaluate`, and both CLI entry points keep their
+established contracts.
+
+The refactor does not change the Jev question, thresholds, process-state schema,
+packaged corpus, collection limits, thread-pool concurrency, or warnings-first
+output. No additional resource monitor or collection progress display is added.

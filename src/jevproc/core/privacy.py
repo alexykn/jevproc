@@ -2,12 +2,29 @@
 
 import re
 import unicodedata
+from collections.abc import Iterator
 
 from jevproc.core.models import Process, Snapshot
 
 _SECRET_FLAGS = {
-    "password", "passwd", "pass", "pwd", "token", "access-token", "refresh-token", "api-key", "apikey",
-    "secret", "client-secret", "authorization", "credential", "credentials", "cookie", "p", "h", "header",
+    "password",
+    "passwd",
+    "pass",
+    "pwd",
+    "token",
+    "access-token",
+    "refresh-token",
+    "api-key",
+    "apikey",
+    "secret",
+    "client-secret",
+    "authorization",
+    "credential",
+    "credentials",
+    "cookie",
+    "p",
+    "h",
+    "header",
 }
 _ASSIGNMENT = re.compile(
     r"(?i)((?:password|passwd|token|api[_-]?key|secret|authorization|credential|cookie)[\w.-]*\s*[:=]\s*)([^\s&;]+)"
@@ -31,22 +48,10 @@ def redact_text(text: str) -> str:
 
 
 def redact_argv(arguments: list[str]) -> tuple[list[str], bool]:
-    """Redact before bounding so a cut-off secret cannot defeat the recognizer."""
+    """Redact first, then apply the wire limits without exposing a partial secret."""
     result: list[str] = []
-    redact_next = False
     shortened = len(arguments) > 64
-    for index, value in enumerate(arguments[:64]):
-        if redact_next:
-            redact_next = value.lower() in {"bearer", "basic"}
-            value = "<redacted>"
-        elif index:
-            flag, separator, _ = value.partition("=")
-            if flag.startswith("-") and flag.lstrip("-").lower().replace("_", "-") in _SECRET_FLAGS:
-                if separator:
-                    value = flag + "=<redacted>"
-                else:
-                    redact_next = True
-        cleaned = redact_text(value)
+    for cleaned in _redacted_arguments(arguments[:64]):
         if len(cleaned) > 512:
             cleaned = cleaned[:498] + "...<truncated>"
             shortened = True
@@ -72,13 +77,9 @@ def sanitize_process(process: Process, include_command_line: bool) -> Process:
     if process.executable is not None:
         data["executable"] = clean(process.executable, 8192, "executable")
     if process.file.signature_identifier is not None:
-        data["file"]["signature_identifier"] = clean(
-            process.file.signature_identifier, 512, "signature"
-        )
+        data["file"]["signature_identifier"] = clean(process.file.signature_identifier, 512, "signature")
     if process.file.signature_team_id is not None:
-        data["file"]["signature_team_id"] = clean(
-            process.file.signature_team_id, 512, "signature"
-        )
+        data["file"]["signature_team_id"] = clean(process.file.signature_team_id, 512, "signature")
     data["file"]["signature_authorities"] = [
         clean(value, 512, "signature") for value in process.file.signature_authorities
     ]
@@ -108,15 +109,36 @@ def sanitize_process(process: Process, include_command_line: bool) -> Process:
 
 def sanitize_snapshot(snapshot: Snapshot, include_command_line: bool) -> Snapshot:
     host = snapshot.host.model_copy(update={"architecture": redact_text(snapshot.host.architecture)[:512]})
-    return snapshot.model_copy(update={
-        "host": host,
-        "processes": [sanitize_process(p, include_command_line) for p in snapshot.processes],
-    })
+    return snapshot.model_copy(
+        update={
+            "host": host,
+            "processes": [sanitize_process(p, include_command_line) for p in snapshot.processes],
+        }
+    )
 
 
 def terminal_text(text: str) -> str:
     """Escape ALL line/control/format characters so evidence cannot forge terminal rows."""
     return "".join(
-        f"\\u{ord(char):04x}" if unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"} else char
-        for char in text
+        f"\\u{ord(char):04x}" if unicodedata.category(char) in {"Cc", "Cf", "Cs", "Zl", "Zp"} else char for char in text
     )
+
+
+def _secret_flag(value: str) -> tuple[str, bool]:
+    flag, separator, _ = value.partition("=")
+    key = flag.lstrip("-").lower().replace("_", "-")
+    if not flag.startswith("-") or key not in _SECRET_FLAGS:
+        return value, False
+    return (flag + "=<redacted>", False) if separator else (value, True)
+
+
+def _redacted_arguments(arguments: list[str]) -> Iterator[str]:
+    """Track split secret values, including a separate Bearer/Basic scheme."""
+    redact_next = False
+    for index, value in enumerate(arguments):
+        if redact_next:
+            redact_next = value.lower() in {"bearer", "basic"}
+            value = "<redacted>"
+        elif index:
+            value, redact_next = _secret_flag(value)
+        yield redact_text(value)

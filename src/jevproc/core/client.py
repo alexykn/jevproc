@@ -45,8 +45,14 @@ def endpoint(value: str) -> str:
         _ = parts.port
     except ValueError as exc:
         raise JevError("invalid TYPESAFE_BASE_URL origin") from exc
-    if (not parts.hostname or parts.username or parts.password or parts.query or parts.fragment
-        or parts.path not in {"", "/"}):
+    if (
+        not parts.hostname
+        or parts.username
+        or parts.password
+        or parts.query
+        or parts.fragment
+        or parts.path not in {"", "/"}
+    ):
         raise JevError("TYPESAFE_BASE_URL must be an origin without credentials, path, query or fragment")
     if parts.scheme != "https" and not (parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"}):
         raise JevError("TYPESAFE_BASE_URL requires HTTPS except for a loopback test server")
@@ -129,8 +135,14 @@ def _context_error(response: httpx.Response) -> bool:
 
 
 class JevClient:
-    def __init__(self, settings: JevSettings, api_key: str, *, base_url: str = "https://api.typesafe.ai",
-                 transport: httpx.AsyncBaseTransport | None = None):
+    def __init__(
+        self,
+        settings: JevSettings,
+        api_key: str,
+        *,
+        base_url: str = "https://api.typesafe.ai",
+        transport: httpx.AsyncBaseTransport | None = None,
+    ):
         if not api_key.strip():
             raise JevError("set TYPESAFE_API_KEY for live analysis, or use --offline or --demo")
         if any(ord(char) < 33 or ord(char) > 126 for char in api_key):
@@ -145,11 +157,18 @@ class JevClient:
         self.limiter = Limiter(settings.requests_per_minute)
         self.slots = asyncio.Semaphore(settings.concurrency)
         self.http = httpx.AsyncClient(
-            base_url=self.base_url, transport=transport,
-            timeout=settings.timeout_seconds, follow_redirects=False, trust_env=False,
+            base_url=self.base_url,
+            transport=transport,
+            timeout=settings.timeout_seconds,
+            follow_redirects=False,
+            trust_env=False,
             limits=httpx.Limits(max_connections=settings.concurrency, max_keepalive_connections=settings.concurrency),
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json",
-                     "Accept": "application/json", "User-Agent": f"jevproc/{__version__}"},
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": f"jevproc/{__version__}",
+            },
         )
 
     def _check_ready(self) -> None:
@@ -165,66 +184,85 @@ class JevClient:
             self._check_ready()
             self.requests += 1
             async with self.http.stream("POST", "/v1/systemone", content=body) as response:
-                parts: list[bytes] = []
-                size = 0
-                async for part in response.aiter_bytes(chunk_size=65536):
-                    size += len(part)
-                    if size > 2 * 1024 * 1024:
-                        raise JevError("Jev response exceeds the 2 MiB safety limit")
-                    parts.append(part)
-                headers = response.headers.copy()
-                headers.pop("content-encoding", None)
-                headers.pop("content-length", None)
-                result = httpx.Response(response.status_code, headers=headers, content=b"".join(parts))
-                if response.status_code in {401, 403}:
-                    self.fatal_error = f"Jev authentication/authorization failed (HTTP {response.status_code})"
-                return result
+                result = await _read_bounded_response(response)
+            if result.status_code in {401, 403}:
+                self.fatal_error = f"Jev authentication/authorization failed (HTTP {result.status_code})"
+            return result
 
     async def evaluate(self, body: bytes, questions: dict[str, Question]) -> JevResponse:
         for attempt in range(self.settings.retries + 1):
             try:
                 response = await self._post(body)
             except httpx.RequestError as exc:
-                if attempt == self.settings.retries:
-                    raise JevError(f"Jev transport failed ({type(exc).__name__}); no response was classified") from exc
-                delay = self._backoff(attempt)
+                delay = self._transport_retry(exc, attempt)
             else:
                 if response.is_success:
-                    validated = validate_response(response.content, questions)
-                    if self.settings.model not in {"jev-latest", "jev-preview"} and validated.model != self.settings.model:
-                        raise JevError("Jev returned a different model than the requested pinned version")
-                    self.input_tokens += validated.usage.input_tokens
-                    self.output_tokens += validated.usage.output_tokens
-                    return validated
-                if _context_error(response):
-                    raise ContextLimitError("Jev rejected the context size")
-                if response.status_code in {400, 422}:
-                    raise RequestRejectedError(
-                        status=response.status_code,
-                        machine_fields=_machine_fields(_json_body(response)),
-                        request_id=_safe_request_id(response),
-                    )
-                if response.status_code not in {408, 429} and response.status_code < 500:
-                    request_id = _safe_request_id(response)
-                    suffix = f"; request-id={request_id}" if request_id else ""
-                    raise JevError(f"Jev request failed (HTTP {response.status_code}{suffix})")
-                if attempt == self.settings.retries:
-                    raise JevError(f"Jev retries exhausted (HTTP {response.status_code})")
-                provider_delay = retry_after(response.headers)
-                delay = self._backoff(attempt) if provider_delay is None else provider_delay
-                if delay > self.settings.max_retry_delay:
-                    raise JevError("Jev Retry-After exceeds max_retry_delay; refusing to retry early")
-                # All workers honor overload delays rather than just the worker that hit the limit.
+                    return self._accept_response(response, questions)
+                delay = self._response_retry(response, attempt)
+                # Preserve shared overload pacing, independently of a worker's own sleep.
                 self.limiter.defer(delay)
             self.retries += 1
             await asyncio.sleep(delay)
         raise AssertionError("retry loop must return or raise")
 
+    def _accept_response(self, response: httpx.Response, questions: dict[str, Question]) -> JevResponse:
+        validated = validate_response(response.content, questions)
+        if self.settings.model not in {"jev-latest", "jev-preview"} and validated.model != self.settings.model:
+            raise JevError("Jev returned a different model than the requested pinned version")
+        self.input_tokens += validated.usage.input_tokens
+        self.output_tokens += validated.usage.output_tokens
+        return validated
+
+    def _transport_retry(self, error: httpx.RequestError, attempt: int) -> float:
+        if attempt == self.settings.retries:
+            raise JevError(f"Jev transport failed ({type(error).__name__}); no response was classified") from error
+        return self._backoff(attempt)
+
+    def _response_retry(self, response: httpx.Response, attempt: int) -> float:
+        _raise_permanent_failure(response)
+        if attempt == self.settings.retries:
+            raise JevError(f"Jev retries exhausted (HTTP {response.status_code})")
+        provider_delay = retry_after(response.headers)
+        delay = self._backoff(attempt) if provider_delay is None else provider_delay
+        if delay > self.settings.max_retry_delay:
+            raise JevError("Jev Retry-After exceeds max_retry_delay; refusing to retry early")
+        return delay
+
     def _backoff(self, attempt: int) -> float:
-        return min(self.settings.max_retry_delay, 0.5 * 2 ** attempt + random.random() * 0.2)
+        return min(self.settings.max_retry_delay, 0.5 * 2**attempt + random.random() * 0.2)
 
     async def __aenter__(self) -> Self:
         return self
 
     async def __aexit__(self, *exc: object) -> None:
         await self.http.aclose()
+
+
+async def _read_bounded_response(response: httpx.Response) -> httpx.Response:
+    """Consume and detach a decoded response without retaining transport resources."""
+    parts: list[bytes] = []
+    size = 0
+    async for part in response.aiter_bytes(chunk_size=65536):
+        size += len(part)
+        if size > 2 * 1024 * 1024:
+            raise JevError("Jev response exceeds the 2 MiB safety limit")
+        parts.append(part)
+    headers = response.headers.copy()
+    headers.pop("content-encoding", None)
+    headers.pop("content-length", None)
+    return httpx.Response(response.status_code, headers=headers, content=b"".join(parts))
+
+
+def _raise_permanent_failure(response: httpx.Response) -> None:
+    if _context_error(response):
+        raise ContextLimitError("Jev rejected the context size")
+    if response.status_code in {400, 422}:
+        raise RequestRejectedError(
+            status=response.status_code,
+            machine_fields=_machine_fields(_json_body(response)),
+            request_id=_safe_request_id(response),
+        )
+    if response.status_code not in {408, 429} and response.status_code < 500:
+        request_id = _safe_request_id(response)
+        suffix = f"; request-id={request_id}" if request_id else ""
+        raise JevError(f"Jev request failed (HTTP {response.status_code}{suffix})")
