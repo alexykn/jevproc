@@ -789,6 +789,7 @@ def collect(
     pids: list[int] | None = None,
     *,
     family_pid: int | None = None,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> Snapshot:
     if sys.platform not in {"linux", "darwin"}:
         raise CollectionError("live collection supports Linux and macOS; use a saved snapshot on other platforms")
@@ -808,16 +809,21 @@ def collect(
     resource_probes = _prime_resource_probes(selected, settings)
 
     file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] = {}
-    processes = [
-        _process(
-            pid,
-            settings,
-            now,
-            file_cache,
-            resource_probe=resource_probes.get(pid),
+    processes: list[Process] = []
+    if on_progress is not None:
+        on_progress(0, len(selected))
+    for completed, pid in enumerate(selected, start=1):
+        processes.append(
+            _process(
+                pid,
+                settings,
+                now,
+                file_cache,
+                resource_probe=resource_probes.get(pid),
+            )
         )
-        for pid in selected
-    ]
+        if on_progress is not None:
+            on_progress(completed, len(selected))
     # Capture sockets AFTER process identities and revalidate those identities afterwards.
     # Otherwise a reused PID could inherit the previous process's network evidence.
     network, coverage = _network(settings)
