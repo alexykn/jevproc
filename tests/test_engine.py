@@ -1,18 +1,16 @@
-import asyncio
 import json
 
 import httpx
-import pytest
 
 from jevproc.core.client import JevClient
-from jevproc.core.config import CacheSettings, Config
+from jevproc.core.config import CacheSettings
 from jevproc.core.demo import demo_transport
 from jevproc.core.engine import Engine
-from jevproc.core.protocol import make_batch
+from jevproc.core.protocol import make_request
 from jevproc.core.storage import AnswerCache
 
 
-async def test_synthetic_end_to_end_uses_real_policy(config,snapshot):
+async def test_synthetic_end_to_end_uses_one_request(config,snapshot):
     async with JevClient(config.jev,'demo',transport=demo_transport()) as client:
         report=await Engine(config,client).scan(snapshot,'demo')
     assert [r.status for r in report.assessments]==['probably_legitimate','warning','uncertain_warning','unknown']
@@ -34,26 +32,13 @@ async def test_exact_state_cached_and_state_change_invalidates(config,snapshot,t
             assert third.summary['requests']==1
 
 
-async def test_context_rejection_splits_without_losing_targets(config,snapshot):
-    original=demo_transport()
-    def handler(request):
-        payload=json.loads(request.content)
-        if len(payload['state']['processes'])>1:
-            return httpx.Response(413)
-        return original.handle_request(request)
-    async with JevClient(config.jev,'demo',transport=httpx.MockTransport(handler)) as client:
-        report=await Engine(config,client).scan(snapshot,'demo')
-    assert report.summary['evaluated']==4
-    assert report.summary['requests']==7
-    assert not report.summary['incomplete']
-    assert len({r.process.pid for r in report.assessments})==4
-
-
-async def test_single_oversize_request_is_not_hidden_success(config,snapshot):
+async def test_context_rejection_does_not_fragment_snapshot(config,snapshot):
     async with JevClient(config.jev,'demo',transport=httpx.MockTransport(lambda r:httpx.Response(413))) as client:
         report=await Engine(config,client).scan(snapshot,'demo')
+    assert report.summary['requests']==1
     assert report.summary['evaluated']==0
     assert report.summary['failed_processes']==4 and report.summary['incomplete']
+    assert all(r.status=='not_evaluated' for r in report.assessments)
 
 
 async def test_transport_failure_preserves_all_processes(config,snapshot):
@@ -84,26 +69,26 @@ async def test_unstable_identity_not_submitted(config,snapshot):
     assert report.summary['unstable_processes']==1
 
 
-async def test_fixed_worker_pool_limits_concurrency(config,snapshot):
-    data=config.model_dump(mode='json')
-    data['jev'].update(concurrency=2,batch_size=1)
-    config=Config.model_validate(data)
-    active=peak=0
-    source=demo_transport()
-    async def handler(request):
-        nonlocal active,peak
-        active+=1
-        peak=max(peak,active)
-        await asyncio.sleep(.005)
-        result=source.handle_request(request)
-        active-=1
-        return result
+async def test_hundreds_of_processes_are_one_request(config,snapshot):
+    processes=[snapshot.processes[0].model_copy(update={'pid':10000+i,'ppid':None}) for i in range(700)]
+    source=snapshot.model_copy(update={'processes':processes})
+    calls=0
+    def handler(request):
+        nonlocal calls
+        calls+=1
+        payload=json.loads(request.content)
+        assert 'processes' not in payload['state']
+        assert len(payload['questions'])==700
+        answers={key:{'type':'noul','noul':0.08} for key in payload['questions']}
+        return httpx.Response(200,json={'model':payload['model'],'answers':answers,
+                                        'usage':{'input_tokens':1000,'output_tokens':700}})
     async with JevClient(config.jev,'demo',transport=httpx.MockTransport(handler)) as client:
-        report=await Engine(config,client).scan(snapshot,'demo')
-    assert report.summary['evaluated']==4 and peak==2
+        report=await Engine(config,client).scan(source,'demo')
+    assert calls==1 and report.summary['requests']==1
+    assert report.summary['evaluated']==700
 
 
-async def test_missing_evidence_never_receives_fabricated_negative_answer(config,snapshot):
+async def test_missing_evidence_does_not_create_extra_questions(config,snapshot):
     sanitized=snapshot.model_copy(update={'processes':[snapshot.processes[3]]})
-    batch=make_batch(sanitized,sanitized.processes,config)
-    assert set(batch.questions)=={'p7700_JPR001'}
+    request=make_request(sanitized,sanitized.processes,config)
+    assert set(request.questions)=={'p7700_JPR001'}

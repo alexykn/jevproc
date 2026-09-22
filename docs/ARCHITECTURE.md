@@ -4,7 +4,7 @@
 psutil snapshot or validated saved JSON
   -> privacy minimization + bounded typed Process records
   -> independent rule applicability checks
-  -> bounded shared-state request batches
+  -> one Jev request for the complete selected snapshot
   -> validated cache / paced Jev client
   -> exact typed answers
   -> local warning policy
@@ -18,21 +18,32 @@ policy. `protocol.py` binds targets and owns response validation; `client.py`
 handles only transport, pacing and request accounting. `assessment.py` applies
 local policy. `engine.py` owns orchestration. `cli` never invents a second detector.
 
-## Shared state, not duplicated per-question prompts
+## One snapshot, one request
 
-A request contains one `state.processes` mapping. Each question's instruction
-object explicitly names its `target.ref`, PID and creation time and includes the
-policy and task. The provider's API says question IDs are not passed to the model;
-using only a key such as `p123_JPR001` would therefore be incorrect. The key is a
-local attribution handle; the instructions perform the semantic binding.
+The shared `state` contains host context, the fixed evidence policy, active rule
+definitions and compact field legends. It deliberately does **not** repeat the
+whole process table. Each independent question carries one compact process record
+and explicitly names its target and rule. The provider's API says question IDs
+are not passed to the model, so the target binding remains inside instructions.
+The full local `Process` objects are retained for reporting and policy decisions;
+only the inference wire is compacted.
 
-Question independence is intentional. Overall assessment does not consume the
-other model answers, and the dimensions do not consume each other. Relationships
-between observed processes are context; they are not fabricated execution history.
-There is no hidden agent/tool loop, shell execution or model-written remediation.
+This layout follows Jev 1.13's documented context model: 64k tokens for a full
+request, with a 32k limit on shared state plus the longest question. It also
+follows TypeSafe's speculative fan-out guidance that many independent questions
+should normally be sent together because they are evaluated in parallel. There
+is no process batch planner, API worker pool, recursive context split or local
+byte-count approximation of model tokens. If the provider rejects an unusually
+large snapshot, every affected process is explicitly `not_evaluated`; the tool
+does not silently change the context and retry subsets.
 
-The boundary checks exact answer IDs, answer types, criterion labels, finite ranges
-and score scale. Choice/Score numeric distributions are preserved without
+Question independence is intentional. Relationships between observed processes
+are evidence only when present in the process record; they are not fabricated
+execution history. There is no hidden agent/tool loop, shell execution or
+model-written remediation.
+
+The boundary checks exact answer IDs, answer types, criterion labels, finite
+ranges and score scale. Choice/Score numeric distributions are preserved without
 normalization. Cached answers use the same decoder. Pinned-model mismatches are
 errors, not transparent model substitutions. Noul has no invented confidence.
 
@@ -75,14 +86,13 @@ messages come from the local rubric and observed facts, not invented model prose
 Cache identity hashes the exact canonical request and endpoint, so it includes
 model, policy, shared state and bound questions. It expires quickly and never
 learns an allowlist from repeated observations. Changing a process's PID/start
-identity, age band, evidence or batch context changes the key. Responses are
+identity, age band, evidence or snapshot context changes the key. Responses are
 stored; raw requests and process evidence are not.
 
-A fixed worker pool consumes planned batches. The transport semaphore, pacing
-lock and attempt budget include retries. Recognized context errors split batches
-until a single target is reached. Errors there are explicit non-evaluations.
-Authentication failures stop subsequent queued transport attempts. Concurrency
-may leave already-started requests in flight; there is no claim of undoing them.
+The transport pacing lock and attempt budget include retries and watch cycles.
+A snapshot has only one in-flight evaluation request. Authentication, transport
+and context failures become explicit non-evaluations rather than fallback
+classifications.
 
 Read-only means no mutation of inspected processes or their software. The tool can
 write its own cache and explicitly requested snapshots. Root/kernel compromise,

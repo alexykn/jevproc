@@ -106,15 +106,11 @@ class Rule(Settings):
 
 class JevSettings(Settings):
     model: str = Field(default="jev-1.13.0", pattern=r"^jev-[A-Za-z0-9.\-]+$")
-    concurrency: int = Field(default=4, ge=1, le=64)
     timeout_seconds: float = Field(default=30, ge=0.1, le=300)
     retries: int = Field(default=2, ge=0, le=8)
     requests_per_minute: float = Field(default=120, ge=0, le=100000)
     max_retry_delay: float = Field(default=30, ge=0, le=300)
     max_requests: int = Field(default=1000, ge=1, le=100000)
-    max_request_bytes: int = Field(default=48000, ge=2000, le=192000)
-    max_state_question_bytes: int = Field(default=24000, ge=1000, le=96000)
-    batch_size: int = Field(default=4, ge=1, le=32)
 
 
 class CollectionSettings(Settings):
