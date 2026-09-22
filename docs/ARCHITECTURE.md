@@ -55,6 +55,10 @@ summaries are collected in one process-table pass, capped by `child_limit`, and
 carry the full observed child count separately. `--family PID` selects the root
 plus descendants for independent evaluation.
 
+When command-line collection is disabled, Linux identity helpers use direct
+`/proc` metadata and macOS uses fixed-path `/bin/ps` command metadata so psutil
+cannot silently fall back to argv while resolving names/paths.
+
 Resource evidence uses one shared short CPU sampling window across selected
 processes rather than one blocking interval per PID. CPU percent, RSS, memory
 percent, thread count and FD count are bounded typed evidence sent to Jev/JSON but
