@@ -165,6 +165,28 @@ def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):
     assert p.coverage['connections']=='not_requested'
 
 
+
+
+
+def test_collect_reports_selected_process_progress():
+    events = []
+    snapshot = collect(
+        CollectionSettings(
+            ancestry_depth=0,
+            connections=False,
+            command_line=False,
+            hashes=False,
+            signatures=False,
+            resources=False,
+            child_limit=0,
+        ),
+        [os.getpid()],
+        on_progress=lambda completed, total: events.append((completed, total)),
+    )
+    assert len(snapshot.processes) == 1
+    assert events == [(0, 1), (1, 1)]
+
+
 def test_import_rejects_unknown_fields_and_duplicate_pids(tmp_path,snapshot):
     raw=snapshot.model_dump(mode='json')
     raw['processes'][0]['environment']={'SECRET':'do not send'}
