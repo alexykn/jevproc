@@ -115,13 +115,7 @@ def _evaluate_observations(
         if label not in totals:
             raise ValueError(f"unsupported calibration label: {label}")
         totals[label] += 1
-        predicted = (
-            "warning"
-            if score >= warning_at
-            else "ambiguous"
-            if score >= uncertain_at
-            else "benign"
-        )
+        predicted = "warning" if score >= warning_at else "ambiguous" if score >= uncertain_at else "benign"
         target = {
             "benign": "benign",
             "ambiguous": "ambiguous",
@@ -162,10 +156,8 @@ def evaluate_pair(
     Kept for case-mean stability analysis and backwards-compatible callers.
     Operational calibration should use evaluate_samples().
     """
-    observations = [
-        (cases[case_id].label, score)
-        for case_id, score in case_means.items()
-        if cases[case_id].label != "unknown"
+    observations: list[tuple[str, float]] = [
+        (cases[case_id].label, score) for case_id, score in case_means.items() if cases[case_id].label != "unknown"
     ]
     return _evaluate_observations(observations, uncertain_at, warning_at)
 
@@ -177,7 +169,7 @@ def evaluate_samples(
     warning_at: float,
 ) -> PairMetrics:
     """Evaluate every repeated run independently."""
-    observations = [
+    observations: list[tuple[str, float]] = [
         (cases[case_id].label, score)
         for case_id, values in samples.items()
         for score in values
@@ -268,7 +260,7 @@ def candidate_pairs(
     current_uncertain: float,
     current_warning: float,
 ) -> dict[str, Any]:
-    observations = [
+    observations: list[tuple[str, float]] = [
         (cases[case_id].label, value)
         for case_id, value in case_means.items()
         if cases[case_id].label in {"benign", "ambiguous", "suspicious"}
@@ -286,7 +278,7 @@ def sample_candidate_pairs(
     current_uncertain: float,
     current_warning: float,
 ) -> dict[str, Any]:
-    observations = [
+    observations: list[tuple[str, float]] = [
         (cases[case_id].label, value)
         for case_id, values in samples.items()
         for value in values
@@ -355,27 +347,19 @@ def calibration_report(
         "min_ambiguous_mean": min(ambiguous_means) if ambiguous_means else None,
         "min_suspicious_mean": min(suspicious_means) if suspicious_means else None,
         "benign_to_ambiguous_gap": (
-            min(ambiguous_means) - max(benign_means)
-            if benign_means and ambiguous_means
-            else None
+            min(ambiguous_means) - max(benign_means) if benign_means and ambiguous_means else None
         ),
         "benign_to_suspicious_gap": (
-            min(suspicious_means) - max(benign_means)
-            if benign_means and suspicious_means
-            else None
+            min(suspicious_means) - max(benign_means) if benign_means and suspicious_means else None
         ),
         "max_benign_sample": max(benign_samples) if benign_samples else None,
         "min_ambiguous_sample": min(ambiguous_samples) if ambiguous_samples else None,
         "min_suspicious_sample": min(suspicious_samples) if suspicious_samples else None,
         "benign_to_ambiguous_sample_gap": (
-            min(ambiguous_samples) - max(benign_samples)
-            if benign_samples and ambiguous_samples
-            else None
+            min(ambiguous_samples) - max(benign_samples) if benign_samples and ambiguous_samples else None
         ),
         "benign_to_suspicious_sample_gap": (
-            min(suspicious_samples) - max(benign_samples)
-            if benign_samples and suspicious_samples
-            else None
+            min(suspicious_samples) - max(benign_samples) if benign_samples and suspicious_samples else None
         ),
     }
 
@@ -389,9 +373,7 @@ def calibration_report(
                 "min": case_stats[case.id].get("min"),
                 "max": case_stats[case.id].get("max"),
                 "span": (
-                    case_stats[case.id]["max"] - case_stats[case.id]["min"]
-                    if case_stats[case.id].get("n", 0)
-                    else None
+                    case_stats[case.id]["max"] - case_stats[case.id]["min"] if case_stats[case.id].get("n", 0) else None
                 ),
             }
             for case in cases

@@ -8,114 +8,132 @@ import pytest
 from pydantic import ValidationError
 
 from jevproc.core.collector import (
-    _classify_codesign_failure,
     _collect_processes_parallel,
-    _family_pids,
     _file_evidence_futures,
-    _file_info,
-    _get,
-    _hash_file,
-    _network,
-    _parse_lsof_network,
-    _resource_usage,
-    _signature,
-    attach_ancestry,
-    attach_children,
-    attach_network,
     collect,
     load_snapshot,
 )
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence.files import (
+    _classify_codesign_failure,
+    _file_info,
+    _hash_file,
+    _signature,
+)
+from jevproc.core.evidence.network import _network, _parse_lsof_network, attach_network
+from jevproc.core.evidence.process import _get, _resource_usage
+from jevproc.core.evidence.relationships import (
+    _family_pids,
+    attach_ancestry,
+    attach_children,
+)
 from jevproc.core.models import Connection, Process
 from jevproc.core.privacy import redact_argv, sanitize_snapshot, terminal_text
 
 
 def test_sensitive_arguments_are_redacted_before_truncation():
-    args=["program","--password","SECRET","--api-key=SECOND","https://user:THIRD@example.com/?token=FOURTH",
-          "Authorization: Bearer FIFTH","jv_live_abcdefghijk","/Users/alex/private"]
-    cleaned,_=redact_argv(args)
-    result=" ".join(cleaned)
-    for secret in ("SECRET","SECOND","THIRD","FOURTH","FIFTH","abcdefghijk","/Users/alex"):
+    args = [
+        "program",
+        "--password",
+        "SECRET",
+        "--api-key=SECOND",
+        "https://user:THIRD@example.com/?token=FOURTH",
+        "Authorization: Bearer FIFTH",
+        "jv_live_abcdefghijk",
+        "/Users/alex/private",
+    ]
+    cleaned, _ = redact_argv(args)
+    result = " ".join(cleaned)
+    for secret in ("SECRET", "SECOND", "THIRD", "FOURTH", "FIFTH", "abcdefghijk", "/Users/alex"):
         assert secret not in result
     assert "<redacted>" in result and "/Users/<user>" in result
-    cleaned,truncated=redact_argv(["p","--token="+"z"*10000])
-    assert cleaned[1]=="--token=<redacted>" and not truncated
+    cleaned, truncated = redact_argv(["p", "--token=" + "z" * 10000])
+    assert cleaned[1] == "--token=<redacted>" and not truncated
 
 
 def test_argument_limits_are_explicit():
-    args,truncated=redact_argv(["a"]*70)
-    assert len(args)==64 and truncated
-    args,truncated=redact_argv(["p","x"*1000])
-    assert len(args[1]) <=512 and truncated
+    args, truncated = redact_argv(["a"] * 70)
+    assert len(args) == 64 and truncated
+    args, truncated = redact_argv(["p", "x" * 1000])
+    assert len(args[1]) <= 512 and truncated
 
 
 def test_command_line_can_be_explicitly_omitted_on_import(snapshot):
-    sanitized=sanitize_snapshot(snapshot,False)
+    sanitized = sanitize_snapshot(snapshot, False)
     assert all(p.command_line is None for p in sanitized.processes)
-    assert all(p.coverage['command_line']=='not_requested' for p in sanitized.processes)
+    assert all(p.coverage["command_line"] == "not_requested" for p in sanitized.processes)
 
 
 def test_terminal_control_and_row_injection_escaped():
-    raw="safe\x1b[2J\r\nFAKE\u202e\x9b31m"
-    escaped=terminal_text(raw)
+    raw = "safe\x1b[2J\r\nFAKE\u202e\x9b31m"
+    escaped = terminal_text(raw)
     assert "\x1b" not in escaped and "\n" not in escaped and "\r" not in escaped and "\u202e" not in escaped
     assert "\\u001b" in escaped
 
 
-@pytest.mark.parametrize("exception,coverage",[(psutil.AccessDenied(42),'denied'),(psutil.NoSuchProcess(42),'gone'),(OSError(),'unavailable')])
-def test_collection_failure_is_not_empty_success(exception,coverage):
+@pytest.mark.parametrize(
+    "exception,coverage",
+    [(psutil.AccessDenied(42), "denied"), (psutil.NoSuchProcess(42), "gone"), (OSError(), "unavailable")],
+)
+def test_collection_failure_is_not_empty_success(exception, coverage):
     def fail():
         raise exception
-    states={}
-    assert _get('executable',fail,states) is None
-    assert states['executable']==coverage
+
+    states = {}
+    assert _get("executable", fail, states) is None
+    assert states["executable"] == coverage
 
 
 def test_reused_parent_pid_is_not_attached():
-    child=Process(pid=2,created_at=20,ppid=1)
-    wrong_parent=Process(pid=1,created_at=30,ppid=0)
-    results=attach_ancestry([wrong_parent,child],4)
-    assert results[1].ancestors==[]
-    assert results[1].coverage['ancestry']=='partial'
+    child = Process(pid=2, created_at=20, ppid=1)
+    wrong_parent = Process(pid=1, created_at=30, ppid=0)
+    results = attach_ancestry([wrong_parent, child], 4)
+    assert results[1].ancestors == []
+    assert results[1].coverage["ancestry"] == "partial"
 
 
 def test_ancestry_cycles_and_depth_are_bounded():
-    a=Process(pid=1,created_at=1,ppid=2,name='a')
-    b=Process(pid=2,created_at=1,ppid=1,name='b')
-    results=attach_ancestry([a,b],4)
-    assert all(len(p.ancestors)==1 for p in results)
-    assert all(p.coverage['ancestry']=='partial' for p in results)
+    a = Process(pid=1, created_at=1, ppid=2, name="a")
+    b = Process(pid=2, created_at=1, ppid=1, name="b")
+    results = attach_ancestry([a, b], 4)
+    assert all(len(p.ancestors) == 1 for p in results)
+    assert all(p.coverage["ancestry"] == "partial" for p in results)
 
 
 def test_pid_reuse_drops_socket_evidence(monkeypatch):
-    process=Process(pid=42,created_at=10,executable='/bin/tool')
-    monkeypatch.setattr(psutil,'Process',lambda pid:SimpleNamespace(create_time=lambda:20))
-    results=attach_network([process],{42:[Connection(protocol='tcp',remote_address='192.0.2.1',remote_port=443)]},'observed')
-    assert results[0].freshness=='reused'
-    assert results[0].connections==[]
-    assert results[0].coverage['connections']=='unavailable'
+    process = Process(pid=42, created_at=10, executable="/bin/tool")
+    monkeypatch.setattr(psutil, "Process", lambda pid: SimpleNamespace(create_time=lambda: 20))
+    results = attach_network(
+        [process], {42: [Connection(protocol="tcp", remote_address="192.0.2.1", remote_port=443)]}, "observed"
+    )
+    assert results[0].freshness == "reused"
+    assert results[0].connections == []
+    assert results[0].coverage["connections"] == "unavailable"
 
 
 def test_hash_is_bounded_regular_file_only(tmp_path):
-    path=tmp_path/'binary'
-    path.write_bytes(b'abc')
+    path = tmp_path / "binary"
+    path.write_bytes(b"abc")
     import hashlib
-    assert _hash_file(str(path),3)==(hashlib.sha256(b'abc').hexdigest(),'observed')
-    assert _hash_file(str(path),2)==(None,'truncated')
-    link=tmp_path/'link'
+
+    assert _hash_file(str(path), 3) == (hashlib.sha256(b"abc").hexdigest(), "observed")
+    assert _hash_file(str(path), 2) == (None, "truncated")
+    link = tmp_path / "link"
     link.symlink_to(path)
-    assert _hash_file(str(link),100)[0] is None
-    fifo=tmp_path/'fifo'
+    assert _hash_file(str(link), 100)[0] is None
+    fifo = tmp_path / "fifo"
     os.mkfifo(fifo)
-    assert _hash_file(str(fifo),100)[0] is None
+    assert _hash_file(str(fifo), 100)[0] is None
 
 
 def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
-    import jevproc.core.collector as module
-    monkeypatch.setattr(module.sys,'platform','darwin')
-    calls=[]
-    def run(argv,**kwargs):
-        calls.append((argv,kwargs))
+    import jevproc.core.evidence.files as module
+
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
         if "--display" in argv:
             return SimpleNamespace(
                 returncode=0,
@@ -128,24 +146,23 @@ def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
                 ),
             )
         return SimpleNamespace(returncode=0)
-    monkeypatch.setattr(module.subprocess,'run',run)
-    values, coverage = _signature('/tmp/a;echo owned')
-    assert coverage == 'observed'
+
+    monkeypatch.setattr(module.subprocess, "run", run)
+    values, coverage = _signature("/tmp/a;echo owned")
+    assert coverage == "observed"
     assert values == {
-        'signature': 'valid',
-        'signature_identifier': 'com.example.tool',
-        'signature_team_id': 'TEAM123456',
-        'signature_authorities': [
-            'Developer ID Application: Example Corp',
-            'Developer ID Certification Authority',
+        "signature": "valid",
+        "signature_identifier": "com.example.tool",
+        "signature_team_id": "TEAM123456",
+        "signature_authorities": [
+            "Developer ID Application: Example Corp",
+            "Developer ID Certification Authority",
         ],
     }
-    assert calls[0][0]==['/usr/bin/codesign','--verify','--strict','--','/tmp/a;echo owned']
-    assert calls[1][0]==['/usr/bin/codesign','--display','--verbose=4','--','/tmp/a;echo owned']
-    assert all('shell' not in kwargs for _, kwargs in calls)
-    assert all(kwargs['timeout']==3 for _, kwargs in calls)
-
-
+    assert calls[0][0] == ["/usr/bin/codesign", "--verify", "--strict", "--", "/tmp/a;echo owned"]
+    assert calls[1][0] == ["/usr/bin/codesign", "--display", "--verbose=4", "--", "/tmp/a;echo owned"]
+    assert all("shell" not in kwargs for _, kwargs in calls)
+    assert all(kwargs["timeout"] == 3 for _, kwargs in calls)
 
 
 @pytest.mark.parametrize(
@@ -159,7 +176,11 @@ def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
         ("nested code is modified or invalid", "verification_failed", "nested_code_invalid"),
         ("code or signature modified", "verification_failed", "signature_modified"),
         ("does not satisfy its designated Requirement", "verification_failed", "requirement_failed"),
-        ("test-requirement: code failed to satisfy specified code requirement(s)", "verification_failed", "requirement_failed"),
+        (
+            "test-requirement: code failed to satisfy specified code requirement(s)",
+            "verification_failed",
+            "requirement_failed",
+        ),
         ("bundle format is ambiguous (could be app or framework)", "verification_failed", "bundle_format_invalid"),
         ("bundle format unrecognized, invalid, or unsuitable", "verification_failed", "bundle_format_invalid"),
         ("notarization indicates this code has been revoked", "verification_failed", "revoked"),
@@ -173,7 +194,7 @@ def test_codesign_failure_diagnostics_are_normalized(diagnostic, state, issue):
 
 
 def test_legacy_codesign_keeps_signer_metadata(monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.files as module
 
     monkeypatch.setattr(module.sys, "platform", "darwin")
     calls = []
@@ -220,7 +241,7 @@ def test_legacy_codesign_keeps_signer_metadata(monkeypatch):
 
 
 def test_unsigned_codesign_skips_display(monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.files as module
 
     monkeypatch.setattr(module.sys, "platform", "darwin")
     calls = []
@@ -237,7 +258,7 @@ def test_unsigned_codesign_skips_display(monkeypatch):
 
 
 def test_failed_codesign_can_preserve_display_identity(monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.files as module
 
     monkeypatch.setattr(module.sys, "platform", "darwin")
 
@@ -257,9 +278,6 @@ def test_failed_codesign_can_preserve_display_identity(monkeypatch):
     assert values["signature_issue"] == "signature_modified"
     assert values["signature_identifier"] == "com.example.tool"
     assert values["signature_team_id"] == "TEAM123456"
-
-
-
 
 
 def test_process_metadata_collection_runs_in_parallel(monkeypatch):
@@ -361,11 +379,12 @@ def test_file_evidence_is_deduplicated_and_parallel(monkeypatch):
 
 
 def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):
-    def forbidden(*args,**kwargs):
-        raise AssertionError('sensitive collector used')
-    monkeypatch.setattr(psutil.Process,'environ',forbidden)
-    monkeypatch.setattr(psutil.Process,'cmdline',forbidden)
-    snapshot=collect(
+    def forbidden(*args, **kwargs):
+        raise AssertionError("sensitive collector used")
+
+    monkeypatch.setattr(psutil.Process, "environ", forbidden)
+    monkeypatch.setattr(psutil.Process, "cmdline", forbidden)
+    snapshot = collect(
         CollectionSettings(
             connections=False,
             command_line=False,
@@ -374,26 +393,24 @@ def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):
         ),
         [os.getpid()],
     )
-    assert len(snapshot.processes)==1
-    p=snapshot.processes[0]
-    assert p.pid==os.getpid() and p.created_at is not None
+    assert len(snapshot.processes) == 1
+    p = snapshot.processes[0]
+    assert p.pid == os.getpid() and p.created_at is not None
     assert p.command_line is None
-    assert p.coverage['connections']=='not_requested'
+    assert p.coverage["connections"] == "not_requested"
 
 
-
-
-
-def test_import_rejects_unknown_fields_and_duplicate_pids(tmp_path,snapshot):
-    raw=snapshot.model_dump(mode='json')
-    raw['processes'][0]['environment']={'SECRET':'do not send'}
-    path=tmp_path/'bad.json'
+def test_import_rejects_unknown_fields_and_duplicate_pids(tmp_path, snapshot):
+    raw = snapshot.model_dump(mode="json")
+    raw["processes"][0]["environment"] = {"SECRET": "do not send"}
+    path = tmp_path / "bad.json"
     import json
+
     path.write_text(json.dumps(raw))
     with pytest.raises(ValidationError):
         load_snapshot(path)
-    raw=snapshot.model_dump(mode='json')
-    raw['processes'].append(raw['processes'][0])
+    raw = snapshot.model_dump(mode="json")
+    raw["processes"].append(raw["processes"][0])
     path.write_text(json.dumps(raw))
     with pytest.raises(ValidationError):
         load_snapshot(path)
@@ -404,10 +421,12 @@ def test_authorization_split_and_observations_are_redacted(snapshot):
 
     arguments, _ = redact_argv(["curl", "--authorization", "Bearer", "private-token"])
     assert "private-token" not in " ".join(arguments)
-    process = snapshot.processes[0].model_copy(update={
-        "observations": ["Authorization: Bearer private-token"],
-        "name": "a" * 504 + " token=x",
-    })
+    process = snapshot.processes[0].model_copy(
+        update={
+            "observations": ["Authorization: Bearer private-token"],
+            "name": "a" * 504 + " token=x",
+        }
+    )
     sanitized = sanitize_process(process, False)
     assert "private-token" not in sanitized.model_dump_json()
     assert len(sanitized.name) <= 512
@@ -416,16 +435,21 @@ def test_authorization_split_and_observations_are_redacted(snapshot):
 
 def test_exec_image_change_discards_network_evidence(monkeypatch):
     process = Process(pid=42, created_at=10, executable="/bin/original")
-    monkeypatch.setattr(psutil, "Process", lambda pid: SimpleNamespace(
-        create_time=lambda: 10, exe=lambda: "/bin/replacement",
-    ))
+    monkeypatch.setattr(
+        psutil,
+        "Process",
+        lambda pid: SimpleNamespace(
+            create_time=lambda: 10,
+            exe=lambda: "/bin/replacement",
+        ),
+    )
     result = attach_network([process], {42: [Connection(protocol="tcp")]}, "observed")[0]
     assert result.freshness == "changed"
     assert result.connections == []
 
 
 def test_replaced_file_evidence_is_not_combined(tmp_path, monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.files as module
 
     path = tmp_path / "binary"
     path.write_bytes(b"original")
@@ -480,7 +504,7 @@ def test_lsof_field_parser_maps_tcp_and_udp_connections():
 
 
 def test_macos_network_falls_back_to_lsof(monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.network as module
 
     monkeypatch.setattr(module.sys, "platform", "darwin")
     monkeypatch.setattr(
@@ -489,12 +513,14 @@ def test_macos_network_falls_back_to_lsof(monkeypatch):
         lambda **kwargs: (_ for _ in ()).throw(psutil.AccessDenied()),
     )
     calls = []
+
     def run(argv, **kwargs):
         calls.append((argv, kwargs))
         return SimpleNamespace(
             returncode=0,
             stdout="p42\nf9\nPTCP\nn127.0.0.1:5000->203.0.113.5:443\nTST=ESTABLISHED\n",
         )
+
     monkeypatch.setattr(module.subprocess, "run", run)
     network, coverage = _network(CollectionSettings())
     assert coverage == "partial"
@@ -504,7 +530,7 @@ def test_macos_network_falls_back_to_lsof(monkeypatch):
 
 
 def test_file_inspection_cache_deduplicates_hash_and_signature(tmp_path, monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.files as module
 
     path = tmp_path / "binary"
     path.write_bytes(b"same executable")
@@ -567,13 +593,10 @@ def test_resource_usage_is_partial_when_one_measure_is_denied():
 
 
 def test_children_are_bounded_and_total_count_is_preserved(monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.relationships as module
     from jevproc.core.models import Child
 
-    children = [
-        Child(pid=100 + index, created_at=10 + index, name=f"child-{index}")
-        for index in range(5)
-    ]
+    children = [Child(pid=100 + index, created_at=10 + index, name=f"child-{index}") for index in range(5)]
     monkeypatch.setattr(module, "_child_index", lambda: ({42: children}, "observed"))
     process = Process(pid=42, created_at=1)
     result = attach_children([process], 2)[0]
@@ -583,7 +606,7 @@ def test_children_are_bounded_and_total_count_is_preserved(monkeypatch):
 
 
 def test_family_selection_walks_descendants_only(monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.relationships as module
 
     table = [
         SimpleNamespace(info={"pid": 1, "ppid": 0}),
@@ -599,7 +622,7 @@ def test_family_selection_walks_descendants_only(monkeypatch):
 
 
 def test_live_missing_parent_can_be_resolved_for_single_pid(monkeypatch):
-    import jevproc.core.collector as module
+    import jevproc.core.evidence.relationships as module
 
     child = Process(pid=42, created_at=20, ppid=7, name="child")
     parent_proc = SimpleNamespace(

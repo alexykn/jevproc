@@ -89,3 +89,29 @@ this release beyond assisted triage. Do not execute live malware for testing.
 **Publication:** No public GitHub repository, GitHub Release, remote CI run or PyPI
 package was created. The source, package artifacts and a committed Git bundle are
 the handoff. See PUBLISHING.md for the exact remaining GitHub publication step.
+
+
+
+
+## Architecture refactor checks (2026-09-22)
+
+The refactor was compared against `4ba6a91a51517b09f6ace90f5d0eaa2f11532596`
+with the same installed dependencies and deterministic synthetic HTTP responses.
+The offline fingerprints matched for all 72 request bodies, 362 policy decisions,
+500 seeded argument-redaction cases, the sanitized corpus snapshot, and nine
+corpus CLI variants (listing/regression/calibration in text/JSON/JSONL). Only
+elapsed time is removed from output comparison. The reproducible probe is
+`PYTHONPATH=src uv run python tools/behavior_fingerprint.py`.
+
+The baseline had 187 passing tests; the refactor adds nine regression cases for
+cache setup cleanup (including interruption), non-mutating config overlays,
+corpus accounting, and the core-to-CLI dependency boundary. Existing tests still
+exercise parallel collection, executable deduplication, identity revalidation,
+retry budgets, redaction, and complete machine output. The initial Linux pass
+also built the source distribution/wheel and exercised the installed wheel away
+from the checkout. The PR's normal matrix remains authoritative for each exact
+commit's Linux/macOS and Python 3.12/3.13 results.
+
+This is not a new detection calibration or a live Jevscan result. No live provider
+key was used, no host inventory was submitted, and the 72 corpus cases, prompt,
+thresholds, and external evidence schema were not changed to improve scores.

@@ -5,6 +5,7 @@ import os
 import sqlite3
 import stat
 import time
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Self
 
@@ -43,21 +44,8 @@ def request_key(origin: str, body: bytes) -> str:
 
 class AnswerCache:
     def __init__(self, directory: Path, settings: CacheSettings):
-        _private_directory(directory)
-        path = directory / "answers.sqlite3"
-        fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
-        try:
-            info = os.fstat(fd)
-            if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
-                or info.st_mode & 0o077 or info.st_nlink != 1):
-                raise StorageError("cache must be a private, owned regular file with one link")
-        finally:
-            os.close(fd)
+        self.db = _open_cache_database(_prepare_cache_file(directory))
         self.settings = settings
-        self.db = sqlite3.connect(path, timeout=5)
-        self.db.execute("PRAGMA trusted_schema=OFF")
-        self.db.execute("CREATE TABLE IF NOT EXISTS answers (key TEXT PRIMARY KEY, expires REAL NOT NULL, body BLOB NOT NULL)")
-        self.db.commit()
 
     def get(self, key: str, questions: dict[str, Question]) -> JevResponse | None:
         row = self.db.execute("SELECT expires, body FROM answers WHERE key=?", (key,)).fetchone()
@@ -77,10 +65,13 @@ class AnswerCache:
         # A local cache is not a baseline/allowlist: identical evidence expires quickly.
         with self.db:
             self.db.execute("DELETE FROM answers WHERE expires<=?", (time.time(),))
-            self.db.execute("INSERT OR REPLACE INTO answers VALUES (?, ?, ?)",
-                            (key, expires, response.model_dump_json().encode()))
-            self.db.execute("DELETE FROM answers WHERE key IN (SELECT key FROM answers ORDER BY expires DESC LIMIT -1 OFFSET ?)",
-                            (self.settings.max_entries,))
+            self.db.execute(
+                "INSERT OR REPLACE INTO answers VALUES (?, ?, ?)", (key, expires, response.model_dump_json().encode())
+            )
+            self.db.execute(
+                "DELETE FROM answers WHERE key IN (SELECT key FROM answers ORDER BY expires DESC LIMIT -1 OFFSET ?)",
+                (self.settings.max_entries,),
+            )
 
     def delete(self, key: str) -> None:
         with self.db:
@@ -91,3 +82,31 @@ class AnswerCache:
 
     def __exit__(self, *exc: object) -> None:
         self.db.close()
+
+
+def _prepare_cache_file(directory: Path) -> Path:
+    """Acquire and validate the private disk file, always releasing its descriptor."""
+    _private_directory(directory)
+    path = directory / "answers.sqlite3"
+    fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1:
+            raise StorageError("cache must be a private, owned regular file with one link")
+    finally:
+        os.close(fd)
+    return path
+
+
+def _open_cache_database(path: Path) -> sqlite3.Connection:
+    """Transfer ownership only after setup succeeds; close on every failure path."""
+    with ExitStack() as cleanup:
+        db = sqlite3.connect(path, timeout=5)
+        cleanup.callback(db.close)
+        db.execute("PRAGMA trusted_schema=OFF")
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS answers (key TEXT PRIMARY KEY, expires REAL NOT NULL, body BLOB NOT NULL)"
+        )
+        db.commit()
+        cleanup.pop_all()
+    return db
