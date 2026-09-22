@@ -12,6 +12,7 @@ def main() -> None:
     assert not any(item.lower().startswith("rich") for item in requirement_names)
     assert files("jevproc").joinpath("data/default.yaml").is_file()
     assert files("jevproc").joinpath("data/demo-snapshot.json").is_file()
+    assert files("jevproc").joinpath("data/test-corpus.json").is_file()
     result = subprocess.run(
         [sys.executable, "-m", "jevproc", "--demo", "--format", "json", "--fail-on", "none"],
         capture_output=True,
@@ -24,7 +25,17 @@ def main() -> None:
     assert len(report["assessments"]) == 4
     assert report["summary"]["warnings"] == 1
     assert report["summary"]["uncertain_warnings"] == 1
-    print("Installed wheel: resources, entry point, synthetic pipeline and JSON contract passed.")
+    corpus = subprocess.run(
+        [sys.executable, "-m", "jevproc.cli.corpus", "--list", "--format", "json"],
+        capture_output=True,
+        text=True,
+        check=True,
+        timeout=30,
+    )
+    cases = json.loads(corpus.stdout)
+    assert len(cases) >= 7
+    assert any(case["id"] == "root-user-writable-masquerade" for case in cases)
+    print("Installed wheel: resources, entry points, synthetic pipeline, corpus and JSON contract passed.")
 
 
 if __name__ == "__main__":
