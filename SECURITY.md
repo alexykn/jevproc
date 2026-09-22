@@ -8,8 +8,9 @@ quarantine, block network access or delete files based on its output.
 
 Live mode submits sanitized process metadata to TypeSafe, or to the explicitly
 configured `TYPESAFE_BASE_URL`. By default this includes process paths, redacted
-command arguments, socket endpoints, bounded executable hashes, file metadata and
-macOS signature identity where available. Environment variables of inspected
+command arguments, parent/child summaries, short CPU/memory/thread/FD resource
+samples, socket endpoints, bounded executable hashes, file metadata and macOS
+signature identity where available. Environment variables of inspected
 processes and process memory are never read. Hashing reads bounded executable
 bytes locally but sends only the hash; no binary or script contents are submitted.
 The API key is used only for transport
