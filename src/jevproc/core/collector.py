@@ -10,6 +10,7 @@ import sys
 import time
 from collections import defaultdict
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, Callable
 
@@ -700,34 +701,36 @@ def _process(
     except psutil.NoSuchProcess:
         return Process(pid=pid, freshness="gone", coverage={"identity": "gone"})
     coverage: dict[str, Coverage] = {}
-    created = _get("identity", proc.create_time, coverage)
-    if settings.command_line:
-        name = _get("name", proc.name, coverage, "<unavailable>")
-        executable = _get("executable", proc.exe, coverage) or None
-    else:
-        name = _process_name_without_cmdline(proc, pid)
-        executable = _process_executable_without_cmdline(proc, pid)
-        coverage["name"] = "observed" if name != "<unavailable>" else "unavailable"
-        coverage["executable"] = "observed" if executable else "unavailable"
-    if executable is None and coverage["executable"] == "observed":
-        coverage["executable"] = "unavailable"
-    ppid = _get("parent", proc.ppid, coverage)
-    uid = _get("uid", lambda: proc.uids().real, coverage)
-    status = _get("status", proc.status, coverage, "unknown")
-    resources = ResourceUsage()
-    coverage["resources"] = "not_requested"
-    if settings.resources:
-        resources, coverage["resources"] = _resource_usage(
-            proc, cpu_primed=resource_probe is not None
-        )
-    command_line = None
-    coverage["command_line"] = "not_requested"
-    if settings.command_line:
-        raw = _get("command_line", proc.cmdline, coverage)
-        if raw is not None:
-            command_line, truncated = redact_argv(raw)
-            if truncated:
-                coverage["command_line"] = "truncated"
+    oneshot = proc.oneshot() if hasattr(proc, "oneshot") else nullcontext()
+    with oneshot:
+        created = _get("identity", proc.create_time, coverage)
+        if settings.command_line:
+            name = _get("name", proc.name, coverage, "<unavailable>")
+            executable = _get("executable", proc.exe, coverage) or None
+        else:
+            name = _process_name_without_cmdline(proc, pid)
+            executable = _process_executable_without_cmdline(proc, pid)
+            coverage["name"] = "observed" if name != "<unavailable>" else "unavailable"
+            coverage["executable"] = "observed" if executable else "unavailable"
+        if executable is None and coverage["executable"] == "observed":
+            coverage["executable"] = "unavailable"
+        ppid = _get("parent", proc.ppid, coverage)
+        uid = _get("uid", lambda: proc.uids().real, coverage)
+        status = _get("status", proc.status, coverage, "unknown")
+        resources = ResourceUsage()
+        coverage["resources"] = "not_requested"
+        if settings.resources:
+            resources, coverage["resources"] = _resource_usage(
+                proc, cpu_primed=resource_probe is not None
+            )
+        command_line = None
+        coverage["command_line"] = "not_requested"
+        if settings.command_line:
+            raw = _get("command_line", proc.cmdline, coverage)
+            if raw is not None:
+                command_line, truncated = redact_argv(raw)
+                if truncated:
+                    coverage["command_line"] = "truncated"
     deleted = None
     if sys.platform == "linux":
         try:
@@ -771,9 +774,12 @@ def _observations(path: str | None, info: Executable) -> list[str]:
 def _live_parent(pid: int) -> tuple[Parent, int | None] | None:
     try:
         proc = psutil.Process(pid)
-        created = proc.create_time()
-        name = _process_name_without_cmdline(proc, pid)
-        executable = _process_executable_without_cmdline(proc, pid)
+        oneshot = proc.oneshot() if hasattr(proc, "oneshot") else nullcontext()
+        with oneshot:
+            created = proc.create_time()
+            name = _process_name_without_cmdline(proc, pid)
+            executable = _process_executable_without_cmdline(proc, pid)
+            ppid = proc.ppid()
         return (
             Parent(
                 pid=pid,
@@ -781,7 +787,7 @@ def _live_parent(pid: int) -> tuple[Parent, int | None] | None:
                 name=name[:512],
                 executable=executable[:8192] if executable else None,
             ),
-            proc.ppid(),
+            ppid,
         )
     except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
         return None
@@ -865,10 +871,12 @@ def _attach_network_one(
         try:
             # Fresh objects avoid psutil's cached executable/start-time attributes.
             current = psutil.Process(process.pid)
-            if current.create_time() != process.created_at:
-                freshness, entries, state = "reused", [], "unavailable"
-            elif process.executable and current.exe() != process.executable:
-                freshness, entries, state = "changed", [], "unavailable"
+            oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
+            with oneshot:
+                if current.create_time() != process.created_at:
+                    freshness, entries, state = "reused", [], "unavailable"
+                elif process.executable and current.exe() != process.executable:
+                    freshness, entries, state = "changed", [], "unavailable"
         except psutil.NoSuchProcess:
             freshness, entries, state = "gone", [], "gone"
         except (psutil.AccessDenied, OSError):
