@@ -15,7 +15,17 @@ from typing import Any, Callable
 import psutil
 
 from jevproc.core.config import CollectionSettings
-from jevproc.core.models import Connection, Coverage, Executable, Host, Parent, Process, Snapshot
+from jevproc.core.models import (
+    Child,
+    Connection,
+    Coverage,
+    Executable,
+    Host,
+    Parent,
+    Process,
+    ResourceUsage,
+    Snapshot,
+)
 from jevproc.core.privacy import redact_argv, sanitize_snapshot
 
 
@@ -323,6 +333,172 @@ def _file_info(
         cache[cache_key] = (result, dict(coverage))
     return result, coverage
 
+def _resource_value(action: Callable[[], Any]) -> tuple[Any, Coverage]:
+    try:
+        return action(), "observed"
+    except psutil.AccessDenied:
+        return None, "denied"
+    except (psutil.NoSuchProcess, psutil.ZombieProcess):
+        return None, "gone"
+    except (OSError, NotImplementedError, AttributeError):
+        return None, "unavailable"
+
+
+def _resource_usage(proc: psutil.Process, cpu_primed: bool) -> tuple[ResourceUsage, Coverage]:
+    values: dict[str, Any] = {}
+    states: list[Coverage] = []
+
+    if cpu_primed:
+        value, state = _resource_value(lambda: proc.cpu_percent(interval=None))
+        values["cpu_percent"] = value
+        states.append(state)
+    else:
+        values["cpu_percent"] = None
+        states.append("unavailable")
+
+    memory_info, state = _resource_value(proc.memory_info)
+    values["rss_bytes"] = memory_info.rss if memory_info is not None else None
+    states.append(state)
+
+    value, state = _resource_value(proc.memory_percent)
+    values["memory_percent"] = value
+    states.append(state)
+
+    value, state = _resource_value(proc.num_threads)
+    values["thread_count"] = value
+    states.append(state)
+
+    value, state = _resource_value(proc.num_fds)
+    values["fd_count"] = value
+    states.append(state)
+
+    observed = sum(state == "observed" for state in states)
+    if observed == len(states):
+        coverage: Coverage = "observed"
+    elif observed:
+        coverage = "partial"
+    elif "denied" in states:
+        coverage = "denied"
+    elif "gone" in states:
+        coverage = "gone"
+    else:
+        coverage = "unavailable"
+    return ResourceUsage.model_validate(values), coverage
+
+
+def _prime_resource_probes(
+    pids: list[int], settings: CollectionSettings
+) -> dict[int, psutil.Process]:
+    if not settings.resources:
+        return {}
+    probes: dict[int, psutil.Process] = {}
+    for pid in pids:
+        try:
+            proc = psutil.Process(pid)
+            proc.cpu_percent(interval=None)
+            probes[pid] = proc
+        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
+            continue
+    if probes:
+        time.sleep(settings.resource_sample_seconds)
+    return probes
+
+
+def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
+    by_parent: dict[int, list[Child]] = defaultdict(list)
+    incomplete = False
+    try:
+        iterator = psutil.process_iter(
+            ["pid", "ppid", "name", "exe", "create_time", "status"],
+            ad_value=None,
+        )
+        for item in iterator:
+            info = item.info
+            ppid = info.get("ppid")
+            pid = info.get("pid")
+            if ppid is None or pid is None:
+                incomplete = True
+                continue
+            name = info.get("name") or "<unavailable>"
+            executable = info.get("exe")
+            status = info.get("status") or "unknown"
+            created = info.get("create_time")
+            if created is None or executable is None:
+                incomplete = True
+            by_parent[int(ppid)].append(Child(
+                pid=int(pid),
+                created_at=created,
+                name=str(name)[:512],
+                executable=str(executable)[:8192] if executable else None,
+                status=str(status)[:512],
+            ))
+    except (OSError, NotImplementedError):
+        return {}, "unavailable"
+    for entries in by_parent.values():
+        entries.sort(key=lambda child: (child.created_at or 0, child.pid))
+    return dict(by_parent), "partial" if incomplete else "observed"
+
+
+def attach_children(processes: list[Process], limit: int) -> list[Process]:
+    if limit == 0:
+        return [
+            process.model_copy(update={
+                "children": [],
+                "child_count": 0,
+                "coverage": {**process.coverage, "children": "not_requested"},
+            })
+            for process in processes
+        ]
+    by_parent, global_coverage = _child_index()
+    result = []
+    for process in processes:
+        entries = by_parent.get(process.pid, [])
+        state = global_coverage
+        if process.freshness != "observed":
+            entries, state = [], "unavailable"
+        elif len(entries) > limit:
+            state = "truncated"
+        result.append(process.model_copy(update={
+            "children": entries[:limit],
+            "child_count": len(entries),
+            "coverage": {**process.coverage, "children": state},
+        }))
+    return result
+
+
+def _family_pids(root_pid: int) -> list[int]:
+    if not psutil.pid_exists(root_pid):
+        raise CollectionError(f"process family root PID {root_pid} does not exist")
+    children: dict[int, list[int]] = defaultdict(list)
+    seen_pids = set()
+    try:
+        for item in psutil.process_iter(["pid", "ppid"], ad_value=None):
+            pid = item.info.get("pid")
+            ppid = item.info.get("ppid")
+            if pid is None:
+                continue
+            seen_pids.add(int(pid))
+            if ppid is not None:
+                children[int(ppid)].append(int(pid))
+    except (OSError, NotImplementedError) as exc:
+        raise CollectionError("could not enumerate process family") from exc
+
+    if root_pid not in seen_pids and not psutil.pid_exists(root_pid):
+        raise CollectionError(f"process family root PID {root_pid} exited")
+
+    ordered = [root_pid]
+    seen = {root_pid}
+    cursor = 0
+    while cursor < len(ordered):
+        parent = ordered[cursor]
+        cursor += 1
+        for child in sorted(children.get(parent, [])):
+            if child not in seen:
+                seen.add(child)
+                ordered.append(child)
+    return ordered
+
+
 def _age_band(created: float | None, now: float) -> str:
     if created is None or created > now:
         return "unknown"
@@ -335,9 +511,10 @@ def _process(
     settings: CollectionSettings,
     now: float,
     file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None = None,
+    resource_probe: psutil.Process | None = None,
 ) -> Process:
     try:
-        proc = psutil.Process(pid)
+        proc = resource_probe or psutil.Process(pid)
     except psutil.NoSuchProcess:
         return Process(pid=pid, freshness="gone", coverage={"identity": "gone"})
     coverage: dict[str, Coverage] = {}
@@ -349,6 +526,12 @@ def _process(
     ppid = _get("parent", proc.ppid, coverage)
     uid = _get("uid", lambda: proc.uids().real, coverage)
     status = _get("status", proc.status, coverage, "unknown")
+    resources = ResourceUsage()
+    coverage["resources"] = "not_requested"
+    if settings.resources:
+        resources, coverage["resources"] = _resource_usage(
+            proc, cpu_primed=resource_probe is not None
+        )
     command_line = None
     coverage["command_line"] = "not_requested"
     if settings.command_line:
@@ -377,7 +560,7 @@ def _process(
     observations = _observations(executable, file_info)
     values = dict(pid=pid, created_at=created, name=name[:512], executable=executable, ppid=ppid, uid=uid,
                   status=status[:512], age_band=_age_band(created, now), command_line=command_line,
-                  connections=[], file=file_info, coverage=coverage,
+                  connections=[], resources=resources, file=file_info, coverage=coverage,
                   observations=observations, freshness=freshness)
     if len(name) > 512:
         coverage["name"] = "truncated"
@@ -397,32 +580,91 @@ def _observations(path: str | None, info: Executable) -> list[str]:
     return facts
 
 
-def attach_ancestry(processes: list[Process], depth: int) -> list[Process]:
+def _live_parent(pid: int) -> tuple[Parent, int | None] | None:
+    try:
+        proc = psutil.Process(pid)
+        created = proc.create_time()
+        try:
+            name = proc.name()
+        except (psutil.AccessDenied, OSError):
+            name = "<unavailable>"
+        try:
+            executable = proc.exe() or None
+        except (psutil.AccessDenied, OSError):
+            executable = None
+        return (
+            Parent(
+                pid=pid,
+                created_at=created,
+                name=name[:512],
+                executable=executable[:8192] if executable else None,
+            ),
+            proc.ppid(),
+        )
+    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
+        return None
+
+
+def attach_ancestry(
+    processes: list[Process],
+    depth: int,
+    *,
+    resolve_missing: bool = False,
+) -> list[Process]:
     by_pid = {p.pid: p for p in processes}
     result = []
     for process in processes:
         parents: list[Parent] = []
-        current = process
+        next_pid = process.ppid
+        current_created = process.created_at
         seen = {process.pid}
         state: Coverage = "not_requested" if depth == 0 else "observed"
         for _ in range(depth):
-            if current.ppid == 0:
+            if next_pid in (0, None):
                 break
-            parent = by_pid.get(current.ppid) if current.ppid is not None else None
-            if (parent is None or parent.pid in seen or parent.created_at is None or
-                current.created_at is None or parent.created_at > current.created_at or
-                parent.freshness != "observed"):
+            if next_pid in seen or current_created is None:
                 state = "partial"
                 break
+            parent_process = by_pid.get(next_pid)
+            if parent_process is not None:
+                if (
+                    parent_process.created_at is None
+                    or parent_process.created_at > current_created
+                    or parent_process.freshness != "observed"
+                ):
+                    state = "partial"
+                    break
+                parent = Parent(
+                    pid=parent_process.pid,
+                    created_at=parent_process.created_at,
+                    name=parent_process.name,
+                    executable=parent_process.executable,
+                )
+                parent_ppid = parent_process.ppid
+            elif resolve_missing:
+                live = _live_parent(next_pid)
+                if live is None:
+                    state = "partial"
+                    break
+                parent, parent_ppid = live
+                if parent.created_at > current_created:
+                    state = "partial"
+                    break
+            else:
+                state = "partial"
+                break
+
             seen.add(parent.pid)
-            parents.append(Parent(pid=parent.pid, created_at=parent.created_at, name=parent.name,
-                                  executable=parent.executable))
-            current = parent
+            parents.append(parent)
+            current_created = parent.created_at
+            next_pid = parent_ppid
         else:
-            if depth and current.ppid not in (0, None):
+            if depth and next_pid not in (0, None):
                 state = "truncated"
+
         result.append(process.model_copy(update={
-            "ancestors": parents, "coverage": {**process.coverage, "ancestry": state}
+            "ancestors": parents,
+            "coverage": {**process.coverage, "ancestry": state},
         }))
     return result
 
@@ -456,23 +698,60 @@ def attach_network(processes: list[Process], network: dict[int, list[Connection]
     return results
 
 
-def collect(settings: CollectionSettings, pids: list[int] | None = None) -> Snapshot:
+def collect(
+    settings: CollectionSettings,
+    pids: list[int] | None = None,
+    *,
+    family_pid: int | None = None,
+) -> Snapshot:
     if sys.platform not in {"linux", "darwin"}:
         raise CollectionError("live collection supports Linux and macOS; use a saved snapshot on other platforms")
+    if pids is not None and family_pid is not None:
+        raise CollectionError("PID selection and process-family selection are mutually exclusive")
+
     now = time.time()
-    selected = sorted(set(pids if pids is not None else psutil.pids()))
-    omitted = max(0, len(selected) - settings.max_processes)
-    selected = selected[:settings.max_processes]
+    if family_pid is not None:
+        candidates = _family_pids(family_pid)
+    elif pids is not None:
+        candidates = sorted(set(pids))
+    else:
+        candidates = sorted(set(psutil.pids()))
+
+    omitted = max(0, len(candidates) - settings.max_processes)
+    selected = candidates[:settings.max_processes]
+    resource_probes = _prime_resource_probes(selected, settings)
+
     file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] = {}
-    processes = [_process(pid, settings, now, file_cache) for pid in selected]
+    processes = [
+        _process(
+            pid,
+            settings,
+            now,
+            file_cache,
+            resource_probe=resource_probes.get(pid),
+        )
+        for pid in selected
+    ]
     # Capture sockets AFTER process identities and revalidate those identities afterwards.
     # Otherwise a reused PID could inherit the previous process's network evidence.
     network, coverage = _network(settings)
     processes = attach_network(processes, network, coverage)
-    processes = attach_ancestry(processes, settings.ancestry_depth)
-    snapshot = Snapshot(captured_at=now, host=Host(platform=sys.platform,
-                        architecture=platform.machine()[:512], privileged=os.geteuid() == 0),
-                        processes=processes, omitted=omitted)
+    processes = attach_ancestry(
+        processes,
+        settings.ancestry_depth,
+        resolve_missing=True,
+    )
+    processes = attach_children(processes, settings.child_limit)
+    snapshot = Snapshot(
+        captured_at=now,
+        host=Host(
+            platform=sys.platform,
+            architecture=platform.machine()[:512],
+            privileged=os.geteuid() == 0,
+        ),
+        processes=processes,
+        omitted=omitted,
+    )
     return sanitize_snapshot(snapshot, settings.command_line)
 
 
