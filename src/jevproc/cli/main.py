@@ -11,7 +11,7 @@ from typing import TextIO
 from pydantic import ValidationError
 
 from jevproc.cli.args import parser
-from jevproc.cli.render import Terminal, render
+from jevproc.cli.render import Reporter, Terminal, render
 from jevproc.core.client import JevClient
 from jevproc.core.collector import CollectionError, collect, load_snapshot
 from jevproc.core.config import Config, ConfigError, default_yaml, load_config
@@ -69,8 +69,31 @@ async def _cycles(args: argparse.Namespace, config: Config, engine: Engine, stdo
         if args.save_snapshot is not None:
             write_private(args.save_snapshot, (snapshot.model_dump_json(indent=2) + "\n").encode())
         mode = "demo" if args.demo else "offline" if args.offline else "live"
-        report = await engine.scan(snapshot, mode=mode)
-        render(report, stdout, verbose=args.verbose, format_name=args.format, width=args.width, color=args.color)
+        if args.format == "json":
+            report = await engine.scan(snapshot, mode=mode)
+            render(
+                report,
+                stdout,
+                verbose=args.verbose,
+                format_name=args.format,
+                width=args.width,
+                color=args.color,
+            )
+        else:
+            reporter = Reporter(
+                stdout,
+                mode=mode,
+                snapshot_time=snapshot.captured_at,
+                model_requested=config.jev.model,
+                synthetic=snapshot.synthetic or mode == "demo",
+                total_processes=len(snapshot.processes),
+                verbose=args.verbose,
+                format_name=args.format,
+                width=args.width,
+                color=args.color,
+            )
+            report = await engine.scan(snapshot, mode=mode, on_assessment=reporter.emit)
+            reporter.finish(report)
         code = max(code, exit_code(report, args.fail_on))
         if args.watch is None or report.summary["incomplete"]:
             return code
