@@ -1,0 +1,460 @@
+{
+  "schema_version": 1,
+  "captured_at": 1790071200,
+  "host": {
+    "platform": "fixture",
+    "architecture": "synthetic-corpus",
+    "privileged": false
+  },
+  "cases": [
+    {
+      "id": "root-user-writable-masquerade",
+      "description": "Root process uses a system-daemon-like name but runs a user-owned, world-writable binary outside system paths and has an outbound TEST-NET connection.",
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 9101,
+        "created_at": 1790071185,
+        "ppid": 9001,
+        "uid": 0,
+        "name": "softwareupdated",
+        "executable": "/Users/test/Library/.cache/softwareupdated",
+        "status": "running",
+        "age_band": "under_minute",
+        "command_line": [
+          "/Users/test/Library/.cache/softwareupdated",
+          "--service"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52144,
+            "remote_address": "203.0.113.45",
+            "remote_port": 8443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 9001,
+            "created_at": 1790071100,
+            "name": "sh",
+            "executable": "/bin/sh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 184320,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790071180000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Executable is owned by an unprivileged user while the process runs as UID 0.",
+          "Executable is world-writable and its code-signature verification failed.",
+          "Process name resembles a system update daemon but the executable is outside system directories."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "temporary-dropper-with-network",
+      "description": "Fresh temporary executable launched below a document viewer and shell, world-writable, signature-invalid, with an outbound TEST-NET connection.",
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 9102,
+        "created_at": 1790071190,
+        "ppid": 9012,
+        "uid": 501,
+        "name": "update-helper",
+        "executable": "/private/tmp/.session/update-helper",
+        "status": "running",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.session/update-helper",
+          "--connect",
+          "198.51.100.80:4444"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.11",
+            "local_port": 53110,
+            "remote_address": "198.51.100.80",
+            "remote_port": 4444,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 9012,
+            "created_at": 1790071175,
+            "name": "sh",
+            "executable": "/bin/sh"
+          },
+          {
+            "pid": 9011,
+            "created_at": 1790071150,
+            "name": "document-viewer",
+            "executable": "/Applications/Document Viewer.app/Contents/MacOS/Document Viewer"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 122880,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790071188000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Executable is in a temporary directory, world-writable, and failed code-signature verification.",
+          "An interactive document viewer and shell appear in the observed ancestry.",
+          "The process established an outbound connection immediately after its recent start."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "deleted-temp-network-service",
+      "description": "Recently started temporary executable is already deleted on disk, runs as root, and maintains an outbound TEST-NET connection.",
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 9103,
+        "created_at": 1790071188,
+        "ppid": 9020,
+        "uid": 0,
+        "name": "networkd",
+        "executable": "/private/tmp/.net/networkd",
+        "status": "running",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.net/networkd",
+          "--background"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.12",
+            "local_port": 54001,
+            "remote_address": "203.0.113.90",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 9020,
+            "created_at": 1790071160,
+            "name": "python3",
+            "executable": "/usr/bin/python3"
+          }
+        ],
+        "file": {
+          "exists": false,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
+          "sha256": null,
+          "deleted": true,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "The executable image is reported deleted while the root process remains running.",
+          "The executable path is under a temporary directory.",
+          "The process has a live outbound connection to a TEST-NET address."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "privileged-hidden-user-service",
+      "description": "Root process executes from a hidden user directory under a system-security-like name, with user ownership, failed signature verification, and network activity.",
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 9104,
+        "created_at": 1790071178,
+        "ppid": 1,
+        "uid": 0,
+        "name": "securityd",
+        "executable": "/Users/test/.local/.security/securityd",
+        "status": "running",
+        "age_band": "under_minute",
+        "command_line": [
+          "/Users/test/.local/.security/securityd",
+          "--daemon"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.13",
+            "local_port": 55002,
+            "remote_address": "198.51.100.22",
+            "remote_port": 9443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790000000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 98304,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790071170000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "A UID 0 process executes a user-owned world-writable file from a hidden user directory.",
+          "The process name resembles a protected operating-system security service.",
+          "Code-signature verification failed and the process has an outbound TEST-NET connection."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "document-shell-ambiguous",
+      "description": "Shell is launched from a document application with a synthetic payload-execution marker but otherwise uses the legitimate system shell.",
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 9105,
+        "created_at": 1790071192,
+        "ppid": 9030,
+        "uid": 501,
+        "name": "sh",
+        "executable": "/bin/sh",
+        "status": "running",
+        "age_band": "under_minute",
+        "command_line": [
+          "/bin/sh",
+          "-c",
+          "<synthetic downloaded-payload execution>"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 9030,
+            "created_at": 1790071160,
+            "name": "DocumentEditor",
+            "executable": "/Applications/DocumentEditor.app/Contents/MacOS/DocumentEditor"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 365,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "A document application is the observed ancestor of a shell whose sanitized command line contains a synthetic payload-execution marker."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-build-tool",
+      "description": "Ordinary user build process using a system compiler under a build tool, with no network activity.",
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 9201,
+        "created_at": 1790071000,
+        "ppid": 9200,
+        "uid": 501,
+        "name": "clang",
+        "executable": "/usr/bin/clang",
+        "status": "running",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/clang",
+          "-c",
+          "src/example.c",
+          "-o",
+          "build/example.o"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 9200,
+            "created_at": 1790070900,
+            "name": "ninja",
+            "executable": "/opt/homebrew/bin/ninja"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 524288,
+          "mode": 365,
+          "owner_uid": 0,
+          "modified_ns": 1789000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "missing-executable-evidence",
+      "description": "Low-information process intentionally lacks executable/file evidence and should remain unknown rather than being called legitimate.",
+      "expected_statuses": [
+        "unknown"
+      ],
+      "process": {
+        "pid": 9202,
+        "created_at": 1790070000,
+        "ppid": 1,
+        "uid": 501,
+        "name": "restricted-worker",
+        "executable": null,
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": null,
+        "connections": [],
+        "ancestors": [],
+        "file": {
+          "exists": null,
+          "size": null,
+          "mode": null,
+          "owner_uid": null,
+          "modified_ns": null,
+          "sha256": null,
+          "deleted": null,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "denied",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "not_requested",
+          "connections": "observed",
+          "file": "denied",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    }
+  ]
+}

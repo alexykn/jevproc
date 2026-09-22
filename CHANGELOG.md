@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a packaged synthetic warning/benign/unknown evaluation corpus and `jevproc-test` live regression command.
+
 - Stream completed process assessments to text and JSONL output instead of waiting for the full scan.
 - Show one in-place TTY progress line between streamed findings.
 

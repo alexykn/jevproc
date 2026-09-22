@@ -29,6 +29,7 @@ classifiers = [
 
 [project.scripts]
 jevproc = "jevproc.cli.main:main"
+jevproc-test = "jevproc.cli.corpus:main"
 
 [dependency-groups]
 dev = ["pytest>=8.3,<10", "pytest-asyncio>=0.25,<2", "ruff>=0.11,<1", "ty>=0.0.1,<1", "build>=1.2,<2", "radon>=6,<7"]

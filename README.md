@@ -42,6 +42,27 @@ This initial handoff is not a PyPI publication. Do not assume `uv tool install
 jevproc` downloads this project. A dependency lockfile is not included; see the
 validation notes before claiming a fully reproducible environment.
 
+## Synthetic warning corpus
+
+`jevproc-test` runs a packaged labeled corpus through **live Jev** using the same
+request and assessment pipeline as normal process triage. It is intended for
+regression testing the classifier, not for executing malware.
+
+```sh
+jevproc-test --list
+jevproc-test
+jevproc-test --case root-user-writable-masquerade
+jevproc-test --format json
+```
+
+The corpus contains strong warning-positive cases, an ambiguous
+warning/uncertain-warning case, a benign build-tool control, and an
+evidence-limited unknown control. All cases are synthetic metadata; TEST-NET
+addresses and inert placeholders are used instead of live malicious infrastructure
+or executable payloads. Exit 0 means all declared expectations matched, 1 means a
+classification mismatch, and 2 means an operational failure. See
+[the corpus documentation](docs/CORPUS.md).
+
 ## Live triage
 
 Set `TYPESAFE_API_KEY` in your environment using your normal secret-management
