@@ -30,10 +30,18 @@ def test_corpus_matches_rich_default_evidence_profile():
             assert process.coverage["hash"] == "unavailable"
             assert process.coverage["signature"] == "unavailable"
             assert process.coverage["command_line"] in {"denied", "unavailable"}
+            assert process.coverage["resources"] == "unavailable"
+            assert process.coverage["children"] == "unavailable"
+            assert process.resources.cpu_percent is None
             continue
         assert process.command_line is not None
         assert process.coverage["command_line"] == "observed"
         assert process.coverage["connections"] == "observed"
+        assert process.coverage["resources"] == "observed"
+        assert process.coverage["children"] in {"observed", "truncated"}
+        assert process.resources.cpu_percent is not None
+        assert process.resources.rss_bytes is not None
+        assert process.child_count >= len(process.children)
         if process.file.exists is True:
             assert process.file.sha256 is not None
             assert process.coverage["hash"] == "observed"
@@ -42,6 +50,20 @@ def test_corpus_matches_rich_default_evidence_profile():
                 assert process.file.signature_team_id
                 assert process.file.signature_authorities
                 assert process.coverage["signature"] == "observed"
+
+
+def test_corpus_resources_do_not_encode_the_label():
+    corpus = load_corpus()
+    benign = {case.id: case.process for case in corpus.cases if case.label == "benign"}
+    suspicious = {case.id: case.process for case in corpus.cases if case.label == "suspicious"}
+
+    assert benign["benign-clang-build"].resources.cpu_percent > 100
+    assert benign["benign-browser-renderer"].resources.rss_bytes > 1024 * 1024 * 1024
+    assert suspicious["susp-world-writable-root-no-network"].resources.cpu_percent < 1
+    assert suspicious["susp-temp-dropper-network"].resources.rss_bytes < 100 * 1024 * 1024
+
+    assert benign["benign-container-runtime"].child_count > 0
+    assert suspicious["susp-browser-shell-hidden-child"].child_count > 0
 
 
 def test_corpus_evidence_limited_cases_are_internally_consistent():
