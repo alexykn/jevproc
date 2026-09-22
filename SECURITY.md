@@ -49,7 +49,10 @@ The collector does not terminate, suspend, attach to or alter processes. Inspect
 subprocesses are fixed-path macOS `codesign` calls, fixed-path `lsof` when
 psutil socket enumeration is denied, and fixed-path `ps` metadata reads used to
 preserve the `--no-command-line` guarantee; all use explicit argv, no shell and
-bounded timeouts. Target executables are never run.
+bounded timeouts. macOS `codesign` stderr is used only to normalize known local
+verification diagnostics and is never forwarded verbatim to Jev or terminal
+output. Unknown diagnostics remain generic verification failures. Target
+executables are never run.
 Retries, rate pacing and request-attempt budgets are bounded. Context failures
 are reported without splitting the snapshot.
 HTTP errors, bad answers and budget exhaustion do not produce benign results.
