@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Recalibrate JPR001 to `uncertain_at=0.08` / `warning_at=0.12` after adding resource/child evidence.
+- Select operational calibration candidates from individual repeated-run samples instead of case means.
+- Report sample-level separation and keep case-mean candidate metrics as a separate stability view.
+- Restore JPR001's concise pre-resource instruction text; richer evidence remains in state without prompt over-specification.
+
 - Add CPU/RSS/memory/thread/FD context and bounded direct-child summaries to Jev process evidence without adding them to text output.
 - Resolve parent context for single-PID checks and add `--family PID` for root-plus-descendant evaluation.
 - Update the 72-case calibration corpus with non-correlated resource profiles and benign/suspicious child-process examples.
