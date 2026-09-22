@@ -12,6 +12,7 @@ from jevproc.cli.render import Reporter, Terminal, render
 from jevproc.core.client import JevClient
 from jevproc.core.demo import demo_transport
 from jevproc.core.engine import Engine
+from jevproc.core.models import Child, ResourceUsage
 
 
 @pytest.fixture
@@ -107,21 +108,21 @@ def test_live_offline_cli_smoke(capsys):
 
 def test_resources_and_children_are_json_only_not_text(report):
     process = report.assessments[0].process.model_copy(update={
-        "resources": {
-            "cpu_percent": 88.0,
-            "rss_bytes": 3221225472,
-            "memory_percent": 12.5,
-            "thread_count": 42,
-            "fd_count": 99,
-        },
+        "resources": ResourceUsage(
+            cpu_percent=88.0,
+            rss_bytes=3221225472,
+            memory_percent=12.5,
+            thread_count=42,
+            fd_count=99,
+        ),
         "children": [
-            {
-                "pid": 99999,
-                "created_at": 1790071000.0,
-                "name": "worker-child",
-                "executable": "/tmp/worker-child",
-                "status": "running",
-            }
+            Child(
+                pid=99999,
+                created_at=1790071000.0,
+                name="worker-child",
+                executable="/tmp/worker-child",
+                status="running",
+            )
         ],
         "child_count": 1,
     })
