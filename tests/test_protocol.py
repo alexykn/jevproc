@@ -14,6 +14,9 @@ def test_process_evidence_is_in_state_and_target_is_bound_in_question(config, sn
     assert body["state"]["process"]["pid"] == process.pid
     assert body["state"]["process"]["name"] == process.name
     assert body["state"]["process"]["ancestors"][0]["name"] == "document-viewer"
+    assert "resources" in body["state"]["process"]
+    assert "children" in body["state"]["process"]
+    assert "child_count" in body["state"]["process"]
 
     question = body["questions"]["p4819_JPR001"]
     instructions = question["instructions"]
