@@ -150,7 +150,14 @@ def test_invalid_input_errors_do_not_echo_secrets(tmp_path,capsys):
     assert 'PRIVATE-EXAMPLE-TOKEN' not in capsys.readouterr().err
 
 
-@pytest.mark.parametrize('args',[['--watch','nan'],['--watch','inf'],['--watch','0'],['--demo','--watch','1'],['--pid','-1']])
+@pytest.mark.parametrize('args',[
+    ['--watch','nan'],
+    ['--watch','inf'],
+    ['--watch','0'],
+    ['--demo','--watch','1'],
+    ['--pid','-1'],
+    ['--pid','1','--family','1'],
+])
 def test_bad_cli_combinations_rejected(args):
     with pytest.raises(SystemExit) as exc:
         main(args)
