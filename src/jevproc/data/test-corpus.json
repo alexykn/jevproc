@@ -3,391 +3,50 @@
   "captured_at": 1790071200,
   "host": {
     "platform": "fixture",
-    "architecture": "synthetic-corpus",
+    "architecture": "synthetic-calibration-corpus",
     "privileged": false
   },
   "cases": [
     {
-      "id": "root-user-writable-masquerade",
-      "description": "Root process uses a system-daemon-like name but runs a user-owned, world-writable binary outside system paths and has an outbound TEST-NET connection.",
+      "id": "benign-system-configd",
+      "description": "Signed macOS system configuration daemon launched by launchd.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "system",
+        "signed"
+      ],
       "expected_statuses": [
-        "warning"
+        "probably_legitimate",
+        "no_warning"
       ],
       "process": {
-        "pid": 9101,
-        "created_at": 1790071185,
-        "ppid": 9001,
-        "uid": 0,
-        "name": "softwareupdated",
-        "executable": "/Users/test/Library/.cache/softwareupdated",
-        "status": "running",
-        "age_band": "under_minute",
-        "command_line": [
-          "/Users/test/Library/.cache/softwareupdated",
-          "--service"
-        ],
-        "connections": [
-          {
-            "protocol": "tcp",
-            "local_address": "192.0.2.10",
-            "local_port": 52144,
-            "remote_address": "203.0.113.45",
-            "remote_port": 8443,
-            "status": "ESTABLISHED"
-          }
-        ],
-        "ancestors": [
-          {
-            "pid": 9001,
-            "created_at": 1790071100,
-            "name": "sh",
-            "executable": "/bin/sh"
-          }
-        ],
-        "file": {
-          "exists": true,
-          "size": 184320,
-          "mode": 511,
-          "owner_uid": 501,
-          "modified_ns": 1790071180000000000,
-          "sha256": null,
-          "deleted": false,
-          "signature": "verification_failed"
-        },
-        "coverage": {
-          "identity": "observed",
-          "name": "observed",
-          "executable": "observed",
-          "parent": "observed",
-          "uid": "observed",
-          "status": "observed",
-          "command_line": "observed",
-          "connections": "observed",
-          "file": "observed",
-          "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "observed"
-        },
-        "observations": [
-          "Executable is owned by an unprivileged user while the process runs as UID 0.",
-          "Executable is world-writable and its code-signature verification failed.",
-          "Process name resembles a system update daemon but the executable is outside system directories."
-        ],
-        "freshness": "observed"
-      }
-    },
-    {
-      "id": "temporary-dropper-with-network",
-      "description": "Fresh temporary executable launched below a document viewer and shell, world-writable, signature-invalid, with an outbound TEST-NET connection.",
-      "expected_statuses": [
-        "warning"
-      ],
-      "process": {
-        "pid": 9102,
-        "created_at": 1790071190,
-        "ppid": 9012,
-        "uid": 501,
-        "name": "update-helper",
-        "executable": "/private/tmp/.session/update-helper",
-        "status": "running",
-        "age_band": "under_minute",
-        "command_line": [
-          "/private/tmp/.session/update-helper",
-          "--connect",
-          "198.51.100.80:4444"
-        ],
-        "connections": [
-          {
-            "protocol": "tcp",
-            "local_address": "192.0.2.11",
-            "local_port": 53110,
-            "remote_address": "198.51.100.80",
-            "remote_port": 4444,
-            "status": "ESTABLISHED"
-          }
-        ],
-        "ancestors": [
-          {
-            "pid": 9012,
-            "created_at": 1790071175,
-            "name": "sh",
-            "executable": "/bin/sh"
-          },
-          {
-            "pid": 9011,
-            "created_at": 1790071150,
-            "name": "document-viewer",
-            "executable": "/Applications/Document Viewer.app/Contents/MacOS/Document Viewer"
-          }
-        ],
-        "file": {
-          "exists": true,
-          "size": 122880,
-          "mode": 511,
-          "owner_uid": 501,
-          "modified_ns": 1790071188000000000,
-          "sha256": null,
-          "deleted": false,
-          "signature": "verification_failed"
-        },
-        "coverage": {
-          "identity": "observed",
-          "name": "observed",
-          "executable": "observed",
-          "parent": "observed",
-          "uid": "observed",
-          "status": "observed",
-          "command_line": "observed",
-          "connections": "observed",
-          "file": "observed",
-          "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "observed"
-        },
-        "observations": [
-          "Executable is in a temporary directory, world-writable, and failed code-signature verification.",
-          "An interactive document viewer and shell appear in the observed ancestry.",
-          "The process established an outbound connection immediately after its recent start."
-        ],
-        "freshness": "observed"
-      }
-    },
-    {
-      "id": "deleted-temp-network-service",
-      "description": "Recently started temporary executable is already deleted on disk, runs as root, and maintains an outbound TEST-NET connection.",
-      "expected_statuses": [
-        "warning"
-      ],
-      "process": {
-        "pid": 9103,
-        "created_at": 1790071188,
-        "ppid": 9020,
-        "uid": 0,
-        "name": "networkd",
-        "executable": "/private/tmp/.net/networkd",
-        "status": "running",
-        "age_band": "under_minute",
-        "command_line": [
-          "/private/tmp/.net/networkd",
-          "--background"
-        ],
-        "connections": [
-          {
-            "protocol": "tcp",
-            "local_address": "192.0.2.12",
-            "local_port": 54001,
-            "remote_address": "203.0.113.90",
-            "remote_port": 443,
-            "status": "ESTABLISHED"
-          }
-        ],
-        "ancestors": [
-          {
-            "pid": 9020,
-            "created_at": 1790071160,
-            "name": "python3",
-            "executable": "/usr/bin/python3"
-          }
-        ],
-        "file": {
-          "exists": false,
-          "size": null,
-          "mode": null,
-          "owner_uid": null,
-          "modified_ns": null,
-          "sha256": null,
-          "deleted": true,
-          "signature": "verification_failed"
-        },
-        "coverage": {
-          "identity": "observed",
-          "name": "observed",
-          "executable": "observed",
-          "parent": "observed",
-          "uid": "observed",
-          "status": "observed",
-          "command_line": "observed",
-          "connections": "observed",
-          "file": "observed",
-          "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "observed"
-        },
-        "observations": [
-          "The executable image is reported deleted while the root process remains running.",
-          "The executable path is under a temporary directory.",
-          "The process has a live outbound connection to a TEST-NET address."
-        ],
-        "freshness": "observed"
-      }
-    },
-    {
-      "id": "privileged-hidden-user-service",
-      "description": "Root process executes from a hidden user directory under a system-security-like name, with user ownership, failed signature verification, and network activity.",
-      "expected_statuses": [
-        "warning"
-      ],
-      "process": {
-        "pid": 9104,
-        "created_at": 1790071178,
+        "pid": 10001,
+        "created_at": 1790070900,
         "ppid": 1,
         "uid": 0,
-        "name": "securityd",
-        "executable": "/Users/test/.local/.security/securityd",
-        "status": "running",
-        "age_band": "under_minute",
+        "name": "configd",
+        "executable": "/usr/libexec/configd",
+        "status": "sleeping",
+        "age_band": "under_hour",
         "command_line": [
-          "/Users/test/.local/.security/securityd",
-          "--daemon"
+          "/usr/libexec/configd"
         ],
-        "connections": [
-          {
-            "protocol": "tcp",
-            "local_address": "192.0.2.13",
-            "local_port": 55002,
-            "remote_address": "198.51.100.22",
-            "remote_port": 9443,
-            "status": "ESTABLISHED"
-          }
-        ],
+        "connections": [],
         "ancestors": [
           {
             "pid": 1,
-            "created_at": 1790000000,
+            "created_at": 1790070000,
             "name": "launchd",
             "executable": "/sbin/launchd"
           }
         ],
         "file": {
           "exists": true,
-          "size": 98304,
-          "mode": 511,
-          "owner_uid": 501,
-          "modified_ns": 1790071170000000000,
-          "sha256": null,
-          "deleted": false,
-          "signature": "verification_failed"
-        },
-        "coverage": {
-          "identity": "observed",
-          "name": "observed",
-          "executable": "observed",
-          "parent": "observed",
-          "uid": "observed",
-          "status": "observed",
-          "command_line": "observed",
-          "connections": "observed",
-          "file": "observed",
-          "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "observed"
-        },
-        "observations": [
-          "A UID 0 process executes a user-owned world-writable file from a hidden user directory.",
-          "The process name resembles a protected operating-system security service.",
-          "Code-signature verification failed and the process has an outbound TEST-NET connection."
-        ],
-        "freshness": "observed"
-      }
-    },
-    {
-      "id": "document-shell-ambiguous",
-      "description": "Shell is launched from a document application with a synthetic payload-execution marker but otherwise uses the legitimate system shell.",
-      "expected_statuses": [
-        "warning",
-        "uncertain_warning"
-      ],
-      "process": {
-        "pid": 9105,
-        "created_at": 1790071192,
-        "ppid": 9030,
-        "uid": 501,
-        "name": "sh",
-        "executable": "/bin/sh",
-        "status": "running",
-        "age_band": "under_minute",
-        "command_line": [
-          "/bin/sh",
-          "-c",
-          "<synthetic downloaded-payload execution>"
-        ],
-        "connections": [],
-        "ancestors": [
-          {
-            "pid": 9030,
-            "created_at": 1790071160,
-            "name": "DocumentEditor",
-            "executable": "/Applications/DocumentEditor.app/Contents/MacOS/DocumentEditor"
-          }
-        ],
-        "file": {
-          "exists": true,
           "size": 131072,
-          "mode": 365,
+          "mode": 493,
           "owner_uid": 0,
           "modified_ns": 1790000000000000000,
-          "sha256": null,
-          "deleted": false,
-          "signature": "valid"
-        },
-        "coverage": {
-          "identity": "observed",
-          "name": "observed",
-          "executable": "observed",
-          "parent": "observed",
-          "uid": "observed",
-          "status": "observed",
-          "command_line": "observed",
-          "connections": "observed",
-          "file": "observed",
-          "ancestry": "observed",
-          "hash": "not_requested",
-          "signature": "observed"
-        },
-        "observations": [
-          "A document application is the observed ancestor of a shell whose sanitized command line contains a synthetic payload-execution marker."
-        ],
-        "freshness": "observed"
-      }
-    },
-    {
-      "id": "benign-build-tool",
-      "description": "Ordinary user build process using a system compiler under a build tool, with no network activity.",
-      "expected_statuses": [
-        "probably_legitimate",
-        "no_warning"
-      ],
-      "process": {
-        "pid": 9201,
-        "created_at": 1790071000,
-        "ppid": 9200,
-        "uid": 501,
-        "name": "clang",
-        "executable": "/usr/bin/clang",
-        "status": "running",
-        "age_band": "under_hour",
-        "command_line": [
-          "/usr/bin/clang",
-          "-c",
-          "src/example.c",
-          "-o",
-          "build/example.o"
-        ],
-        "connections": [],
-        "ancestors": [
-          {
-            "pid": 9200,
-            "created_at": 1790070900,
-            "name": "ninja",
-            "executable": "/opt/homebrew/bin/ninja"
-          }
-        ],
-        "file": {
-          "exists": true,
-          "size": 524288,
-          "mode": 365,
-          "owner_uid": 0,
-          "modified_ns": 1789000000000000000,
           "sha256": null,
           "deleted": false,
           "signature": "valid"
@@ -411,31 +70,4474 @@
       }
     },
     {
-      "id": "missing-executable-evidence",
-      "description": "Low-information process intentionally lacks executable/file evidence and should remain unknown rather than being called legitimate.",
+      "id": "benign-mdnsresponder-network",
+      "description": "Signed system network daemon with ordinary network activity.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "system",
+        "network",
+        "signed"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10002,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 65,
+        "name": "mDNSResponder",
+        "executable": "/usr/sbin/mDNSResponder",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/sbin/mDNSResponder"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.53",
+            "remote_port": 53,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-homebrew-postgres",
+      "description": "User-owned Homebrew database serving localhost only.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "homebrew",
+        "listener"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10003,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "postgres",
+        "executable": "/opt/homebrew/opt/postgresql/bin/postgres",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/opt/homebrew/opt/postgresql/bin/postgres"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "127.0.0.1",
+            "local_port": 5432,
+            "remote_address": "",
+            "remote_port": 0,
+            "status": "LISTEN"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-homebrew-redis",
+      "description": "User-owned Homebrew Redis service listening only on loopback.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "homebrew",
+        "listener"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10004,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "redis-server",
+        "executable": "/opt/homebrew/bin/redis-server",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/opt/homebrew/bin/redis-server"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "127.0.0.1",
+            "local_port": 6379,
+            "remote_address": "",
+            "remote_port": 0,
+            "status": "LISTEN"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-clang-build",
+      "description": "System compiler invoked by Ninja for a normal local build.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "compiler"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10005,
+        "created_at": 1790070900,
+        "ppid": 1101,
+        "uid": 501,
+        "name": "clang",
+        "executable": "/usr/bin/clang",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/clang",
+          "-c",
+          "src/main.c",
+          "-o",
+          "build/main.o"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1101,
+            "created_at": 1790070000,
+            "name": "ninja",
+            "executable": "/opt/homebrew/bin/ninja"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-rustc-cargo",
+      "description": "Rust compiler invoked by Cargo in a user project.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "compiler"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10006,
+        "created_at": 1790070900,
+        "ppid": 1102,
+        "uid": 501,
+        "name": "rustc",
+        "executable": "/Users/test/.rustup/toolchains/stable/bin/rustc",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "rustc",
+          "src/main.rs",
+          "--crate-name",
+          "demo"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1102,
+            "created_at": 1790070000,
+            "name": "cargo",
+            "executable": "/Users/test/.cargo/bin/cargo"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-node-dev-server",
+      "description": "Node development server listening on localhost under a package manager.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "node",
+        "listener"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10007,
+        "created_at": 1790070900,
+        "ppid": 1103,
+        "uid": 501,
+        "name": "node",
+        "executable": "/opt/homebrew/bin/node",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "node",
+          "dev-server.js"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "127.0.0.1",
+            "local_port": 3000,
+            "remote_address": "",
+            "remote_port": 0,
+            "status": "LISTEN"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1103,
+            "created_at": 1790070000,
+            "name": "npm",
+            "executable": "/opt/homebrew/bin/npm"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-python-pytest",
+      "description": "Python test runner executing a local project test suite.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "python"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10008,
+        "created_at": 1790070900,
+        "ppid": 1104,
+        "uid": 501,
+        "name": "python3.12",
+        "executable": "/Users/test/.local/share/uv/python/cpython-3.12/bin/python3.12",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "python3.12",
+          "-m",
+          "pytest",
+          "-q"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1104,
+            "created_at": 1790070000,
+            "name": "zsh",
+            "executable": "/bin/zsh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-ide-shell",
+      "description": "Interactive shell launched from a developer IDE terminal.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "shell"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10009,
+        "created_at": 1790070900,
+        "ppid": 1105,
+        "uid": 501,
+        "name": "zsh",
+        "executable": "/bin/zsh",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/bin/zsh",
+          "-l"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1105,
+            "created_at": 1790070000,
+            "name": "Code",
+            "executable": "/Applications/Visual Studio Code.app/Contents/MacOS/Electron"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-ssh-agent",
+      "description": "Standard user ssh-agent launched for an interactive login.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "auth",
+        "system"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10010,
+        "created_at": 1790070900,
+        "ppid": 1106,
+        "uid": 501,
+        "name": "ssh-agent",
+        "executable": "/usr/bin/ssh-agent",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/ssh-agent",
+          "-s"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1106,
+            "created_at": 1790070000,
+            "name": "zsh",
+            "executable": "/bin/zsh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-gpg-agent",
+      "description": "Homebrew GPG agent running as the user.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "auth",
+        "homebrew"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10011,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "gpg-agent",
+        "executable": "/opt/homebrew/bin/gpg-agent",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "gpg-agent",
+          "--daemon"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-gitstatusd",
+      "description": "User-owned shell prompt helper under a local data directory.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "user-binary"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10012,
+        "created_at": 1790070900,
+        "ppid": 1107,
+        "uid": 501,
+        "name": "gitstatusd",
+        "executable": "/Users/test/.local/share/ztheme/gitstatus/gitstatusd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "gitstatusd",
+          "--parent-pid",
+          "100"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1107,
+            "created_at": 1790070000,
+            "name": "zsh",
+            "executable": "/bin/zsh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 448,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-nextcloud-sync",
+      "description": "Signed cloud-sync client with ordinary TLS network activity.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "desktop",
+        "network",
+        "signed"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10013,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "Nextcloud",
+        "executable": "/Applications/Nextcloud.app/Contents/MacOS/Nextcloud",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Applications/Nextcloud.app/Contents/MacOS/Nextcloud"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.44",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-browser-renderer",
+      "description": "Signed browser renderer child with browser ancestry.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "browser",
+        "signed"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10014,
+        "created_at": 1790070900,
+        "ppid": 1108,
+        "uid": 501,
+        "name": "Google Chrome Helper (Renderer)",
+        "executable": "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper (Renderer)",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper (Renderer)"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.20",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1108,
+            "created_at": 1790070000,
+            "name": "Google Chrome",
+            "executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-vpn-agent-root",
+      "description": "Privileged signed enterprise VPN helper launched by launchd.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "vpn",
+        "root",
+        "signed"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10015,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "vpnagent",
+        "executable": "/Applications/EnterpriseVPN.app/Contents/Helpers/vpnagent",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Applications/EnterpriseVPN.app/Contents/Helpers/vpnagent"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.10",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-time-machine",
+      "description": "Signed Time Machine backup daemon running as root.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "backup",
+        "root",
+        "signed"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10016,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "backupd",
+        "executable": "/System/Library/CoreServices/TimeMachine/backupd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/System/Library/CoreServices/TimeMachine/backupd"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-package-installer-root",
+      "description": "Privileged signed package installer processing a temporary package path.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "installer",
+        "root",
+        "temp"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10017,
+        "created_at": 1790070900,
+        "ppid": 1109,
+        "uid": 0,
+        "name": "installer",
+        "executable": "/usr/sbin/installer",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/sbin/installer",
+          "-pkg",
+          "/private/tmp/vendor.pkg",
+          "-target",
+          "/"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1109,
+            "created_at": 1790070000,
+            "name": "softwareupdated",
+            "executable": "/System/Library/PrivateFrameworks/MobileSoftwareUpdate.framework/Support/softwareupdated"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-codesign-helper",
+      "description": "System code-signing helper verifying application code.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "system",
+        "codesign"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10018,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "com.apple.CodeSigningHelper",
+        "executable": "/System/Library/Frameworks/Security.framework/XPCServices/com.apple.CodeSigningHelper",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/System/Library/Frameworks/Security.framework/XPCServices/com.apple.CodeSigningHelper"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-nginx-homebrew",
+      "description": "Homebrew web server listening on loopback for development.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "homebrew",
+        "listener"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10019,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "nginx",
+        "executable": "/opt/homebrew/bin/nginx",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/opt/homebrew/bin/nginx"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "127.0.0.1",
+            "local_port": 8080,
+            "remote_address": "",
+            "remote_port": 0,
+            "status": "LISTEN"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-container-runtime",
+      "description": "User container runtime helper with local IPC-style network endpoint.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "container"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10020,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "podman",
+        "executable": "/opt/homebrew/bin/podman",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/opt/homebrew/bin/podman"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "127.0.0.1",
+            "local_port": 51234,
+            "remote_address": "",
+            "remote_port": 0,
+            "status": "LISTEN"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-temp-build-artifact",
+      "description": "Fresh unsigned executable in a temporary build directory, launched by Cargo with no network activity.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "temp",
+        "unsigned"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10021,
+        "created_at": 1790070900,
+        "ppid": 1110,
+        "uid": 501,
+        "name": "integration-test",
+        "executable": "/private/tmp/cargo-build/integration-test",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/cargo-build/integration-test",
+          "--test"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1110,
+            "created_at": 1790070000,
+            "name": "cargo",
+            "executable": "/Users/test/.cargo/bin/cargo"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Executable is in a temporary directory; the observed parent is a build tool."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-deleted-updater",
+      "description": "Legitimate updater process remains briefly after its replaced executable disappeared during an update.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "updater",
+        "deleted"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10022,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "vendor-updater",
+        "executable": "/Applications/Vendor.app/Contents/Helpers/vendor-updater",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Applications/Vendor.app/Contents/Helpers/vendor-updater"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": false,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": true,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [
+          "Executable disappeared during an application update; process is expected to exit shortly."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-user-bin-tool",
+      "description": "Unsigned personal command-line utility in the user's bin directory with no network activity.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "unsigned",
+        "user-binary"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10023,
+        "created_at": 1790070900,
+        "ppid": 1111,
+        "uid": 501,
+        "name": "mytool",
+        "executable": "/Users/test/bin/mytool",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/bin/mytool",
+          "status"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1111,
+            "created_at": 1790070000,
+            "name": "zsh",
+            "executable": "/bin/zsh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-root-backup-wrapper",
+      "description": "Root-owned local backup wrapper invoked by an administrator shell, with root ownership and no network.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "admin",
+        "root",
+        "shell"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10024,
+        "created_at": 1790070900,
+        "ppid": 1112,
+        "uid": 0,
+        "name": "backup-wrapper",
+        "executable": "/usr/local/sbin/backup-wrapper",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/local/sbin/backup-wrapper",
+          "nightly"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1112,
+            "created_at": 1790070000,
+            "name": "zsh",
+            "executable": "/bin/zsh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-rsync-backup",
+      "description": "User rsync backup connecting over SSH to a documentation-range host.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "backup",
+        "network"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10025,
+        "created_at": 1790070900,
+        "ppid": 1113,
+        "uid": 501,
+        "name": "rsync",
+        "executable": "/usr/bin/rsync",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "rsync",
+          "-a",
+          "Documents/",
+          "backup-host:/archive/"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.60",
+            "remote_port": 22,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1113,
+            "created_at": 1790070000,
+            "name": "zsh",
+            "executable": "/bin/zsh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-package-download",
+      "description": "System curl launched by a package manager to download a package over TLS.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "network",
+        "package-manager"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10026,
+        "created_at": 1790070900,
+        "ppid": 1114,
+        "uid": 501,
+        "name": "curl",
+        "executable": "/usr/bin/curl",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "curl",
+          "https://packages.example.invalid/archive.tar.gz"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.30",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1114,
+            "created_at": 1790070000,
+            "name": "brew",
+            "executable": "/opt/homebrew/bin/brew"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-user-launchagent",
+      "description": "Unsigned user launch agent for a desktop utility, installed under the application bundle.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "desktop",
+        "launchagent",
+        "unsigned"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10027,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "utility-agent",
+        "executable": "/Applications/Utility.app/Contents/Helpers/utility-agent",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "utility-agent",
+          "--launch-agent"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-xcode-compiler-service",
+      "description": "Apple developer compiler service launched by Xcode.",
+      "label": "benign",
+      "tier": "control",
+      "tags": [
+        "developer",
+        "xcode",
+        "signed"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10028,
+        "created_at": 1790070900,
+        "ppid": 1115,
+        "uid": 501,
+        "name": "MTLCompilerService",
+        "executable": "/System/Library/Frameworks/Metal.framework/XPCServices/MTLCompilerService",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/System/Library/Frameworks/Metal.framework/XPCServices/MTLCompilerService"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1115,
+            "created_at": 1790070000,
+            "name": "Xcode",
+            "executable": "/Applications/Xcode.app/Contents/MacOS/Xcode"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-uv-python-local-api",
+      "description": "User Python development API serving localhost only from a uv-managed interpreter.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "python",
+        "listener"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10029,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "python3.12",
+        "executable": "/Users/test/.local/share/uv/python/cpython-3.12/bin/python3.12",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "python3.12",
+          "-m",
+          "uvicorn",
+          "app:app",
+          "--host",
+          "127.0.0.1"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "127.0.0.1",
+            "local_port": 8000,
+            "remote_address": "",
+            "remote_port": 0,
+            "status": "LISTEN"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "benign-kubectl-port-forward",
+      "description": "User kubectl port-forward to a development cluster over TLS.",
+      "label": "benign",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "kubernetes",
+        "network"
+      ],
+      "expected_statuses": [
+        "probably_legitimate",
+        "no_warning"
+      ],
+      "process": {
+        "pid": 10030,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "kubectl",
+        "executable": "/opt/homebrew/bin/kubectl",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "kubectl",
+          "port-forward",
+          "svc/api",
+          "8080:80"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.70",
+            "remote_port": 6443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-root-user-writable-masquerade",
+      "description": "Root process uses a system-daemon-like name but runs a user-owned world-writable binary outside system paths and has outbound network activity.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "masquerade",
+        "root",
+        "writable",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10031,
+        "created_at": 1790070900,
+        "ppid": 1201,
+        "uid": 0,
+        "name": "softwareupdated",
+        "executable": "/Users/test/Library/.cache/softwareupdated",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/Users/test/Library/.cache/softwareupdated"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.45",
+            "remote_port": 8443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1201,
+            "created_at": 1790070000,
+            "name": "sh",
+            "executable": "/bin/sh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "UID 0 process executes a user-owned world-writable file.",
+          "Name resembles a system update daemon but path is a hidden user cache.",
+          "Code-signature verification failed."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-temp-dropper-network",
+      "description": "Fresh temporary executable is world-writable, signature-invalid, descended from a document app and shell, and connected outbound.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "temp",
+        "writable",
+        "document",
+        "shell",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10032,
+        "created_at": 1790070900,
+        "ppid": 1202,
+        "uid": 501,
+        "name": "update-helper",
+        "executable": "/private/tmp/.session/update-helper",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.session/update-helper"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.80",
+            "remote_port": 4444,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1202,
+            "created_at": 1790070000,
+            "name": "sh",
+            "executable": "/bin/sh"
+          },
+          {
+            "pid": 1203,
+            "created_at": 1790070000,
+            "name": "DocumentEditor",
+            "executable": "/Applications/DocumentEditor.app/Contents/MacOS/DocumentEditor"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Temporary executable is world-writable and signature-invalid.",
+          "Observed ancestry contains a document application followed by a shell."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-deleted-temp-root-network",
+      "description": "Root temporary executable is already deleted on disk while maintaining outbound network activity.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "deleted",
+        "temp",
+        "root",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10033,
+        "created_at": 1790070900,
+        "ppid": 1204,
+        "uid": 0,
+        "name": "networkd",
+        "executable": "/private/tmp/.net/networkd",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.net/networkd"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.90",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1204,
+            "created_at": 1790070000,
+            "name": "python3",
+            "executable": "/usr/bin/python3"
+          }
+        ],
+        "file": {
+          "exists": false,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": true,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Executable image is deleted while the root process remains running.",
+          "Executable path is temporary."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-hidden-root-security-masquerade",
+      "description": "Root process named like a security daemon runs a user-owned hidden executable with failed signature and network activity.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "masquerade",
+        "root",
+        "hidden",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10034,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "securityd",
+        "executable": "/Users/test/.local/.security/securityd",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/Users/test/.local/.security/securityd"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.22",
+            "remote_port": 9443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "UID 0 process executes a user-owned world-writable file from a hidden directory.",
+          "Name resembles a protected OS security service."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-browser-shell-hidden-child",
+      "description": "Browser ancestry leads through a shell to a fresh hidden unsigned user executable with outbound network activity.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "browser",
+        "shell",
+        "hidden",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10035,
+        "created_at": 1790070900,
+        "ppid": 1205,
+        "uid": 501,
+        "name": "helperd",
+        "executable": "/Users/test/.cache/.helper/helperd",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/Users/test/.cache/.helper/helperd"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.88",
+            "remote_port": 8443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1205,
+            "created_at": 1790070000,
+            "name": "sh",
+            "executable": "/bin/sh"
+          },
+          {
+            "pid": 1206,
+            "created_at": 1790070000,
+            "name": "Google Chrome",
+            "executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Observed ancestry contains a browser followed by a shell.",
+          "Executable is hidden under a user cache and signature verification failed."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-office-shell-temp-child",
+      "description": "Office application ancestry leads to shell execution of a fresh temporary unsigned binary.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "office",
+        "shell",
+        "temp"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10036,
+        "created_at": 1790070900,
+        "ppid": 1207,
+        "uid": 501,
+        "name": "sync-helper",
+        "executable": "/private/tmp/.office/sync-helper",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.office/sync-helper"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1207,
+            "created_at": 1790070000,
+            "name": "sh",
+            "executable": "/bin/sh"
+          },
+          {
+            "pid": 1208,
+            "created_at": 1790070000,
+            "name": "WordProcessor",
+            "executable": "/Applications/WordProcessor.app/Contents/MacOS/WordProcessor"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Observed office application -> shell ancestry precedes a temporary executable.",
+          "Temporary executable is world-writable."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-launchagent-hidden-network",
+      "description": "Hidden user launch-agent executable has failed signature verification and persistent outbound network activity.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "launchagent",
+        "hidden",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10037,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "com.apple.syncd",
+        "executable": "/Users/test/Library/Application Support/.sync/com.apple.syncd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/Library/Application Support/.sync/com.apple.syncd"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.91",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Executable is hidden in user Application Support while its name resembles an Apple service.",
+          "Code-signature verification failed."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-root-temp-cron-like",
+      "description": "Root process launched from a scheduler-like parent executes a world-writable temporary binary.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "root",
+        "temp",
+        "scheduler",
+        "writable"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10038,
+        "created_at": 1790070900,
+        "ppid": 1209,
+        "uid": 0,
+        "name": "maintenance",
+        "executable": "/private/tmp/.jobs/maintenance",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.jobs/maintenance"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1209,
+            "created_at": 1790070000,
+            "name": "periodic",
+            "executable": "/usr/sbin/periodic"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "UID 0 process executes a user-owned world-writable temporary binary."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-fake-sshd-user-path",
+      "description": "Root process named sshd runs from a hidden user-owned path rather than the system daemon path.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "masquerade",
+        "root",
+        "ssh"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10039,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "sshd",
+        "executable": "/Users/test/.cache/sshd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/.cache/sshd"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.101",
+            "remote_port": 22,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Process name matches a system SSH daemon but executable is user-owned and hidden.",
+          "Executable is world-writable and signature-invalid."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-fake-mdworker-home",
+      "description": "Process named like Spotlight mdworker executes from a hidden home directory and connects outbound.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "masquerade",
+        "hidden",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10040,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "mdworker_shared",
+        "executable": "/Users/test/.cache/.spotlight/mdworker_shared",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/.cache/.spotlight/mdworker_shared"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.102",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Name resembles a macOS system indexing worker but executable is in a hidden user cache."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-downloads-hidden-executable",
+      "description": "Fresh unsigned hidden executable launched from Downloads establishes outbound network activity.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "downloads",
+        "hidden",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10041,
+        "created_at": 1790070900,
+        "ppid": 1210,
+        "uid": 501,
+        "name": ".viewer-update",
+        "executable": "/Users/test/Downloads/.viewer-update",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/Users/test/Downloads/.viewer-update"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.103",
+            "remote_port": 8081,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1210,
+            "created_at": 1790070000,
+            "name": "Finder",
+            "executable": "/System/Library/CoreServices/Finder.app/Contents/MacOS/Finder"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Hidden executable under Downloads started recently and opened an outbound connection."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-root-library-cache-helper",
+      "description": "Root helper executes a user-owned file from a hidden Library cache and failed signature verification.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "root",
+        "hidden",
+        "ownership"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10042,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "com.vendor.helper",
+        "executable": "/Users/test/Library/Caches/.vendor/helper",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/Library/Caches/.vendor/helper"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "UID 0 process executes a user-owned hidden cache file.",
+          "Executable is world-writable."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-temp-python-collector-marker",
+      "description": "Fresh Python process from a temporary virtual environment carries an inert synthetic credential-collection marker and connects outbound.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "python",
+        "temp",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10043,
+        "created_at": 1790070900,
+        "ppid": 1211,
+        "uid": 501,
+        "name": "python3",
+        "executable": "/private/tmp/.venv/bin/python3",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "python3",
+          "<synthetic credential-collection marker>"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.104",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1211,
+            "created_at": 1790070000,
+            "name": "sh",
+            "executable": "/bin/sh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Sanitized command line contains a synthetic credential-collection marker; no real credential action is executed."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-shell-downloaded-payload-marker",
+      "description": "System shell under a document application contains an inert marker representing downloaded-payload execution.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "shell",
+        "document"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10044,
+        "created_at": 1790070900,
+        "ppid": 1212,
+        "uid": 501,
+        "name": "sh",
+        "executable": "/bin/sh",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/bin/sh",
+          "-c",
+          "<synthetic downloaded-payload execution marker>"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1212,
+            "created_at": 1790070000,
+            "name": "DocumentEditor",
+            "executable": "/Applications/DocumentEditor.app/Contents/MacOS/DocumentEditor"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Document application is the observed parent of a shell with a synthetic payload-execution marker."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-world-writable-root-no-network",
+      "description": "Root process executes a recently modified user-owned world-writable binary from a temporary directory even without observed network activity.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "root",
+        "temp",
+        "writable"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10045,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "helper",
+        "executable": "/private/tmp/.helper",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.helper"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "UID 0 process executes a user-owned world-writable temporary binary."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-deleted-user-outbound",
+      "description": "User process continues running from a deleted hidden executable while connected outbound.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "deleted",
+        "hidden",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10046,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "agent",
+        "executable": "/Users/test/.cache/.agent",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/.cache/.agent"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.105",
+            "remote_port": 7443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": false,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": true,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [
+          "Executable is deleted while process remains active and connected outbound."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-root-user-path-no-signature",
+      "description": "Root process executes an unsigned user-owned program directly from a home directory.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "root",
+        "ownership",
+        "unsigned"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10047,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "service-helper",
+        "executable": "/Users/test/bin/service-helper",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/bin/service-helper"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "UID 0 process executes a user-owned home-directory binary with failed signature verification."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-system-name-homebrew-hidden",
+      "description": "System-like daemon name is backed by a hidden Homebrew prefix executable with failed signature and outbound traffic.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "masquerade",
+        "homebrew",
+        "hidden"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10048,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "trustd",
+        "executable": "/opt/homebrew/var/.cache/trustd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/opt/homebrew/var/.cache/trustd"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.106",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Name resembles a system trust daemon but executable is a hidden non-system file."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-fake-kernel-helper-temp",
+      "description": "Kernel-helper-like root process runs a world-writable temporary user-owned executable.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "masquerade",
+        "root",
+        "temp"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10049,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "kernelmanagerd",
+        "executable": "/private/tmp/kernelmanagerd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/private/tmp/kernelmanagerd"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Name resembles a privileged OS service while executable is a user-owned temporary file."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-hidden-launchdaemon-path",
+      "description": "Privileged service executes from a hidden path under a LaunchDaemons support directory with user ownership.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "root",
+        "persistence",
+        "hidden"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10050,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "com.vendor.update",
+        "executable": "/Library/LaunchDaemons/.cache/com.vendor.update",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Library/LaunchDaemons/.cache/com.vendor.update"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.107",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Privileged process executes a user-owned hidden file under a LaunchDaemons-related directory."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-user-owned-privileged-helper",
+      "description": "Root privileged-helper-like process runs a user-owned world-writable binary in a privileged helper location.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "root",
+        "privileged-helper",
+        "ownership"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10051,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "com.vendor.PrivilegedHelper",
+        "executable": "/Library/PrivilegedHelperTools/com.vendor.PrivilegedHelper",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Library/PrivilegedHelperTools/com.vendor.PrivilegedHelper"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Privileged helper path is backed by a user-owned world-writable file with failed signature verification."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-recent-hidden-agent-highport",
+      "description": "Recently started hidden user agent with failed signature connects to an unusual high remote port.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "hidden",
+        "network",
+        "recent"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10052,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "syncagent",
+        "executable": "/Users/test/.local/share/.sync/syncagent",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/Users/test/.local/share/.sync/syncagent"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.108",
+            "remote_port": 49152,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Hidden recently started unsigned user agent has an outbound high-port connection."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-script-host-temp-child",
+      "description": "System scripting host ancestry leads to a fresh temporary unsigned executable with network activity.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "script-host",
+        "temp",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10053,
+        "created_at": 1790070900,
+        "ppid": 1213,
+        "uid": 501,
+        "name": "task-helper",
+        "executable": "/private/tmp/.task/task-helper",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.task/task-helper"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.109",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1213,
+            "created_at": 1790070000,
+            "name": "osascript",
+            "executable": "/usr/bin/osascript"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "System scripting host is the observed ancestor of a temporary unsigned networked executable."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-fake-xprotect-user-binary",
+      "description": "Process named XProtect runs from a hidden user directory with failed signature verification.",
+      "label": "suspicious",
+      "tier": "strong",
+      "tags": [
+        "masquerade",
+        "security",
+        "hidden"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10054,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "XProtect",
+        "executable": "/Users/test/.cache/XProtect",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/.cache/XProtect"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 511,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Process name imitates a built-in security component while executable is user-owned and hidden."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "susp-temp-service-name-mismatch",
+      "description": "System-service-like process name maps to a fresh temporary executable with different basename and outbound connection.",
+      "label": "suspicious",
+      "tier": "moderate",
+      "tags": [
+        "masquerade",
+        "temp",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning"
+      ],
+      "process": {
+        "pid": 10055,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "locationd",
+        "executable": "/private/tmp/.svc/update-bin",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/.svc/update-bin"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.110",
+            "remote_port": 8443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "System-service-like process name does not match its temporary executable basename."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-temp-cargo-networkless",
+      "description": "Unsigned temporary executable under Cargo ancestry with no network activity.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "temp"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10056,
+        "created_at": 1790070900,
+        "ppid": 1301,
+        "uid": 501,
+        "name": "example-test",
+        "executable": "/private/tmp/cargo/example-test",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/cargo/example-test"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1301,
+            "created_at": 1790070000,
+            "name": "cargo",
+            "executable": "/Users/test/.cargo/bin/cargo"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Temporary executable is associated with an observed build-tool parent."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-shell-from-ide",
+      "description": "System shell launched from an IDE with a non-interactive synthetic automation marker.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "shell"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10057,
+        "created_at": 1790070900,
+        "ppid": 1302,
+        "uid": 501,
+        "name": "sh",
+        "executable": "/bin/sh",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/bin/sh",
+          "-c",
+          "<synthetic IDE task>"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1302,
+            "created_at": 1790070000,
+            "name": "Code",
+            "executable": "/Applications/Visual Studio Code.app/Contents/MacOS/Electron"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "valid"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-unsigned-user-tool-network",
+      "description": "Unsigned user utility makes a single ordinary TLS connection.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "unsigned",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10058,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "sync-tool",
+        "executable": "/Users/test/bin/sync-tool",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/bin/sync-tool"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.120",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-deleted-updater-network",
+      "description": "Updater executable has disappeared during update while one TLS connection remains.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "deleted",
+        "updater",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10059,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "updater",
+        "executable": "/Applications/Vendor.app/Contents/Helpers/updater",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Applications/Vendor.app/Contents/Helpers/updater"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.121",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": false,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": true,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [
+          "Executable may have been replaced during an update."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-root-homebrew-daemon",
+      "description": "Homebrew daemon runs as root from a non-system prefix with failed signature verification.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "root",
+        "homebrew",
+        "unsigned"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10060,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "customd",
+        "executable": "/opt/homebrew/sbin/customd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/opt/homebrew/sbin/customd"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Non-system Homebrew daemon is running as UID 0."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-hidden-user-daemon",
+      "description": "Hidden unsigned user daemon has no network activity or privilege elevation.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "hidden",
+        "unsigned"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10061,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "agentd",
+        "executable": "/Users/test/.local/.agent/agentd",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/.local/.agent/agentd"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Executable is hidden under the user's local data directory."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-python-outbound-tls",
+      "description": "User Python script makes an outbound TLS connection from a normal interpreter.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "python",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10062,
+        "created_at": 1790070900,
+        "ppid": 1303,
+        "uid": 501,
+        "name": "python3",
+        "executable": "/opt/homebrew/bin/python3",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "python3",
+          "sync.py"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.122",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1303,
+            "created_at": 1790070000,
+            "name": "zsh",
+            "executable": "/bin/zsh"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-renamed-local-tool",
+      "description": "Unsigned user tool has a generic system-like name but no privilege or network evidence.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "masquerade",
+        "unsigned"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10063,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "updated",
+        "executable": "/Users/test/bin/updated",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Users/test/bin/updated"
+        ],
+        "connections": [],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [
+          "Process name is generic and system-like but executable is a user tool."
+        ],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-root-vpn-unsigned",
+      "description": "Privileged third-party VPN helper lacks a verifiable signature but otherwise resides in an application bundle.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "root",
+        "vpn",
+        "unsigned"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10064,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 0,
+        "name": "vpn-helper",
+        "executable": "/Applications/ThirdPartyVPN.app/Contents/Helpers/vpn-helper",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/Applications/ThirdPartyVPN.app/Contents/Helpers/vpn-helper"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "198.51.100.123",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1,
+            "created_at": 1790070000,
+            "name": "launchd",
+            "executable": "/sbin/launchd"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 0,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "ambig-temp-python-build-helper",
+      "description": "Fresh temporary Python helper under a build system has one documentation-range connection.",
+      "label": "ambiguous",
+      "tier": "weak",
+      "tags": [
+        "developer",
+        "temp",
+        "python",
+        "network"
+      ],
+      "expected_statuses": [
+        "warning",
+        "uncertain_warning"
+      ],
+      "process": {
+        "pid": 10065,
+        "created_at": 1790070900,
+        "ppid": 1304,
+        "uid": 501,
+        "name": "python3",
+        "executable": "/private/tmp/build-venv/bin/python3",
+        "status": "sleeping",
+        "age_band": "under_minute",
+        "command_line": [
+          "/private/tmp/build-venv/bin/python3"
+        ],
+        "connections": [
+          {
+            "protocol": "tcp",
+            "local_address": "192.0.2.10",
+            "local_port": 52000,
+            "remote_address": "203.0.113.124",
+            "remote_port": 443,
+            "status": "ESTABLISHED"
+          }
+        ],
+        "ancestors": [
+          {
+            "pid": 1304,
+            "created_at": 1790070000,
+            "name": "ninja",
+            "executable": "/opt/homebrew/bin/ninja"
+          }
+        ],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "verification_failed"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "observed",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "observed",
+          "connections": "observed",
+          "file": "observed",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "observed"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "unknown-executable-denied",
+      "description": "Executable and file metadata are denied while process identity remains known.",
+      "label": "unknown",
+      "tier": "evidence_limited",
+      "tags": [
+        "permissions"
+      ],
       "expected_statuses": [
         "unknown"
       ],
       "process": {
-        "pid": 9202,
-        "created_at": 1790070000,
+        "pid": 10066,
+        "created_at": 1790070900,
         "ppid": 1,
         "uid": 501,
         "name": "restricted-worker",
-        "executable": null,
+        "executable": "/usr/bin/true",
         "status": "sleeping",
         "age_band": "under_hour",
-        "command_line": null,
+        "command_line": [
+          "/usr/bin/true"
+        ],
         "connections": [],
         "ancestors": [],
         "file": {
-          "exists": null,
-          "size": null,
-          "mode": null,
-          "owner_uid": null,
-          "modified_ns": null,
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
           "sha256": null,
-          "deleted": null,
+          "deleted": false,
           "signature": "not_requested"
         },
         "coverage": {
@@ -449,6 +4551,325 @@
           "connections": "observed",
           "file": "denied",
           "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "unknown-executable-unavailable",
+      "description": "Executable path is unavailable despite known identity and name.",
+      "label": "unknown",
+      "tier": "evidence_limited",
+      "tags": [
+        "coverage"
+      ],
+      "expected_statuses": [
+        "unknown"
+      ],
+      "process": {
+        "pid": 10067,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "restricted-worker",
+        "executable": "/usr/bin/true",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/true"
+        ],
+        "connections": [],
+        "ancestors": [],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "unavailable",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "not_requested",
+          "connections": "observed",
+          "file": "unavailable",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "unknown-name-denied",
+      "description": "Process name and executable identification are inaccessible.",
+      "label": "unknown",
+      "tier": "evidence_limited",
+      "tags": [
+        "permissions"
+      ],
+      "expected_statuses": [
+        "unknown"
+      ],
+      "process": {
+        "pid": 10068,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "restricted-worker",
+        "executable": "/usr/bin/true",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/true"
+        ],
+        "connections": [],
+        "ancestors": [],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "denied",
+          "executable": "denied",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "not_requested",
+          "connections": "observed",
+          "file": "denied",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "unknown-identity-partial",
+      "description": "Identity coverage is partial, preventing a supported legitimacy conclusion.",
+      "label": "unknown",
+      "tier": "evidence_limited",
+      "tags": [
+        "identity"
+      ],
+      "expected_statuses": [
+        "unknown"
+      ],
+      "process": {
+        "pid": 10069,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "restricted-worker",
+        "executable": "/usr/bin/true",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/true"
+        ],
+        "connections": [],
+        "ancestors": [],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "partial",
+          "name": "observed",
+          "executable": "denied",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "not_requested",
+          "connections": "observed",
+          "file": "unavailable",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "unknown-executable-truncated",
+      "description": "Executable evidence is truncated and therefore not strong enough for a legitimacy conclusion.",
+      "label": "unknown",
+      "tier": "evidence_limited",
+      "tags": [
+        "coverage"
+      ],
+      "expected_statuses": [
+        "unknown"
+      ],
+      "process": {
+        "pid": 10070,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "restricted-worker",
+        "executable": "/usr/bin/true",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/true"
+        ],
+        "connections": [],
+        "ancestors": [],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "observed",
+          "executable": "truncated",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "not_requested",
+          "connections": "observed",
+          "file": "unavailable",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "unknown-name-truncated",
+      "description": "Process name evidence is truncated and executable evidence is unavailable.",
+      "label": "unknown",
+      "tier": "evidence_limited",
+      "tags": [
+        "coverage"
+      ],
+      "expected_statuses": [
+        "unknown"
+      ],
+      "process": {
+        "pid": 10071,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "restricted-worker",
+        "executable": "/usr/bin/true",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/true"
+        ],
+        "connections": [],
+        "ancestors": [],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "truncated",
+          "executable": "unavailable",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "not_requested",
+          "connections": "observed",
+          "file": "unavailable",
+          "ancestry": "observed",
+          "hash": "not_requested",
+          "signature": "not_requested"
+        },
+        "observations": [],
+        "freshness": "observed"
+      }
+    },
+    {
+      "id": "unknown-multiple-denials",
+      "description": "Name, executable and file evidence are denied simultaneously.",
+      "label": "unknown",
+      "tier": "evidence_limited",
+      "tags": [
+        "permissions",
+        "ancestry"
+      ],
+      "expected_statuses": [
+        "unknown"
+      ],
+      "process": {
+        "pid": 10072,
+        "created_at": 1790070900,
+        "ppid": 1,
+        "uid": 501,
+        "name": "restricted-worker",
+        "executable": "/usr/bin/true",
+        "status": "sleeping",
+        "age_band": "under_hour",
+        "command_line": [
+          "/usr/bin/true"
+        ],
+        "connections": [],
+        "ancestors": [],
+        "file": {
+          "exists": true,
+          "size": 131072,
+          "mode": 493,
+          "owner_uid": 501,
+          "modified_ns": 1790000000000000000,
+          "sha256": null,
+          "deleted": false,
+          "signature": "not_requested"
+        },
+        "coverage": {
+          "identity": "observed",
+          "name": "denied",
+          "executable": "denied",
+          "parent": "observed",
+          "uid": "observed",
+          "status": "observed",
+          "command_line": "not_requested",
+          "connections": "observed",
+          "file": "denied",
+          "ancestry": "partial",
           "hash": "not_requested",
           "signature": "not_requested"
         },
