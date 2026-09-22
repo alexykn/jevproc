@@ -8,7 +8,18 @@ import psutil
 import pytest
 from pydantic import ValidationError
 
-from jevproc.core.collector import _get, _hash_file, _signature, attach_ancestry, attach_network, collect, load_snapshot
+from jevproc.core.collector import (
+    _file_info,
+    _get,
+    _hash_file,
+    _network,
+    _parse_lsof_network,
+    _signature,
+    attach_ancestry,
+    attach_network,
+    collect,
+    load_snapshot,
+)
 from jevproc.core.config import CollectionSettings
 from jevproc.core.models import Connection, Process
 from jevproc.core.privacy import redact_argv, redact_text, sanitize_snapshot, terminal_text
@@ -33,7 +44,7 @@ def test_argument_limits_are_explicit():
     assert len(args[1]) <=512 and truncated
 
 
-def test_no_command_line_by_default_on_import(snapshot):
+def test_command_line_can_be_explicitly_omitted_on_import(snapshot):
     sanitized=sanitize_snapshot(snapshot,False)
     assert all(p.command_line is None for p in sanitized.processes)
     assert all(p.coverage['command_line']=='not_requested' for p in sanitized.processes)
@@ -94,18 +105,40 @@ def test_hash_is_bounded_regular_file_only(tmp_path):
     assert _hash_file(str(fifo),100)[0] is None
 
 
-def test_codesign_never_runs_target_or_shell(monkeypatch):
+def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
     import jevproc.core.collector as module
     monkeypatch.setattr(module.sys,'platform','darwin')
     calls=[]
     def run(argv,**kwargs):
         calls.append((argv,kwargs))
+        if "--display" in argv:
+            return SimpleNamespace(
+                returncode=0,
+                stdout="",
+                stderr=(
+                    "Identifier=com.example.tool\n"
+                    "TeamIdentifier=TEAM123456\n"
+                    "Authority=Developer ID Application: Example Corp\n"
+                    "Authority=Developer ID Certification Authority\n"
+                ),
+            )
         return SimpleNamespace(returncode=0)
     monkeypatch.setattr(module.subprocess,'run',run)
-    assert _signature('/tmp/a;echo owned')==('valid','observed')
+    values, coverage = _signature('/tmp/a;echo owned')
+    assert coverage == 'observed'
+    assert values == {
+        'signature': 'valid',
+        'signature_identifier': 'com.example.tool',
+        'signature_team_id': 'TEAM123456',
+        'signature_authorities': [
+            'Developer ID Application: Example Corp',
+            'Developer ID Certification Authority',
+        ],
+    }
     assert calls[0][0]==['/usr/bin/codesign','--verify','--strict','--','/tmp/a;echo owned']
-    assert 'shell' not in calls[0][1]
-    assert calls[0][1]['timeout']==3
+    assert calls[1][0]==['/usr/bin/codesign','--display','--verbose=4','--','/tmp/a;echo owned']
+    assert all('shell' not in kwargs for _, kwargs in calls)
+    assert all(kwargs['timeout']==3 for _, kwargs in calls)
 
 
 def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):
@@ -113,7 +146,15 @@ def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):
         raise AssertionError('sensitive collector used')
     monkeypatch.setattr(psutil.Process,'environ',forbidden)
     monkeypatch.setattr(psutil.Process,'cmdline',forbidden)
-    snapshot=collect(CollectionSettings(connections=False),[os.getpid()])
+    snapshot=collect(
+        CollectionSettings(
+            connections=False,
+            command_line=False,
+            hashes=False,
+            signatures=False,
+        ),
+        [os.getpid()],
+    )
     assert len(snapshot.processes)==1
     p=snapshot.processes[0]
     assert p.pid==os.getpid() and p.created_at is not None
@@ -178,3 +219,95 @@ def test_replaced_file_evidence_is_not_combined(tmp_path, monkeypatch):
     assert info.sha256 is None
     assert info.mode is None
     assert coverage["file"] == "partial" and coverage["hash"] == "unavailable"
+
+
+def test_lsof_field_parser_maps_tcp_and_udp_connections():
+    parsed = _parse_lsof_network(
+        "\n".join([
+            "p42",
+            "ctool",
+            "f9",
+            "PTCP",
+            "n127.0.0.1:51000->198.51.100.7:443",
+            "TST=ESTABLISHED",
+            "f10",
+            "PUDP",
+            "n*:5353",
+            "p43",
+            "ctool2",
+            "f4",
+            "PTCP",
+            "n[::1]:8000",
+            "TST=LISTEN",
+        ])
+    )
+    assert parsed[42][0] == Connection(
+        protocol="tcp",
+        local_address="127.0.0.1",
+        local_port=51000,
+        remote_address="198.51.100.7",
+        remote_port=443,
+        status="ESTABLISHED",
+    )
+    assert parsed[42][1].protocol == "udp"
+    assert parsed[42][1].local_address == ""
+    assert parsed[42][1].local_port == 5353
+    assert parsed[43][0].local_address == "::1"
+    assert parsed[43][0].local_port == 8000
+    assert parsed[43][0].status == "LISTEN"
+
+
+def test_macos_network_falls_back_to_lsof(monkeypatch):
+    import jevproc.core.collector as module
+
+    monkeypatch.setattr(module.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        module.psutil,
+        "net_connections",
+        lambda **kwargs: (_ for _ in ()).throw(psutil.AccessDenied()),
+    )
+    calls = []
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return SimpleNamespace(
+            returncode=0,
+            stdout="p42\nf9\nPTCP\nn127.0.0.1:5000->203.0.113.5:443\nTST=ESTABLISHED\n",
+        )
+    monkeypatch.setattr(module.subprocess, "run", run)
+    network, coverage = _network(CollectionSettings())
+    assert coverage == "partial"
+    assert network[42][0].remote_address == "203.0.113.5"
+    assert calls[0][0] == ["/usr/sbin/lsof", "-nP", "-iTCP", "-iUDP", "-FpcfnPT"]
+    assert "shell" not in calls[0][1]
+
+
+def test_file_inspection_cache_deduplicates_hash_and_signature(tmp_path, monkeypatch):
+    import jevproc.core.collector as module
+
+    path = tmp_path / "binary"
+    path.write_bytes(b"same executable")
+    calls = {"hash": 0, "signature": 0}
+
+    def fake_hash(*_args):
+        calls["hash"] += 1
+        return "a" * 64, "observed"
+
+    def fake_signature(*_args):
+        calls["signature"] += 1
+        return {
+            "signature": "valid",
+            "signature_identifier": "com.example.binary",
+            "signature_team_id": "TEAM123456",
+            "signature_authorities": ["Example Authority"],
+        }, "observed"
+
+    monkeypatch.setattr(module, "_hash_file", fake_hash)
+    monkeypatch.setattr(module, "_signature", fake_signature)
+    settings = CollectionSettings(hashes=True, signatures=True)
+    cache = {}
+    first = _file_info(str(path), settings, cache)
+    second = _file_info(str(path), settings, cache)
+    assert first == second
+    assert calls == {"hash": 1, "signature": 1}
+    assert first[0].sha256 == "a" * 64
+    assert first[0].signature_identifier == "com.example.binary"
