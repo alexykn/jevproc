@@ -146,10 +146,11 @@ def _fmt_pair(name: str, pair: dict[str, float]) -> str:
     return (
         f"{name:<22} uncertain={pair['uncertain_at']:.3f} warning={pair['warning_at']:.3f}  "
         f"macro={pair['macro_recall']:.1%} exact={pair['exact_accuracy']:.1%}  "
-        f"benign-fp={pair['benign_false_positive_rate']:.1%} "
-        f"benign-warning={pair['benign_warning_rate']:.1%}  "
-        f"ambiguous-band={pair['ambiguous_band_recall']:.1%} "
-        f"suspicious-warning={pair['suspicious_warning_recall']:.1%}"
+        f"benign-surfaced={pair['benign_surface_rate']:.1%} "
+        f"benign-hard-warning={pair['benign_hard_warning_rate']:.1%}  "
+        f"suspicious-surfaced={pair['suspicious_surface_recall']:.1%} "
+        f"suspicious-hard-warning={pair['suspicious_warning_recall']:.1%}  "
+        f"ambiguous-band={pair['ambiguous_band_recall']:.1%}"
     )
 
 
@@ -354,7 +355,7 @@ async def _run(args: argparse.Namespace) -> int:
 
         term.line()
         term.line("Candidate threshold pairs (descriptive only; NOT applied)", style="\x1b[1m")
-        for name in ("current", "balanced", "zero_benign_fp", "high_suspicious_recall"):
+        for name in ("current", "warnings_first", "balanced", "zero_benign_fp", "high_suspicious_recall"):
             term.line(_fmt_pair(name, calibration["candidates"][name]), indent=2)
 
         term.line()
