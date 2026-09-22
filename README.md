@@ -13,9 +13,11 @@ permissions alone are ordinary uncertainty, not a warning. Operational failures
 and coverage counts remain visible even when process rows are hidden.
 
 **Status: 0.1.0rc1, integration release candidate.** Tests exercise the collector,
-protocol and policies; they do not establish real-world detection accuracy.
-The default rubric has not been calibrated against a labeled process corpus.
-See [validation](docs/VALIDATION.md) for exactly what has and has not been checked.
+protocol and policies; they do not establish real-world malware detection
+accuracy. The default JPR001 operating points are calibrated against the packaged
+72-case **synthetic** process-metadata corpus, including difficult benign controls,
+but not against an independently sampled real-world benign/malicious population.
+See [validation](docs/VALIDATION.md) and [corpus methodology](docs/CORPUS.md).
 
 ## Install and try it
 
@@ -71,7 +73,8 @@ jevproc-test --calibrate --format json
 
 Calibration analyzes raw JPR001 Noul values by corpus label, reports distributions,
 case-to-case separation and repeated-run stability, and calculates descriptive
-candidate threshold pairs (balanced, zero-benign-FP, and high-suspicious-recall).
+candidate threshold pairs, including a warnings-first operating point that
+maximizes suspicious cases surfaced while avoiding benign hard warnings.
 It never writes those thresholds back into configuration automatically. Regular
 regression mode still exits 0 for matching declared statuses, 1 for a mismatch,
 and 2 for operational failure. See [the corpus documentation](docs/CORPUS.md).
@@ -179,10 +182,13 @@ than being interpreted as malicious or as transport failures.
 
 The default classifier asks **one Noul question per process**: does this specific
 process instance have concrete evidence of malicious or abusive behavior in the
-observed snapshot? The local policy maps high probability to `warning`, the review
-band to `uncertain_warning`, and sufficiently low probability with complete basic
-evidence to `probably_legitimate`. This is triage, not a malware verdict. Custom
-Choice, Score and additional Noul rules remain supported through YAML.
+observed snapshot? The calibrated JPR001 policy uses `0.08` as the review
+boundary and `0.10` as the hard-warning boundary. Complete evidence below the
+review boundary is `probably_legitimate`; evidence-limited cases remain
+`unknown` or tentative instead of being promoted by a low scalar alone. These
+numbers are operating points from the synthetic corpus, not literal malware
+probabilities or security certification. Custom Choice, Score and additional Noul
+rules remain supported through YAML.
 
 The transport follows the [TypeSafe API](https://docs.typesafe.ai/api): each
 selected process gets one `POST /v1/systemone` request. That request puts the
