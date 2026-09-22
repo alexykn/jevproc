@@ -107,7 +107,7 @@ historical proof of no network activity.
 Use `type: noul` and an atomic yes/no question. Optional criteria must have quoted
 `"true"` and `"false"` keys. The answer is a scalar in [0,1]. No confidence field is synthesized. The default
 JPR001 thresholds are calibrated to the packaged synthetic corpus at
-`uncertain_at: 0.08` and `warning_at: 0.10`. For Noul rules, complete evidence
+`uncertain_at: 0.08` and `warning_at: 0.12`. For Noul rules, complete evidence
 maps directly into three bands: below `uncertain_at` is
 `probably_legitimate`, the review band is `uncertain_warning`, and values at or
 above `warning_at` are `warning`. Evidence-limited cases are never promoted to
