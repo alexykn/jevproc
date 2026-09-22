@@ -68,7 +68,7 @@ def test_provider_distributions_not_normalized_or_rejected():
         "type": "choice",
         "choice": "suspicious",
         "confidence": 0.8,
-        "probabilities": {key: 0.7 for key in question.criteria},
+        "probabilities": dict.fromkeys(question.criteria, 0.7),
     }
     response = validate_response(
         encode({"model": "jev-1.13.0", "answers": {"q": answer}}),
@@ -100,7 +100,7 @@ def test_bad_choice_contract(mutation):
         "type": "choice",
         "choice": "suspicious",
         "confidence": 0.8,
-        "probabilities": {key: 1 / 3 for key in question.criteria},
+        "probabilities": dict.fromkeys(question.criteria, 1 / 3),
     }
     payload = {"model": "jev-1.13.0", "answers": {"q": answer}}
     if mutation == "missing":

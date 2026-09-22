@@ -12,7 +12,14 @@ import httpx
 
 from jevproc import __version__
 from jevproc.core.config import JevSettings, Question
-from jevproc.core.protocol import (BudgetError, ContextLimitError, JevError, JevResponse, RequestRejectedError, validate_response)
+from jevproc.core.protocol import (
+    BudgetError,
+    ContextLimitError,
+    JevError,
+    JevResponse,
+    RequestRejectedError,
+    validate_response,
+)
 
 
 class Limiter:

@@ -1,9 +1,6 @@
 import os
-import stat
-import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 from types import SimpleNamespace
 
 import psutil
@@ -13,8 +10,8 @@ from pydantic import ValidationError
 from jevproc.core.collector import (
     _classify_codesign_failure,
     _collect_processes_parallel,
-    _file_evidence_futures,
     _family_pids,
+    _file_evidence_futures,
     _file_info,
     _get,
     _hash_file,
@@ -30,7 +27,7 @@ from jevproc.core.collector import (
 )
 from jevproc.core.config import CollectionSettings
 from jevproc.core.models import Connection, Process
-from jevproc.core.privacy import redact_argv, redact_text, sanitize_snapshot, terminal_text
+from jevproc.core.privacy import redact_argv, sanitize_snapshot, terminal_text
 
 
 def test_sensitive_arguments_are_redacted_before_truncation():

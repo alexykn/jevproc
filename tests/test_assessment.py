@@ -53,7 +53,7 @@ def choice_rule():
 ])
 def test_choice_policy(snapshot, choice, p, confidence, status):
     rule=choice_rule()
-    probs = {key: .01 for key in rule.question.criteria}
+    probs = dict.fromkeys(rule.question.criteria, 0.01)
     probs[choice] = p
     result = judge(rule, snapshot.processes[0], ChoiceAnswer(type="choice", choice=choice, confidence=confidence, probabilities=probs))
     assert result.status == status
