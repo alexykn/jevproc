@@ -6,7 +6,7 @@ import os
 import sqlite3
 import sys
 from contextlib import ExitStack
-from typing import TextIO
+from typing import Any, TextIO
 
 from pydantic import ValidationError
 
@@ -22,34 +22,56 @@ from jevproc.core.protocol import JevError
 from jevproc.core.storage import AnswerCache, StorageError, default_cache_dir, write_private
 
 
-def _settings(args: argparse.Namespace) -> Config:
-    config = load_config(args.config)
-    data = config.model_dump(mode="json")
-    for flag, key in (("include_command_line", "command_line"), ("hashes", "hashes"), ("signatures", "signatures")):
+def _enable_collection_flags(args: argparse.Namespace, collection: dict[str, Any]) -> None:
+    for flag, key in (
+        ("include_command_line", "command_line"),
+        ("hashes", "hashes"),
+        ("signatures", "signatures"),
+    ):
         if getattr(args, flag):
-            data["collection"][key] = True
+            collection[key] = True
+
+
+def _disable_collection_flags(args: argparse.Namespace, collection: dict[str, Any]) -> None:
     for flag, key in (
         ("no_command_line", "command_line"),
         ("no_hashes", "hashes"),
         ("no_signatures", "signatures"),
         ("no_resources", "resources"),
+        ("no_connections", "connections"),
     ):
         if getattr(args, flag):
-            data["collection"][key] = False
-    if args.no_connections:
-        data["collection"]["connections"] = False
-    if args.max_processes is not None:
-        data["collection"]["max_processes"] = args.max_processes
-    if args.collection_workers is not None:
-        data["collection"]["workers"] = args.collection_workers
+            collection[key] = False
+
+
+def _collection_limits(args: argparse.Namespace, collection: dict[str, Any]) -> None:
+    overrides = {
+        "max_processes": args.max_processes,
+        "workers": args.collection_workers,
+    }
+    for key, value in overrides.items():
+        if value is not None:
+            collection[key] = value
+
+
+def _jev_overrides(args: argparse.Namespace, jev: dict[str, Any]) -> None:
     for name in ("model", "max_requests", "concurrency"):
-        if (value := getattr(args, name)) is not None:
-            data["jev"][name] = value
-    data["ignore"] = list(set(data["ignore"] + args.ignore))
-    if args.no_cache or args.demo or args.offline:
-        data["cache"]["enabled"] = False
+        value = getattr(args, name)
+        if value is not None:
+            jev[name] = value
     if args.demo:
-        data["jev"]["requests_per_minute"] = 0
+        jev["requests_per_minute"] = 0
+
+
+def _settings(args: argparse.Namespace) -> Config:
+    config = load_config(args.config)
+    data = config.model_dump(mode="json")
+    _enable_collection_flags(args, data["collection"])
+    _disable_collection_flags(args, data["collection"])
+    _collection_limits(args, data["collection"])
+    _jev_overrides(args, data["jev"])
+    data["ignore"] = list(set(data["ignore"] + args.ignore))
+    data["cache"]["enabled"] = not any((args.no_cache, args.demo, args.offline))
     return Config.model_validate(data)
 
 
@@ -131,35 +153,56 @@ async def _run(args: argparse.Namespace, config: Config, stdout: TextIO, stderr:
             return await _cycles(args, config, Engine(config, client, cache), stdout)
 
 
+def _validate_args(p: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    invalid = (
+        (
+            bool(args.watch and any((args.demo, args.input, args.save_snapshot, args.format == "json"))),
+            "--watch requires live collection, text/jsonl output, and no --save-snapshot",
+        ),
+        (
+            bool(args.demo and any((args.input, args.pid, args.family, args.save_snapshot))),
+            "--demo cannot be combined with --input, --pid, --family or --save-snapshot",
+        ),
+        (
+            bool(args.input and any((args.pid, args.family))),
+            "--pid/--family cannot be combined with --input",
+        ),
+    )
+    message = next((message for failed, message in invalid if failed), None)
+    if message is not None:
+        p.error(message)
+
+
+def _safe_error(message: str) -> int:
+    Terminal(sys.stderr, color="never").line(message)
+    return 2
+
+
+def _execute(args: argparse.Namespace) -> int:
+    config = _settings(args)
+    return asyncio.run(_run(args, config, sys.stdout, sys.stderr))
+
+
+def _guarded_execute(args: argparse.Namespace) -> int:
+    try:
+        return _execute(args)
+    except KeyboardInterrupt:
+        return 130
+    except BrokenPipeError:
+        return 0
+    except (ConfigError, CollectionError, StorageError, JevError) as exc:
+        return _safe_error(f"jevproc: {exc}")
+    except (OSError, sqlite3.Error, ValidationError, UnicodeError) as exc:
+        return _safe_error(f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied")
+    except ExceptionGroup as exc:
+        return _safe_error(f"jevproc: worker failed ({type(exc).__name__}); scan incomplete")
+
+
 def main(argv: list[str] | None = None) -> int:
     p = parser()
     args = p.parse_args(argv)
     if args.print_default_config:
         sys.stdout.write(default_yaml())
         return 0
-    if args.watch and (args.demo or args.input or args.save_snapshot or args.format == "json"):
-        p.error("--watch requires live collection, text/jsonl output, and no --save-snapshot")
-    if args.demo and (args.input or args.pid or args.family or args.save_snapshot):
-        p.error("--demo cannot be combined with --input, --pid, --family or --save-snapshot")
-    if args.input and (args.pid or args.family):
-        p.error("--pid/--family cannot be combined with --input")
-    try:
-        config = _settings(args)
-        return asyncio.run(_run(args, config, sys.stdout, sys.stderr))
-    except KeyboardInterrupt:
-        return 130
-    except BrokenPipeError:
-        return 0
-    except (ConfigError, CollectionError, StorageError, JevError) as exc:
-        Terminal(sys.stderr, color="never").line(f"jevproc: {exc}")
-        return 2
-    except (OSError, sqlite3.Error, ValidationError, UnicodeError) as exc:
-        # Never display a validation error containing a snapshot or config secret.
-        Terminal(sys.stderr, color="never").line(
-            f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied"
-        )
-        return 2
-    except ExceptionGroup as exc:
-        # TaskGroup failures must remain operational failures, not a successful empty report.
-        Terminal(sys.stderr, color="never").line(f"jevproc: worker failed ({type(exc).__name__}); scan incomplete")
-        return 2
+    _validate_args(p, args)
+    return _guarded_execute(args)
