@@ -265,7 +265,7 @@ def _patch_rules(existing: object, patches: object) -> list[ConfigMap]:
     return list(by_id.values())
 
 
-def _apply_override(defaults: ConfigMap, override: ConfigMap) -> ConfigMap:
+def _apply_override(defaults: Mapping[str, object], override: Mapping[str, object]) -> ConfigMap:
     additions = _string_mapping(override.get("rulesets", {}), "rulesets must be a mapping")
     default_rulesets = _string_mapping(defaults.get("rulesets", {}), "packaged rulesets must be a mapping")
     rulesets: ConfigMap = dict(default_rulesets)
