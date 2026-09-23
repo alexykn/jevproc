@@ -250,7 +250,10 @@ def _next_ancestor(
     resolve_missing: bool,
 ) -> tuple[Parent, int | None] | None:
     blocked = any((next_pid in (0, None), next_pid in seen, created is None))
-    return None if blocked else _resolve_parent(next_pid, created, by_pid, resolve_missing)
+    if blocked:
+        return None
+    assert next_pid is not None and created is not None
+    return _resolve_parent(next_pid, created, by_pid, resolve_missing)
 
 
 def _ancestry(
