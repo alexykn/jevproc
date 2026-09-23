@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import math
 import statistics
-from itertools import pairwise
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any, Iterable
 
 from jevproc.core.corpus import CorpusCase
