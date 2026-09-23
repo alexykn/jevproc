@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+from bisect import bisect_right
 from contextlib import nullcontext, suppress
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -57,11 +58,13 @@ def _resource_value(action: Callable[[], Any]) -> tuple[Any, Coverage]:
 
 def _resource_coverage(states: list[Coverage]) -> Coverage:
     observed = states.count("observed")
-    if observed == len(states):
-        return "observed"
-    if observed:
-        return "partial"
-    return next((state for state in ("denied", "gone") if state in states), "unavailable")
+    outcomes: tuple[tuple[bool, Coverage], ...] = (
+        (observed == len(states), "observed"),
+        (bool(observed), "partial"),
+        ("denied" in states, "denied"),
+        ("gone" in states, "gone"),
+    )
+    return next((state for matches, state in outcomes if matches), "unavailable")
 
 
 def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUsage, Coverage]:
@@ -78,29 +81,29 @@ def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUs
     states = [result[1] for _, result in measurements]
     return ResourceUsage.model_validate(values), _resource_coverage(states)
 
+def _prime_resource_probe(pid: int) -> psutil.Process | None:
+    try:
+        proc = psutil.Process(pid)
+        proc.cpu_percent(interval=None)
+        return proc
+    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
+        return None
+
+
 def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dict[int, psutil.Process]:
     if not settings.resources:
         return {}
-    probes: dict[int, psutil.Process] = {}
-    for pid in pids:
-        try:
-            proc = psutil.Process(pid)
-            proc.cpu_percent(interval=None)
-            probes[pid] = proc
-        except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
-            continue
+    probes = {pid: probe for pid in pids if (probe := _prime_resource_probe(pid)) is not None}
     if probes:
         time.sleep(settings.resource_sample_seconds)
     return probes
 
 
 def _comm_entry(line: str) -> tuple[int, str] | None:
-    value = line.strip()
-    pid_text, separator, command = value.partition(" ")
-    if not value or not separator or not pid_text.isdigit():
-        return None
+    pid_text, separator, command = line.strip().partition(" ")
     command = command.strip()
-    return (int(pid_text), command[:8192]) if command else None
+    valid = all((bool(separator), pid_text.isdigit(), bool(command)))
+    return (int(pid_text), command[:8192]) if valid else None
 
 
 def _darwin_comm_table() -> dict[int, str]:
@@ -172,33 +175,37 @@ def _process_executable_without_cmdline(
 def _age_band(created: float | None, now: float) -> str:
     if created is None or created > now:
         return "unknown"
-    age = now - created
-    bands = ((60, "under_minute"), (3600, "under_hour"), (86400, "under_day"))
-    return next((label for limit, label in bands if age < limit), "older")
+    labels = ("under_minute", "under_hour", "under_day", "older")
+    return labels[bisect_right((60, 3600, 86400), now - created)]
 
 
-def _process(
-    pid: int,
-    settings: CollectionSettings,
-    now: float,
-    file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None = None,
-    resource_probe: psutil.Process | None = None,
-) -> Process:
+def _live_process(pid: int, resource_probe: psutil.Process | None) -> psutil.Process | None:
     try:
-        proc = resource_probe or psutil.Process(pid)
+        return resource_probe or psutil.Process(pid)
     except psutil.NoSuchProcess:
-        return Process(pid=pid, freshness="gone", coverage={"identity": "gone"})
-    fields, coverage = _process_metadata(proc, pid, settings, resource_probe is not None)
+        return None
+
+
+def _truncate_process_fields(fields: dict[str, Any], coverage: dict[str, Coverage]) -> str | None:
     executable = fields["executable"]
     if executable and len(executable) > 8192:
         executable = fields["executable"] = executable[:8192]
         coverage["executable"] = "truncated"
-    file_info = _process_file(pid, executable, settings, coverage, file_cache)
     if len(fields["name"]) > 512:
         coverage["name"] = "truncated"
     fields["name"] = fields["name"][:512]
     fields["status"] = fields["status"][:512]
-    coverage["connections"] = "not_requested"
+    return executable
+
+
+def _process_record(
+    pid: int,
+    now: float,
+    fields: dict[str, Any],
+    coverage: dict[str, Coverage],
+    executable: str | None,
+    file_info: Executable,
+) -> Process:
     return Process.model_validate({
         **fields,
         "pid": pid,
@@ -211,20 +218,43 @@ def _process(
     })
 
 
-def _identity_fields(
-    proc: psutil.Process, pid: int, include_arguments: bool, coverage: dict[str, Coverage]
-) -> tuple[str, str | None]:
-    if include_arguments:
-        name = _get("name", proc.name, coverage, "<unavailable>")
-        executable = _get("executable", proc.exe, coverage) or None
-        if executable is None and coverage["executable"] == "observed":
-            coverage["executable"] = "unavailable"
-        return name, executable
+def _process(
+    pid: int,
+    settings: CollectionSettings,
+    now: float,
+    file_cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None = None,
+    resource_probe: psutil.Process | None = None,
+) -> Process:
+    proc = _live_process(pid, resource_probe)
+    if proc is None:
+        return Process(pid=pid, freshness="gone", coverage={"identity": "gone"})
+    fields, coverage = _process_metadata(proc, pid, settings, resource_probe is not None)
+    executable = _truncate_process_fields(fields, coverage)
+    file_info = _process_file(pid, executable, settings, coverage, file_cache)
+    coverage["connections"] = "not_requested"
+    return _process_record(pid, now, fields, coverage, executable, file_info)
+
+
+def _psutil_identity(proc: psutil.Process, coverage: dict[str, Coverage]) -> tuple[str, str | None]:
+    name = _get("name", proc.name, coverage, "<unavailable>")
+    executable = _get("executable", proc.exe, coverage) or None
+    if executable is None and coverage["executable"] == "observed":
+        coverage["executable"] = "unavailable"
+    return name, executable
+
+
+def _direct_identity(proc: psutil.Process, pid: int, coverage: dict[str, Coverage]) -> tuple[str, str | None]:
     name = _process_name_without_cmdline(proc, pid)
     executable = _process_executable_without_cmdline(proc, pid)
     coverage["name"] = "observed" if name != "<unavailable>" else "unavailable"
     coverage["executable"] = "observed" if executable else "unavailable"
     return name, executable
+
+
+def _identity_fields(
+    proc: psutil.Process, pid: int, include_arguments: bool, coverage: dict[str, Coverage]
+) -> tuple[str, str | None]:
+    return _psutil_identity(proc, coverage) if include_arguments else _direct_identity(proc, pid, coverage)
 
 
 def _command_arguments(proc: psutil.Process, enabled: bool, coverage: dict[str, Coverage]) -> list[str] | None:
