@@ -47,9 +47,9 @@ class RequestRejectedError(JevError):
         machine_fields: dict[str, tuple[str, ...]],
         request_id: str,
     ) -> None:
-        details = ", ".join(f"{key}={','.join(values)}" for key, values in machine_fields.items() if values)
-        suffix = f"; {details}" if details else ""
-        request = f"; request-id={request_id}" if request_id else ""
+        details = ", ".join(f"{key}={','.join(values)}" for key, values in machine_fields.items())
+        suffix = ("; " + details) * bool(details)
+        request = ("; request-id=" + request_id) * bool(request_id)
         super().__init__(f"Jev rejected request (HTTP {status}{suffix}{request})")
         self.status = status
         self.machine_fields = machine_fields
