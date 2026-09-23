@@ -29,6 +29,11 @@ class EvaluationClient(Protocol):
     async def evaluate(self, body: bytes, questions: Mapping[str, Question]) -> JevResponse: ...
 
 
+def _emit(callback: Callable[[Assessment], None] | None, assessment: Assessment) -> None:
+    if callback is not None:
+        callback(assessment)
+
+
 def _unavailable(process: Process, reason: str, *, failure: bool = False) -> Assessment:
     return Assessment(
         process=process,
@@ -67,6 +72,10 @@ class Engine:
         self.cache.delete(key)
         return None
 
+    def _store_answer(self, key: str, answer: JevResponse) -> None:
+        if self.cache is not None:
+            self.cache.put(key, answer)
+
     async def _answer(self, request: EvaluationRequest) -> tuple[JevResponse, bool]:
         assert self.client is not None
         key = request_key(self.client.base_url, request.body)
@@ -74,8 +83,7 @@ class Engine:
         if cached is not None:
             return cached, True
         answer = await self.client.evaluate(request.body, request.questions)
-        if self.cache is not None:
-            self.cache.put(key, answer)
+        self._store_answer(key, answer)
         return answer, False
 
     async def _evaluate(self, snapshot: Snapshot, process: Process) -> Assessment:
@@ -110,8 +118,7 @@ class Engine:
                 candidates.append(process)
                 continue
             assessments.append(initial)
-            if on_assessment is not None:
-                on_assessment(initial)
+            _emit(on_assessment, initial)
         await self._evaluate_pending(snapshot, candidates, assessments, on_assessment)
         assessments.sort(key=lambda assessment: assessment.process.pid)
         return Report(
@@ -136,8 +143,7 @@ class Engine:
                 return
             result = await self._evaluate(snapshot, process)
             assessments.append(result)
-            if on_assessment is not None:
-                on_assessment(result)
+            _emit(on_assessment, result)
 
     async def _evaluate_pending(
         self,
