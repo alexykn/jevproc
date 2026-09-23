@@ -6,7 +6,6 @@ import subprocess
 import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
 from dataclasses import dataclass, field
 
 import psutil
