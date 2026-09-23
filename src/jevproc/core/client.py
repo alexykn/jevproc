@@ -360,8 +360,15 @@ def _transient_response(response: httpx.Response) -> bool:
 
 
 def _permanent_failure(response: httpx.Response) -> JevError | None:
-    classified = _context_failure(response) or _rejection_failure(response)
-    return classified or (None if _transient_response(response) else _generic_http_error(response))
+    contextual = _context_failure(response)
+    if contextual is not None:
+        return contextual
+    rejected = _rejection_failure(response)
+    if rejected is not None:
+        return rejected
+    if _transient_response(response):
+        return None
+    return _generic_http_error(response)
 
 
 def _raise_permanent_failure(response: httpx.Response) -> None:
