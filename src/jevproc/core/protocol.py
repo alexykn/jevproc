@@ -97,6 +97,36 @@ def encode(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
+def _choice_answer_matches(question: ChoiceQuestion, answer: Answer) -> bool:
+    return isinstance(answer, ChoiceAnswer) and all(
+        (
+            answer.choice in question.criteria,
+            set(answer.probabilities) == set(question.criteria),
+        )
+    )
+
+
+def _score_answer_matches(question: ScoreQuestion, answer: Answer) -> bool:
+    return isinstance(answer, ScoreAnswer) and all(
+        (
+            0 <= answer.score <= len(question.criteria) - 1,
+            set(answer.probabilities) == {str(i) for i in range(len(question.criteria))},
+        )
+    )
+
+
+def _answer_matches(question: Question, answer: Answer) -> bool:
+    if isinstance(question, NoulQuestion):
+        return isinstance(answer, NoulAnswer)
+    if isinstance(question, ChoiceQuestion):
+        return _choice_answer_matches(question, answer)
+    return _score_answer_matches(question, answer)
+
+
+def _answers_match_questions(response: JevResponse, questions: Mapping[str, Question]) -> bool:
+    return all(_answer_matches(question, response.answers[key]) for key, question in questions.items())
+
+
 def validate_response(raw: bytes, questions: Mapping[str, Question]) -> JevResponse:
     try:
         response = JevResponse.model_validate_json(raw)
@@ -104,26 +134,9 @@ def validate_response(raw: bytes, questions: Mapping[str, Question]) -> JevRespo
         raise JevError("Jev response violates the typed answer contract") from exc
     if set(response.answers) != set(questions):
         raise JevError("Jev answer IDs do not exactly match submitted questions")
-    for key, question in questions.items():
-        answer = response.answers[key]
-        if isinstance(question, NoulQuestion):
-            valid = isinstance(answer, NoulAnswer)
-        elif isinstance(question, ChoiceQuestion):
-            valid = (
-                isinstance(answer, ChoiceAnswer)
-                and answer.choice in question.criteria
-                and set(answer.probabilities) == set(question.criteria)
-            )
-        else:
-            assert isinstance(question, ScoreQuestion)
-            valid = (
-                isinstance(answer, ScoreAnswer)
-                and 0 <= answer.score <= len(question.criteria) - 1
-                and set(answer.probabilities) == {str(i) for i in range(len(question.criteria))}
-            )
-        if not valid:
-            raise JevError("Jev answer type, labels or score range do not match the question")
-        # Preserve provider values exactly: no probability renormalization or sum-to-one rejection.
+    if not _answers_match_questions(response, questions):
+        raise JevError("Jev answer type, labels or score range do not match the question")
+    # Preserve provider values exactly: no probability renormalization or sum-to-one rejection.
     return response
 
 
@@ -158,25 +171,29 @@ class EvaluationRequest:
         return {check.key: check.rule.question for check in self.checks}
 
 
+def _source_has_evidence(source: str, process: Process) -> bool:
+    evidence = {
+        "connections": process.connections,
+        "command_line": process.command_line,
+        "executable": process.executable,
+        "ancestry": process.ancestors,
+        "children": process.children,
+        "hash": process.file.sha256,
+    }
+    return bool(evidence.get(source, True))
+
+
+def _source_coverage_ok(source: str, process: Process) -> bool:
+    allowed = {"observed", "partial"} if source == "resources" else {"observed", "partial", "truncated"}
+    return process.coverage.get(source) in allowed
+
+
+def _source_applicable(source: str, process: Process) -> bool:
+    return all((_source_coverage_ok(source, process), _source_has_evidence(source, process)))
+
+
 def applicable(rule: Rule, process: Process) -> bool:
-    for source in rule.requires:
-        if process.coverage.get(source) not in {"observed", "partial", "truncated"}:
-            return False
-        if source == "connections" and not process.connections:
-            return False
-        if source == "command_line" and not process.command_line:
-            return False
-        if source == "executable" and not process.executable:
-            return False
-        if source == "ancestry" and not process.ancestors:
-            return False
-        if source == "children" and not process.children:
-            return False
-        if source == "resources" and process.coverage.get("resources") not in {"observed", "partial"}:
-            return False
-        if source == "hash" and process.file.sha256 is None:
-            return False
-    return True
+    return all(_source_applicable(source, process) for source in rule.requires)
 
 
 def _process_state(process: Process) -> dict[str, Any]:
