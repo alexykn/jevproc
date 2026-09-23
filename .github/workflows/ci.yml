@@ -39,6 +39,8 @@ jobs:
         run: uv run --no-sync ruff check .
       - name: Type-check project
         run: uv run --no-sync ty check
+      - name: Radon complexity report
+        run: uv run --no-sync radon cc src -s -a
       - name: Contract and collector tests (no API keys)
         run: uv run --no-sync pytest -q
       - name: Offline behavior fingerprints (synthetic HTTP only)
