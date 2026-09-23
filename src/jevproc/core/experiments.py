@@ -67,6 +67,10 @@ class CorpusExperiment:
     @property
     def summary(self) -> dict[str, Any]:
         mismatches = sum(not item["passed"] for item in self.results)
+        totals = {
+            key: sum(report.summary[key] for report in self.reports)
+            for key in ("requests", "retries", "input_tokens", "elapsed_seconds")
+        }
         return {
             "cases": len(self.cases),
             "runs": self.runs,
@@ -74,25 +78,27 @@ class CorpusExperiment:
             "passed_samples": len(self.results) - mismatches,
             "mismatches": mismatches,
             "operational_failures": sum(report.summary["failed_processes"] for report in self.reports),
-            **{
-                key: sum(report.summary[key] for report in self.reports)
-                for key in ("requests", "retries", "input_tokens", "elapsed_seconds")
-            },
+            **totals,
         }
+
+    def _missing_samples(self) -> list[str]:
+        return [case.id for case in self.cases if not self.samples[case.id]]
 
     def calibrate(self, uncertain_at: float, warning_at: float) -> dict[str, Any] | None:
         if self.summary["operational_failures"]:
             return None
-        missing = [case.id for case in self.cases if not self.samples[case.id]]
+        missing = self._missing_samples()
         if missing:
             raise JevError("calibration missing JPR001 Noul samples for: " + ", ".join(missing))
         return calibration_report(self.cases, self.samples, current_uncertain=uncertain_at, current_warning=warning_at)
 
     def exit_code(self, calibrating: bool) -> int:
         summary = self.summary
-        if summary["operational_failures"]:
-            return 2
-        return 0 if calibrating or not summary["mismatches"] else 1
+        outcomes = (
+            (bool(summary["operational_failures"]), 2),
+            (bool(not calibrating and summary["mismatches"]), 1),
+        )
+        return next((code for matches, code in outcomes if matches), 0)
 
 
 async def run_corpus(
