@@ -85,38 +85,43 @@ def attach_children(processes: list[Process], limit: int) -> list[Process]:
     return _attach_children_from_index(processes, limit, by_parent, global_coverage)
 
 
-def _family_pids(root_pid: int) -> list[int]:
-    if not psutil.pid_exists(root_pid):
-        raise CollectionError(f"process family root PID {root_pid} does not exist")
+def _process_family_index() -> tuple[dict[int, list[int]], set[int]]:
     children: dict[int, list[int]] = defaultdict(list)
-    seen_pids = set()
+    seen_pids: set[int] = set()
     try:
-        for item in psutil.process_iter(["pid", "ppid"], ad_value=None):
+        rows = psutil.process_iter(["pid", "ppid"], ad_value=None)
+        for item in rows:
             pid = item.info.get("pid")
             ppid = item.info.get("ppid")
             if pid is None:
                 continue
-            seen_pids.add(int(pid))
+            pid = int(pid)
+            seen_pids.add(pid)
             if ppid is not None:
-                children[int(ppid)].append(int(pid))
+                children[int(ppid)].append(pid)
     except (OSError, NotImplementedError) as exc:
         raise CollectionError("could not enumerate process family") from exc
+    return children, seen_pids
 
-    if root_pid not in seen_pids and not psutil.pid_exists(root_pid):
-        raise CollectionError(f"process family root PID {root_pid} exited")
 
+def _descendants(root_pid: int, children: dict[int, list[int]]) -> list[int]:
     ordered = [root_pid]
     seen = {root_pid}
-    cursor = 0
-    while cursor < len(ordered):
-        parent = ordered[cursor]
-        cursor += 1
-        for child in sorted(children.get(parent, [])):
-            if child not in seen:
-                seen.add(child)
-                ordered.append(child)
+    for parent in ordered:
+        unseen = (child for child in sorted(children.get(parent, [])) if child not in seen)
+        for child in unseen:
+            seen.add(child)
+            ordered.append(child)
     return ordered
 
+
+def _family_pids(root_pid: int) -> list[int]:
+    if not psutil.pid_exists(root_pid):
+        raise CollectionError(f"process family root PID {root_pid} does not exist")
+    children, seen_pids = _process_family_index()
+    if root_pid not in seen_pids and not psutil.pid_exists(root_pid):
+        raise CollectionError(f"process family root PID {root_pid} exited")
+    return _descendants(root_pid, children)
 
 def _live_parent(pid: int) -> tuple[Parent, int | None] | None:
     try:
@@ -192,6 +197,18 @@ def _resolve_parent(
     return link
 
 
+def _next_ancestor(
+    next_pid: int | None,
+    created: float | None,
+    seen: set[int],
+    by_pid: dict[int, Process],
+    resolve_missing: bool,
+) -> tuple[Parent, int | None] | None:
+    if next_pid in (0, None) or next_pid in seen or created is None:
+        return None
+    return _resolve_parent(next_pid, created, by_pid, resolve_missing)
+
+
 def _ancestry(
     process: Process, by_pid: dict[int, Process], depth: int, resolve_missing: bool
 ) -> tuple[list[Parent], Coverage]:
@@ -199,18 +216,18 @@ def _ancestry(
     seen = {process.pid}
     next_pid, created = process.ppid, process.created_at
     state: Coverage = "not_requested" if depth == 0 else "observed"
+
     for _ in range(depth):
         if next_pid in (0, None):
             return parents, state
-        if next_pid in seen or created is None:
-            return parents, "partial"
-        link = _resolve_parent(next_pid, created, by_pid, resolve_missing)
+        link = _next_ancestor(next_pid, created, seen, by_pid, resolve_missing)
         if link is None:
             return parents, "partial"
         parent, next_pid = link
         parents.append(parent)
         seen.add(parent.pid)
         created = parent.created_at
-    if depth and next_pid not in (0, None):
-        state = "truncated"
-    return parents, state
+
+    truncated = depth > 0 and next_pid not in (0, None)
+    return parents, "truncated" if truncated else state
+
