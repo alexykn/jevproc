@@ -244,8 +244,11 @@ def _scan_summary(
     }
 
 def _initial_assessment(process: Process, mode: str) -> Assessment | None:
-    if mode == "offline":
-        return _unavailable(process, "Offline inventory only; Jev did not classify this process.")
-    if process.freshness != "observed" or process.created_at is None:
-        return _unavailable(process, f"Process identity is {process.freshness}; not submitted to Jev.")
-    return None
+    identity_ready = all((process.freshness == "observed", process.created_at is not None))
+    messages = {
+        (True, True): "Offline inventory only; Jev did not classify this process.",
+        (True, False): "Offline inventory only; Jev did not classify this process.",
+        (False, False): f"Process identity is {process.freshness}; not submitted to Jev.",
+    }
+    message = messages.get((mode == "offline", identity_ready))
+    return _unavailable(process, message) if message is not None else None
