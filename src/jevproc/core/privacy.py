@@ -3,6 +3,7 @@
 import re
 import unicodedata
 from collections.abc import Iterator
+from typing import Any
 
 from jevproc.core.models import Process, Snapshot
 
@@ -54,51 +55,77 @@ def redact_argv(arguments: list[str]) -> tuple[list[str], bool]:
     return _bound_arguments(text_redacted, arguments_truncated=len(arguments) > 64)
 
 
-def sanitize_process(process: Process, include_command_line: bool) -> Process:
-    # Work at the external-input boundary and revalidate the transformed record.
-    # A replacement such as <redacted> can be longer than the original secret.
-    data = process.model_dump(mode="python")
-    coverage = data["coverage"]
-
-    def clean(value: str, limit: int, source: str) -> str:
-        result = redact_text(value)
-        if len(result) > limit:
-            coverage[source] = "truncated"
-            return result[:limit]
+def _clean_value(value: str, limit: int, source: str, coverage: dict[str, Any]) -> str:
+    result = redact_text(value)
+    if len(result) <= limit:
         return result
+    coverage[source] = "truncated"
+    return result[:limit]
 
-    data["name"] = clean(process.name, 512, "name")
-    data["status"] = clean(process.status, 512, "status")
-    if process.executable is not None:
-        data["executable"] = clean(process.executable, 8192, "executable")
-    if process.file.signature_identifier is not None:
-        data["file"]["signature_identifier"] = clean(process.file.signature_identifier, 512, "signature")
-    if process.file.signature_team_id is not None:
-        data["file"]["signature_team_id"] = clean(process.file.signature_team_id, 512, "signature")
-    data["file"]["signature_authorities"] = [
-        clean(value, 512, "signature") for value in process.file.signature_authorities
+
+def _clean_optional(value: str | None, limit: int, source: str, coverage: dict[str, Any]) -> str | None:
+    return None if value is None else _clean_value(value, limit, source, coverage)
+
+
+def _sanitize_file(data: dict[str, Any], process: Process, coverage: dict[str, Any]) -> None:
+    file_data = data["file"]
+    file_data["signature_identifier"] = _clean_optional(
+        process.file.signature_identifier, 512, "signature", coverage
+    )
+    file_data["signature_team_id"] = _clean_optional(process.file.signature_team_id, 512, "signature", coverage)
+    file_data["signature_authorities"] = [
+        _clean_value(value, 512, "signature", coverage) for value in process.file.signature_authorities
     ]
+
+
+def _sanitize_ancestors(data: dict[str, Any], coverage: dict[str, Any]) -> None:
     for parent in data["ancestors"]:
-        parent["name"] = clean(parent["name"], 512, "ancestry")
-        if parent["executable"] is not None:
-            parent["executable"] = clean(parent["executable"], 8192, "ancestry")
+        parent["name"] = _clean_value(parent["name"], 512, "ancestry", coverage)
+        parent["executable"] = _clean_optional(parent["executable"], 8192, "ancestry", coverage)
+
+
+def _sanitize_children(data: dict[str, Any], coverage: dict[str, Any]) -> None:
     for child in data["children"]:
-        child["name"] = clean(child["name"], 512, "children")
-        if child["executable"] is not None:
-            child["executable"] = clean(child["executable"], 8192, "children")
-        child["status"] = clean(child["status"], 512, "children")
+        child["name"] = _clean_value(child["name"], 512, "children", coverage)
+        child["executable"] = _clean_optional(child["executable"], 8192, "children", coverage)
+        child["status"] = _clean_value(child["status"], 512, "children", coverage)
+
+
+def _sanitize_connections(data: dict[str, Any], coverage: dict[str, Any]) -> None:
     for connection in data["connections"]:
         for key in ("local_address", "remote_address", "status"):
-            connection[key] = clean(connection[key], 512, "connections")
-    data["observations"] = [clean(value, 512, "observations") for value in process.observations]
-    if include_command_line and process.command_line is not None:
-        argv, shortened = redact_argv(process.command_line)
-        data["command_line"] = argv
-        if shortened:
-            coverage["command_line"] = "truncated"
-    else:
+            connection[key] = _clean_value(connection[key], 512, "connections", coverage)
+
+
+def _sanitize_command_line(
+    data: dict[str, Any],
+    process: Process,
+    include_command_line: bool,
+    coverage: dict[str, Any],
+) -> None:
+    if not include_command_line or process.command_line is None:
         data["command_line"] = None
         coverage["command_line"] = "not_requested"
+        return
+    argv, shortened = redact_argv(process.command_line)
+    data["command_line"] = argv
+    if shortened:
+        coverage["command_line"] = "truncated"
+
+
+def sanitize_process(process: Process, include_command_line: bool) -> Process:
+    # Work at the external-input boundary and revalidate the transformed record.
+    data = process.model_dump(mode="python")
+    coverage = data["coverage"]
+    data["name"] = _clean_value(process.name, 512, "name", coverage)
+    data["status"] = _clean_value(process.status, 512, "status", coverage)
+    data["executable"] = _clean_optional(process.executable, 8192, "executable", coverage)
+    _sanitize_file(data, process, coverage)
+    _sanitize_ancestors(data, coverage)
+    _sanitize_children(data, coverage)
+    _sanitize_connections(data, coverage)
+    data["observations"] = [_clean_value(value, 512, "observations", coverage) for value in process.observations]
+    _sanitize_command_line(data, process, include_command_line, coverage)
     return Process.model_validate(data)
 
 
