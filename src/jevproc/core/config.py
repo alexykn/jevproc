@@ -16,6 +16,11 @@ class ConfigError(ValueError):
 type ConfigMap = dict[str, object]
 
 
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
+
 class UniqueSafeLoader(yaml.SafeLoader):
     """Reject ambiguous duplicate mapping keys rather than silently changing policy."""
 
@@ -98,20 +103,16 @@ def _validate_choice_policy(question: ChoiceQuestion, policy: Policy) -> None:
     warning = set(policy.warning_choices)
     legitimate = set(policy.legitimate_choices)
     labels = warning | legitimate
-    if not warning or not labels <= question.criteria.keys():
-        raise ValueError("Choice policy must name valid warning_choices")
-    if warning.intersection(legitimate):
-        raise ValueError("warning and legitimate choices must be disjoint")
+    _require(bool(warning) and labels <= question.criteria.keys(), "Choice policy must name valid warning_choices")
+    _require(warning.isdisjoint(legitimate), "warning and legitimate choices must be disjoint")
 
 
 def _validate_score_policy(question: ScoreQuestion, policy: Policy) -> None:
-    if policy.score_warning_at > len(question.criteria) - 1:
-        raise ValueError("score threshold is outside the question scale")
+    _require(policy.score_warning_at <= len(question.criteria) - 1, "score threshold is outside the question scale")
 
 
 def _validate_noul_policy(policy: Policy) -> None:
-    if any((policy.warning_choices, policy.legitimate_choices)):
-        raise ValueError("choice labels are only supported for Choice questions")
+    _require(not any((policy.warning_choices, policy.legitimate_choices)), "choice labels are only supported for Choice questions")
 
 
 def _validate_question_policy(question: Question, policy: Policy) -> None:
@@ -172,16 +173,13 @@ def _rule_ids(rulesets: dict[str, list[Rule]]) -> list[str]:
 
 
 def _validate_rule_ids(all_ids: list[str]) -> None:
-    if len(all_ids) != len(set(all_ids)):
-        raise ValueError("rule IDs must be unique across rulesets")
-    if len(all_ids) > 128:
-        raise ValueError("at most 128 rules are supported")
+    _require(len(all_ids) == len(set(all_ids)), "rule IDs must be unique across rulesets")
+    _require(len(all_ids) <= 128, "at most 128 rules are supported")
 
 
 def _validate_ignore(ignore: list[str], all_ids: list[str], rulesets: dict[str, list[Rule]]) -> None:
     unknown = set(ignore).difference(all_ids, rulesets.keys())
-    if unknown:
-        raise ValueError("ignore references an unknown rule or ruleset")
+    _require(not unknown, "ignore references an unknown rule or ruleset")
 
 
 def _active_ruleset(name: str, rules: list[Rule], ignored: set[str]) -> list[Rule]:
@@ -279,27 +277,30 @@ def _read_override(path: Path) -> ConfigMap:
     return _string_mapping(_unique_safe_load(raw), "configuration must be a YAML mapping")
 
 
+def _rule_mapping(item: object) -> ConfigMap:
+    rule = _string_mapping(item, "each ruleset must contain rule mappings with an id")
+    if not isinstance(rule.get("id"), str):
+        raise ConfigError("each ruleset must contain rule mappings with an id")
+    return rule
+
+
 def _rule_mappings(value: object) -> list[ConfigMap]:
     if not isinstance(value, list):
         raise ConfigError("each ruleset must contain rule mappings with an id")
-    rules: list[ConfigMap] = []
-    for item in value:
-        rule = _string_mapping(item, "each ruleset must contain rule mappings with an id")
-        if not isinstance(rule.get("id"), str):
-            raise ConfigError("each ruleset must contain rule mappings with an id")
-        rules.append(rule)
-    return rules
+    return list(map(_rule_mapping, value))
 
 
 def _patch_rules(existing: object, patches: object) -> list[ConfigMap]:
     base_rules = _rule_mappings(existing)
     patch_rules = _rule_mappings(patches)
-    if len({rule["id"] for rule in patch_rules}) != len(patch_rules):
+    patch_ids = [str(rule["id"]) for rule in patch_rules]
+    if len(set(patch_ids)) != len(patch_ids):
         raise ConfigError("duplicate rule ID in a ruleset override")
     by_id = {str(rule["id"]): rule for rule in base_rules}
-    for rule in patch_rules:
-        rule_id = str(rule["id"])
-        by_id[rule_id] = _merge(by_id.get(rule_id, {}), rule)
+    by_id.update({
+        rule_id: _merge(by_id.get(rule_id, {}), rule)
+        for rule_id, rule in zip(patch_ids, patch_rules, strict=True)
+    })
     return list(by_id.values())
 
 
