@@ -215,7 +215,7 @@ class JevClient:
     async def _attempt(
         self,
         body: bytes,
-        questions: dict[str, Question],
+        questions: Mapping[str, Question],
         attempt: int,
     ) -> JevResponse | _Retry:
         try:
