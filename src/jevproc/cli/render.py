@@ -5,7 +5,9 @@ import os
 import shlex
 import shutil
 import time
+from bisect import bisect_right
 from datetime import UTC, datetime
+from itertools import accumulate
 from typing import TextIO
 
 from wcwidth import wcwidth
@@ -36,17 +38,12 @@ _MARKERS = {
 
 
 def _wrap_cut(text: str, width: int) -> tuple[str, str]:
-    cells = cut = last_space = 0
-    for index, char in enumerate(text):
-        cells += max(0, wcwidth(char))
-        if cells > width:
-            break
-        cut = index + 1
-        if char == " ":
-            last_space = cut
-    else:
+    cells = list(accumulate(max(0, wcwidth(char)) for char in text))
+    cut = bisect_right(cells, width)
+    if cut >= len(text):
         return text, ""
-    cut = max(1, last_space or cut)
+    space = text.rfind(" ", 0, cut)
+    cut = max(1, space + 1 if space >= 0 else cut)
     return text[:cut].rstrip(), text[cut:].lstrip()
 
 
@@ -383,13 +380,16 @@ class Reporter:
         )
 
     def _summary_warnings(self, report: Report) -> None:
-        if report.summary["incomplete"]:
-            self.term.line(
-                "INCOMPLETE: some selected processes were omitted or could not be evaluated.",
-                style="\x1b[1;31m",
-            )
-        for error in sorted({assessment.error for assessment in report.assessments if assessment.error}):
-            self.term.line(f"error: {error}", style="\x1b[31m")
+        incomplete = (
+            ["INCOMPLETE: some selected processes were omitted or could not be evaluated."]
+            if report.summary["incomplete"]
+            else []
+        )
+        errors = [f"error: {error}" for error in sorted(filter(None, (item.error for item in report.assessments)))]
+        for line in incomplete:
+            self.term.line(line, style="\x1b[1;31m")
+        for line in errors:
+            self.term.line(line, style="\x1b[31m")
 
     def _summary_footer(self, report: Report) -> None:
         if report.mode == "offline":
