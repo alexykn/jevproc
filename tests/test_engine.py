@@ -1,13 +1,14 @@
 import asyncio
 import json
+from collections.abc import Mapping
 
 import httpx
 
 from jevproc.core.client import JevClient
-from jevproc.core.config import CacheSettings, Config
+from jevproc.core.config import CacheSettings, Config, Question
 from jevproc.core.demo import demo_transport
 from jevproc.core.engine import Engine
-from jevproc.core.protocol import make_request
+from jevproc.core.protocol import JevResponse, make_request
 from jevproc.core.storage import AnswerCache
 
 
@@ -73,7 +74,7 @@ async def test_transport_failure_preserves_all_processes(config, snapshot):
     async with JevClient(
         config.jev,
         "demo",
-        transport=httpx.MockTransport(lambda request: httpx.Response(401)),
+        transport=httpx.MockTransport(lambda _request: httpx.Response(401)),
     ) as client:
         report = await Engine(config, client).scan(snapshot, "demo")
     assert len(report.assessments) == 4
@@ -83,9 +84,12 @@ async def test_transport_failure_preserves_all_processes(config, snapshot):
 
 async def test_offline_never_calls_a_client(config, snapshot):
     class Forbidden:
+        base_url = "http://localhost"
         requests = retries = input_tokens = output_tokens = 0
 
-        async def evaluate(self, *args):
+        async def evaluate(self, body: bytes, questions: Mapping[str, Question]) -> JevResponse:
+            assert body
+            assert questions
             raise AssertionError("network access in offline mode")
 
     report = await Engine(config, Forbidden()).scan(snapshot, "offline")
