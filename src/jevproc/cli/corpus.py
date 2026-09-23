@@ -111,18 +111,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
 
-async def _run(args: argparse.Namespace) -> int:
-    corpus = load_corpus()
-    cases = _selected(args, corpus)
-    if args.list:
-        render_case_list(cases, sys.stdout, args.format)
-        return 0
-    config = _settings(args)
-    uncertain, warning = _policy(config)
-    if args.calibrate:
-        require_calibration_labels(cases)
-    runs = args.runs or (3 if args.calibrate else 1)
-    reporter = CorpusReporter(
+def _run_count(args: argparse.Namespace) -> int:
+    return args.runs or (3 if args.calibrate else 1)
+
+
+def _corpus_reporter(args: argparse.Namespace, config: Config, cases: list[CorpusCase], runs: int) -> CorpusReporter:
+    return CorpusReporter(
         sys.stdout,
         model=config.jev.model,
         cases=len(cases),
@@ -131,11 +125,20 @@ async def _run(args: argparse.Namespace) -> int:
         format_name=args.format,
         color=args.color,
     )
-    reporter.start()
+
+
+async def _experiment(
+    args: argparse.Namespace,
+    config: Config,
+    corpus: Corpus,
+    cases: list[CorpusCase],
+    runs: int,
+    reporter: CorpusReporter,
+):
     api_key = os.environ.get("TYPESAFE_API_KEY", "")
     origin = os.environ.get("TYPESAFE_BASE_URL", "https://api.typesafe.ai")
     async with JevClient(config.jev, api_key, base_url=origin) as client:
-        experiment = await run_corpus(
+        return await run_corpus(
             Engine(config, client),
             snapshot_for(corpus, cases),
             cases,
@@ -143,6 +146,23 @@ async def _run(args: argparse.Namespace) -> int:
             on_sample=reporter.sample,
             on_run=reporter.run_finished,
         )
+
+
+async def _run(args: argparse.Namespace) -> int:
+    corpus = load_corpus()
+    cases = _selected(args, corpus)
+    if args.list:
+        render_case_list(cases, sys.stdout, args.format)
+        return 0
+
+    config = _settings(args)
+    uncertain, warning = _policy(config)
+    if args.calibrate:
+        require_calibration_labels(cases)
+    runs = _run_count(args)
+    reporter = _corpus_reporter(args, config, cases, runs)
+    reporter.start()
+    experiment = await _experiment(args, config, corpus, cases, runs, reporter)
     calibration = experiment.calibrate(uncertain, warning) if args.calibrate else None
     reporter.finish(experiment, calibration)
     return experiment.exit_code(args.calibrate)
