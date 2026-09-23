@@ -59,7 +59,7 @@ def test_new_private_directory_is_rolled_back_when_validation_fails(tmp_path, mo
     monkeypatch.setattr(
         storage,
         "_validate_private_directory",
-        lambda path: (_ for _ in ()).throw(StorageError("synthetic directory validation failure")),
+        lambda _path: (_ for _ in ()).throw(StorageError("synthetic directory validation failure")),
     )
     with pytest.raises(StorageError, match="synthetic"):
         AnswerCache(directory, CacheSettings())
@@ -109,7 +109,7 @@ def test_new_cache_file_is_rolled_back_when_validation_fails(tmp_path, monkeypat
     monkeypatch.setattr(
         storage,
         "_validate_cache_info",
-        lambda info: (_ for _ in ()).throw(StorageError("synthetic validation failure")),
+        lambda _info: (_ for _ in ()).throw(StorageError("synthetic validation failure")),
     )
     with pytest.raises(StorageError, match="synthetic"):
         AnswerCache(directory, CacheSettings())
