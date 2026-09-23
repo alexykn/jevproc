@@ -110,16 +110,19 @@ def attach_children(processes: list[Process], limit: int) -> list[Process]:
     return _attach_children_from_index(processes, limit, by_parent, global_coverage)
 
 
-def _family_row(item: psutil.Process) -> tuple[int, int | None] | None:
-    pid = item.info.get("pid")
-    return None if pid is None else (int(pid), item.info.get("ppid"))
+def _family_row(info: dict[str, Any]) -> tuple[int, int | None] | None:
+    pid = info.get("pid")
+    return None if pid is None else (int(pid), info.get("ppid"))
 
 
 def _process_family_index() -> tuple[dict[int, list[int]], set[int]]:
     children: dict[int, list[int]] = defaultdict(list)
     seen_pids: set[int] = set()
     try:
-        rows = filter(None, (_family_row(item) for item in psutil.process_iter(["pid", "ppid"], ad_value=None)))
+        rows = filter(
+            None,
+            (_family_row(getattr(item, "info")) for item in psutil.process_iter(["pid", "ppid"], ad_value=None)),
+        )
         for pid, ppid in rows:
             seen_pids.add(pid)
             if ppid is not None:
