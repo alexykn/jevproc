@@ -52,20 +52,29 @@ def _resource_coverage(states: list[Coverage]) -> Coverage:
     return next((state for matches, state in outcomes if matches), "unavailable")
 
 
+def _cpu_measurement(proc: ResourceProcess, primed: bool) -> tuple[Any, Coverage]:
+    return _resource_value(lambda: proc.cpu_percent(interval=None)) if primed else (None, "unavailable")
+
+
+def _rss_measurement(proc: ResourceProcess) -> tuple[Any, Coverage]:
+    memory_info, state = _resource_value(proc.memory_info)
+    return getattr(memory_info, "rss", None), state
+
+
+def _resource_measurements(proc: ResourceProcess, cpu_primed: bool):
+    return (
+        ("cpu_percent", _cpu_measurement(proc, cpu_primed)),
+        ("rss_bytes", _rss_measurement(proc)),
+        ("memory_percent", _resource_value(proc.memory_percent)),
+        ("thread_count", _resource_value(proc.num_threads)),
+        ("fd_count", _resource_value(proc.num_fds)),
+    )
+
+
 def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUsage, Coverage]:
-    cpu = _resource_value(lambda: proc.cpu_percent(interval=None)) if cpu_primed else (None, "unavailable")
-    memory_info, memory_state = _resource_value(proc.memory_info)
-    memory = _resource_value(proc.memory_percent)
-    threads = _resource_value(proc.num_threads)
-    descriptors = _resource_value(proc.num_fds)
-    values = {
-        "cpu_percent": cpu[0],
-        "rss_bytes": getattr(memory_info, "rss", None),
-        "memory_percent": memory[0],
-        "thread_count": threads[0],
-        "fd_count": descriptors[0],
-    }
-    states = [cpu[1], memory_state, memory[1], threads[1], descriptors[1]]
+    measurements = _resource_measurements(proc, cpu_primed)
+    values = {name: result[0] for name, result in measurements}
+    states = [result[1] for _, result in measurements]
     return ResourceUsage.model_validate(values), _resource_coverage(states)
 
 def _prime_resource_probe(pid: int) -> psutil.Process | None:
@@ -76,14 +85,19 @@ def _prime_resource_probe(pid: int) -> psutil.Process | None:
     return proc if state == "observed" else None
 
 
-def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dict[int, psutil.Process]:
-    if not settings.resources:
-        return {}
-    probes = {pid: probe for pid in pids if (probe := _prime_resource_probe(pid)) is not None}
-    if probes:
-        time.sleep(settings.resource_sample_seconds)
-    return probes
+def _available_resource_probes(pids: list[int]) -> dict[int, psutil.Process]:
+    return {pid: probe for pid in pids if (probe := _prime_resource_probe(pid)) is not None}
 
+
+def _sample_resource_probes(probes: dict[int, psutil.Process], seconds: float) -> None:
+    if probes:
+        time.sleep(seconds)
+
+
+def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dict[int, psutil.Process]:
+    probes = _available_resource_probes(pids) if settings.resources else {}
+    _sample_resource_probes(probes, settings.resource_sample_seconds)
+    return probes
 
 def _comm_entry(line: str) -> tuple[int, str] | None:
     pid_text, separator, command = line.strip().partition(" ")
