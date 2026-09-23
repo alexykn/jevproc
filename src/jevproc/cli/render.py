@@ -7,7 +7,7 @@ import shutil
 import time
 from bisect import bisect_right
 from datetime import UTC, datetime
-from itertools import accumulate
+from itertools import accumulate, chain
 from typing import TextIO
 
 from wcwidth import wcwidth
@@ -127,6 +127,27 @@ def _value(result: RuleResult) -> str:
     text = formatter(result) if formatter is not None else result.status.replace("_", " ")
     suffix = _VALUE_SUFFIXES.get(result.status, "") if result.answer or result.status == "uncertain_warning" else ""
     return text + suffix
+
+def _incomplete_warning(report: Report) -> tuple[str, str] | None:
+    if not report.summary["incomplete"]:
+        return None
+    return "INCOMPLETE: some selected processes were omitted or could not be evaluated.", "\x1b[1;31m"
+
+
+def _error_warnings(report: Report):
+    errors = sorted(filter(None, (assessment.error for assessment in report.assessments)))
+    return ((f"error: {error}", "\x1b[31m") for error in errors)
+
+
+def _summary_warning_rows(report: Report):
+    incomplete = filter(None, (_incomplete_warning(report),))
+    return chain(incomplete, _error_warnings(report))
+
+
+def _limited_coverage(process: Process) -> str:
+    items = filter(lambda item: item[1] != "observed", sorted(process.coverage.items()))
+    return ", ".join(f"{key}={value}" for key, value in items)
+
 
 class Reporter:
     """Flush process results as workers complete; only the summary waits for the full scan."""
@@ -337,8 +358,7 @@ class Reporter:
             )
 
     def _verbose_coverage(self, process: Process) -> None:
-        limited = ((key, value) for key, value in sorted(process.coverage.items()) if value != "observed")
-        coverage = ", ".join(f"{key}={value}" for key, value in limited)
+        coverage = _limited_coverage(process)
         if coverage:
             self.term.line(f"Coverage: {coverage}", indent=6, style="\x1b[2m")
 
@@ -380,16 +400,8 @@ class Reporter:
         )
 
     def _summary_warnings(self, report: Report) -> None:
-        incomplete = (
-            ["INCOMPLETE: some selected processes were omitted or could not be evaluated."]
-            if report.summary["incomplete"]
-            else []
-        )
-        errors = [f"error: {error}" for error in sorted(filter(None, (item.error for item in report.assessments)))]
-        for line in incomplete:
-            self.term.line(line, style="\x1b[1;31m")
-        for line in errors:
-            self.term.line(line, style="\x1b[31m")
+        for line, style in _summary_warning_rows(report):
+            self.term.line(line, style=style)
 
     def _summary_footer(self, report: Report) -> None:
         if report.mode == "offline":
