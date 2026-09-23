@@ -3,6 +3,7 @@
 import asyncio
 import math
 import random
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Self
@@ -94,23 +95,30 @@ def _safe_machine_value(value: object) -> str | None:
     return value if all(char.isalnum() or char in "._:-" for char in value) else None
 
 
-def _machine_fields(body: object) -> dict[str, tuple[str, ...]]:
-    found: dict[str, set[str]] = {}
+_MACHINE_FIELD_KEYS = frozenset({"code", "type", "status", "error"})
 
-    def visit(value: object) -> None:
+
+def _machine_items(body: object) -> Iterator[tuple[str, str]]:
+    """Iteratively walk bounded response structure and yield safe machine fields."""
+    pending = [body]
+    while pending:
+        value = pending.pop()
         if isinstance(value, dict):
             for raw_key, child in value.items():
                 key = str(raw_key)
-                if key in {"code", "type", "status", "error"}:
+                if key in _MACHINE_FIELD_KEYS:
                     safe = _safe_machine_value(child)
                     if safe is not None:
-                        found.setdefault(key, set()).add(safe)
-                visit(child)
+                        yield key, safe
+                pending.append(child)
         elif isinstance(value, list):
-            for child in value[:64]:
-                visit(child)
+            pending.extend(reversed(value[:64]))
 
-    visit(body)
+
+def _machine_fields(body: object) -> dict[str, tuple[str, ...]]:
+    found: dict[str, set[str]] = {}
+    for key, value in _machine_items(body):
+        found.setdefault(key, set()).add(value)
     return {key: tuple(sorted(values)) for key, values in sorted(found.items())}
 
 

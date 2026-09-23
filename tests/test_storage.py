@@ -65,6 +65,32 @@ def test_cache_symlinks_are_rejected(tmp_path):
     assert not (tmp_path/"victim").exists()
 
 
+def test_new_cache_file_is_rolled_back_when_validation_fails(tmp_path, monkeypatch):
+    import jevproc.core.storage as storage
+
+    directory = tmp_path / "cache"
+    monkeypatch.setattr(
+        storage,
+        "_validate_cache_info",
+        lambda info: (_ for _ in ()).throw(StorageError("synthetic validation failure")),
+    )
+    with pytest.raises(StorageError, match="synthetic"):
+        AnswerCache(directory, CacheSettings())
+    assert not (directory / "answers.sqlite3").exists()
+
+
+def test_existing_invalid_cache_file_is_never_deleted(tmp_path):
+    directory = tmp_path / "cache"
+    directory.mkdir(mode=0o700)
+    path = directory / "answers.sqlite3"
+    path.write_bytes(b"existing")
+    path.chmod(0o644)
+
+    with pytest.raises(StorageError):
+        AnswerCache(directory, CacheSettings())
+    assert path.read_bytes() == b"existing"
+
+
 def test_snapshot_writes_are_private_and_exclusive(tmp_path):
     path=tmp_path/"snapshot.json"
     write_private(path,b"safe")

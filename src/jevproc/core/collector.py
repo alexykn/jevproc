@@ -102,6 +102,70 @@ def _apply_file_evidence(
     return result
 
 
+def _candidate_process_ids(pids: list[int] | None, family_pid: int | None) -> list[int]:
+    if family_pid is not None:
+        return _family_pids(family_pid)
+    if pids is not None:
+        return sorted(set(pids))
+    return sorted(set(psutil.pids()))
+
+
+def _selected_process_ids(
+    settings: CollectionSettings,
+    pids: list[int] | None,
+    family_pid: int | None,
+) -> tuple[list[int], int]:
+    candidates = _candidate_process_ids(pids, family_pid)
+    return candidates[: settings.max_processes], max(0, len(candidates) - settings.max_processes)
+
+
+def _attach_shared_evidence(
+    processes: list[Process],
+    settings: CollectionSettings,
+    executor: ThreadPoolExecutor,
+) -> list[Process]:
+    network_future = executor.submit(_network, settings)
+    child_future = executor.submit(_child_index) if settings.child_limit > 0 else None
+    file_futures = _file_evidence_futures(processes, settings, executor)
+
+    file_evidence = {path: future.result() for path, future in file_futures.items()}
+    processes = _apply_file_evidence(processes, file_evidence)
+
+    network, network_coverage = network_future.result()
+    processes = _attach_network_parallel(processes, network, network_coverage, executor)
+    processes = attach_ancestry(processes, settings.ancestry_depth, resolve_missing=True)
+
+    if child_future is None:
+        return _attach_children_from_index(processes, settings.child_limit, {}, "not_requested")
+    by_parent, child_coverage = child_future.result()
+    return _attach_children_from_index(processes, settings.child_limit, by_parent, child_coverage)
+
+
+def _collect_selected_processes(
+    selected: list[int],
+    settings: CollectionSettings,
+    now: float,
+) -> list[Process]:
+    resource_probes = _prime_resource_probes(selected, settings)
+    worker_count = min(settings.workers, max(1, len(selected)))
+    with ThreadPoolExecutor(max_workers=worker_count, thread_name_prefix="jevproc-collect") as executor:
+        processes = _collect_processes_parallel(selected, settings, now, resource_probes, executor)
+        return _attach_shared_evidence(processes, settings, executor)
+
+
+def _snapshot(now: float, processes: list[Process], omitted: int) -> Snapshot:
+    return Snapshot(
+        captured_at=now,
+        host=Host(
+            platform=sys.platform,
+            architecture=platform.machine()[:512],
+            privileged=os.geteuid() == 0,
+        ),
+        processes=processes,
+        omitted=omitted,
+    )
+
+
 def collect(
     settings: CollectionSettings,
     pids: list[int] | None = None,
@@ -114,85 +178,9 @@ def collect(
         raise CollectionError("PID selection and process-family selection are mutually exclusive")
 
     now = time.time()
-    if family_pid is not None:
-        candidates = _family_pids(family_pid)
-    elif pids is not None:
-        candidates = sorted(set(pids))
-    else:
-        candidates = sorted(set(psutil.pids()))
-
-    omitted = max(0, len(candidates) - settings.max_processes)
-    selected = candidates[: settings.max_processes]
-    resource_probes = _prime_resource_probes(selected, settings)
-
-    # Collection is blocking OS/file work, so a bounded thread pool is a better fit
-    # than event-loop tasks. Phase ordering still preserves the identity/socket
-    # safety contract: identities first, socket snapshot second, revalidation last.
-    worker_count = min(settings.workers, max(1, len(selected)))
-    with ThreadPoolExecutor(
-        max_workers=worker_count,
-        thread_name_prefix="jevproc-collect",
-    ) as executor:
-        processes = _collect_processes_parallel(
-            selected,
-            settings,
-            now,
-            resource_probes,
-            executor,
-        )
-
-        # These operations are independent once the process identities are captured.
-        network_future = executor.submit(_network, settings)
-        child_future = executor.submit(_child_index) if settings.child_limit > 0 else None
-        file_futures = _file_evidence_futures(processes, settings, executor)
-
-        file_evidence = {path: future.result() for path, future in file_futures.items()}
-        processes = _apply_file_evidence(processes, file_evidence)
-
-        # Capture sockets after the initial identity snapshot, then revalidate every
-        # process in parallel so PID reuse/exec changes cannot inherit socket evidence.
-        network, network_coverage = network_future.result()
-        processes = _attach_network_parallel(
-            processes,
-            network,
-            network_coverage,
-            executor,
-        )
-
-        processes = attach_ancestry(
-            processes,
-            settings.ancestry_depth,
-            resolve_missing=True,
-        )
-
-        if child_future is None:
-            processes = _attach_children_from_index(
-                processes,
-                settings.child_limit,
-                {},
-                "not_requested",
-            )
-        else:
-            by_parent, child_coverage = child_future.result()
-            processes = _attach_children_from_index(
-                processes,
-                settings.child_limit,
-                by_parent,
-                child_coverage,
-            )
-
-    snapshot = Snapshot(
-        captured_at=now,
-        host=Host(
-            platform=sys.platform,
-            architecture=platform.machine()[:512],
-            privileged=os.geteuid() == 0,
-        ),
-        processes=processes,
-        omitted=omitted,
-    )
-    return sanitize_snapshot(snapshot, settings.command_line)
-
+    selected, omitted = _selected_process_ids(settings, pids, family_pid)
+    processes = _collect_selected_processes(selected, settings, now)
+    return sanitize_snapshot(_snapshot(now, processes, omitted), settings.command_line)
 
 def load_snapshot(path: Path, include_command_line: bool = False) -> Snapshot:
     with path.open("rb") as handle:

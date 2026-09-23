@@ -58,11 +58,9 @@ def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
     return "verification_failed", "other"
 
 
-def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
-    if sys.platform != "darwin":
-        return {"signature": "unavailable"}, "unavailable"
+def _codesign_verify(path: str) -> subprocess.CompletedProcess[str] | None:
     try:
-        verify = subprocess.run(
+        return subprocess.run(
             ["/usr/bin/codesign", "--verify", "--strict", "--", path],
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
@@ -72,21 +70,20 @@ def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return {"signature": "unavailable"}, "unavailable"
+        return None
 
+
+def _verification_values(verify) -> dict[str, Any]:
     if verify.returncode == 0:
-        values: dict[str, Any] = {"signature": "valid"}
-    else:
-        state, issue = _classify_codesign_failure(getattr(verify, "stderr", "") or "")
-        values = {"signature": state}
-        if issue is not None:
-            values["signature_issue"] = issue
-        if state == "unsigned":
-            return values, "observed"
+        return {"signature": "valid"}
+    state, issue = _classify_codesign_failure(getattr(verify, "stderr", "") or "")
+    values: dict[str, Any] = {"signature": state}
+    if issue is not None:
+        values["signature_issue"] = issue
+    return values
 
-    # Display metadata is useful provenance even when integrity verification failed
-    # or the signature uses a legacy resource envelope. It does not make the
-    # verification result valid.
+
+def _codesign_display(path: str) -> str | None:
     try:
         display = subprocess.run(
             ["/usr/bin/codesign", "--display", "--verbose=4", "--", path],
@@ -98,10 +95,13 @@ def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
-        return values, "observed"
+        return None
+    return (getattr(display, "stdout", "") or "") + "\n" + (getattr(display, "stderr", "") or "")
 
+
+def _signature_metadata(text: str) -> dict[str, Any]:
+    values: dict[str, Any] = {}
     authorities: list[str] = []
-    text = (getattr(display, "stdout", "") or "") + "\n" + (getattr(display, "stderr", "") or "")
     for line in text.splitlines():
         if line.startswith("Identifier="):
             values["signature_identifier"] = line.split("=", 1)[1][:512]
@@ -112,9 +112,65 @@ def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
         elif line.startswith("Authority=") and len(authorities) < 8:
             authorities.append(line.split("=", 1)[1][:512])
     values["signature_authorities"] = authorities
-    # Verification and display are separate evidence: metadata never upgrades
-    # a legacy or failed verification result to valid.
+    return values
+
+
+def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
+    if sys.platform != "darwin":
+        return {"signature": "unavailable"}, "unavailable"
+
+    verify = _codesign_verify(path)
+    if verify is None:
+        return {"signature": "unavailable"}, "unavailable"
+
+    values = _verification_values(verify)
+    if values["signature"] == "unsigned":
+        return values, "observed"
+
+    display = _codesign_display(path)
+    if display is not None:
+        values.update(_signature_metadata(display))
     return values, "observed"
+
+def _valid_file_path(path: str | None) -> bool:
+    return bool(path and os.path.isabs(path) and "\x00" not in path)
+
+
+def _file_cache_key(path: str, info: os.stat_result, settings: CollectionSettings) -> tuple:
+    return (path, *_file_identity(info), settings.hashes, settings.signatures, settings.max_hash_bytes)
+
+
+def _cached_file(
+    cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None,
+    key: tuple,
+) -> tuple[Executable, dict[str, Coverage]] | None:
+    if cache is None or key not in cache:
+        return None
+    executable, coverage = cache[key]
+    return executable, dict(coverage)
+
+
+def _inspect_stable_file(
+    path: str,
+    metadata: Executable,
+    info: os.stat_result,
+    settings: CollectionSettings,
+    coverage: dict[str, Coverage],
+) -> tuple[Executable, dict[str, Coverage], bool]:
+    inspected = _inspect_content(path, metadata, settings, coverage) if stat.S_ISREG(info.st_mode) else metadata
+    if (settings.hashes or settings.signatures) and not _file_unchanged(path, info):
+        return Executable(), {**_file_coverage(settings), "file": "partial"}, False
+    return inspected, coverage, True
+
+
+def _remember_file(
+    cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None,
+    key: tuple,
+    executable: Executable,
+    coverage: dict[str, Coverage],
+) -> None:
+    if cache is not None:
+        cache[key] = executable, dict(coverage)
 
 
 def _file_info(
@@ -123,23 +179,23 @@ def _file_info(
     cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None = None,
 ) -> tuple[Executable, dict[str, Coverage]]:
     coverage = _file_coverage(settings)
-    if not path or not os.path.isabs(path) or "\x00" in path:
+    if not _valid_file_path(path):
         return Executable(), coverage
+    assert path is not None
+
     metadata, coverage["file"], info = _stat_executable(path)
     if info is None:
         return metadata, coverage
-    key = (path, *_file_identity(info), settings.hashes, settings.signatures, settings.max_hash_bytes)
-    if cache is not None and key in cache:
-        cached, cached_coverage = cache[key]
-        return cached, dict(cached_coverage)
-    inspected = _inspect_content(path, metadata, settings, coverage) if stat.S_ISREG(info.st_mode) else metadata
-    if (settings.hashes or settings.signatures) and not _file_unchanged(path, info):
-        # Never combine a file's old metadata with a replacement's inspection.
-        return Executable(), {**_file_coverage(settings), "file": "partial"}
-    if cache is not None:
-        cache[key] = inspected, dict(coverage)
-    return inspected, coverage
 
+    key = _file_cache_key(path, info, settings)
+    cached = _cached_file(cache, key)
+    if cached is not None:
+        return cached
+
+    executable, final_coverage, stable = _inspect_stable_file(path, metadata, info, settings, coverage)
+    if stable:
+        _remember_file(cache, key, executable, final_coverage)
+    return executable, final_coverage
 
 def _observations(path: str | None, info: Executable) -> list[str]:
     facts = []

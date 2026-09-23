@@ -84,19 +84,45 @@ class AnswerCache:
         self.db.close()
 
 
+def _open_cache_file(path: Path) -> tuple[int, bool]:
+    flags = os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC
+    try:
+        return os.open(path, flags | os.O_CREAT | os.O_EXCL, 0o600), True
+    except FileExistsError:
+        return os.open(path, flags), False
+
+
+def _validate_cache_info(info: os.stat_result) -> None:
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1:
+        raise StorageError("cache must be a private, owned regular file with one link")
+
+
+def _rollback_created_cache(path: Path, info: os.stat_result | None) -> None:
+    try:
+        current = path.lstat()
+    except FileNotFoundError:
+        return
+    if info is not None and (current.st_dev, current.st_ino) != (info.st_dev, info.st_ino):
+        return
+    path.unlink()
+
+
 def _prepare_cache_file(directory: Path) -> Path:
-    """Acquire and validate the private disk file, always releasing its descriptor."""
+    """Create-or-open the cache file; rollback only a file created by this call."""
     _private_directory(directory)
     path = directory / "answers.sqlite3"
-    fd = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    fd, created = _open_cache_file(path)
+    info: os.stat_result | None = None
     try:
         info = os.fstat(fd)
-        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1:
-            raise StorageError("cache must be a private, owned regular file with one link")
+        _validate_cache_info(info)
+    except BaseException:
+        if created:
+            _rollback_created_cache(path, info)
+        raise
     finally:
         os.close(fd)
     return path
-
 
 def _open_cache_database(path: Path) -> sqlite3.Connection:
     """Transfer ownership only after setup succeeds; close on every failure path."""

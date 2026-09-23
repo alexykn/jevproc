@@ -6,7 +6,7 @@ from email.utils import format_datetime
 import httpx
 import pytest
 
-from jevproc.core.client import JevClient, endpoint, retry_after
+from jevproc.core.client import JevClient, _machine_fields, endpoint, retry_after
 from jevproc.core.config import JevSettings, NoulQuestion
 from jevproc.core.protocol import BudgetError, ContextLimitError, JevError, RequestRejectedError, encode
 
@@ -85,6 +85,23 @@ async def test_recognized_context_limit(status,body):
         with pytest.raises(ContextLimitError):
             await client.evaluate(BODY,Q)
         assert client.requests==1
+
+
+def test_machine_fields_walk_nested_structures_without_leaking_prose():
+    body = {
+        "error": {
+            "details": [
+                {"code": "context_length_exceeded", "message": "PRIVATE TEXT"},
+                {"status": "too_large"},
+            ],
+            "type": "invalid_request",
+        }
+    }
+    assert _machine_fields(body) == {
+        "code": ("context_length_exceeded",),
+        "status": ("too_large",),
+        "type": ("invalid_request",),
+    }
 
 
 async def test_generic_400_exposes_only_safe_machine_fields():

@@ -186,8 +186,10 @@ Keep that dependency direction; core must not import the CLI.
 - `core/assessment.py` has independent Noul, Choice, and Score decision functions;
   `judge` adds the common evidence qualification and result envelope.
 - `core/storage.py` validates filesystem ownership before acquiring SQLite and
-  transfers connection ownership only after initialization succeeds. Setup errors
-  close the connection; they do not delete an existing cache or suppress errors.
+  transfers connection ownership only after initialization succeeds. A cache file
+  created by the current call is rolled back if validation fails; an existing
+  invalid cache file is never deleted. Setup errors close descriptors/connections
+  and remain visible.
 
 There is deliberately no plugin system, dependency-injection container, generic
 repository layer, event bus, or parallel implementation of the detector. Private
