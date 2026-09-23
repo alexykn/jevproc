@@ -1,6 +1,7 @@
 """Local, testable warning policy. Model confidence is not threat severity."""
 
 from dataclasses import dataclass
+from functools import singledispatch
 
 from jevproc.core.config import Policy, Rule
 from jevproc.core.models import Assessment, Process, RuleResult, Status
@@ -158,10 +159,25 @@ def _score_decision(policy: Policy, answer: ScoreAnswer, limited: bool) -> _Deci
     return _Decision(status, answer.score, confidence=answer.confidence)
 
 
+@singledispatch
+def _answer_decision(answer: Answer, policy: Policy, limited: bool) -> _Decision:
+    raise TypeError(f"unsupported answer type: {type(answer).__name__}")
+
+
+@_answer_decision.register
+def _noul_answer_decision(answer: NoulAnswer, policy: Policy, limited: bool) -> _Decision:
+    return _noul_decision(policy, answer, limited)
+
+
+@_answer_decision.register
+def _choice_answer_decision(answer: ChoiceAnswer, policy: Policy, limited: bool) -> _Decision:
+    return _choice_decision(policy, answer, limited)
+
+
+@_answer_decision.register
+def _score_answer_decision(answer: ScoreAnswer, policy: Policy, limited: bool) -> _Decision:
+    return _score_decision(policy, answer, limited)
+
+
 def _decide(policy: Policy, answer: Answer, limited: bool) -> _Decision:
-    handlers = {
-        "noul": _noul_decision,
-        "choice": _choice_decision,
-        "score": _score_decision,
-    }
-    return handlers[answer.type](policy, answer, limited)
+    return _answer_decision(answer, policy, limited)
