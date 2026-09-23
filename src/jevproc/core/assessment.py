@@ -20,17 +20,25 @@ def evidence_limited(rule: Rule, process: Process) -> bool:
     return any(process.coverage.get(source) != "observed" for source in sources)
 
 
+def _missing_sources(rule: Rule, process: Process) -> list[str]:
+    available = {"observed", "partial", "truncated"}
+    return [source for source in rule.requires if process.coverage.get(source) not in available]
+
+
+def _missing_message(missing: list[str], process: Process) -> str:
+    details = ", ".join(f"{source}={process.coverage.get(source, 'unavailable')}" for source in missing)
+    return f"Not evaluated: {details}."
+
+
 def skipped_rule(rule: Rule, process: Process) -> RuleResult:
-    missing = [s for s in rule.requires if process.coverage.get(s) not in {"observed", "partial", "truncated"}]
-    if missing:
-        details = ", ".join(f"{s}={process.coverage.get(s, 'unavailable')}" for s in missing)
-        return RuleResult(rule=rule.id, title=rule.title, status="unknown", message=f"Not evaluated: {details}.")
-    return RuleResult(
-        rule=rule.id,
-        title=rule.title,
-        status="not_applicable",
-        message="No relevant evidence items were observed; this is not proof of absence.",
+    missing = _missing_sources(rule, process)
+    status: Status = "unknown" if missing else "not_applicable"
+    message = (
+        _missing_message(missing, process)
+        if missing
+        else "No relevant evidence items were observed; this is not proof of absence."
     )
+    return RuleResult(rule=rule.id, title=rule.title, status=status, message=message)
 
 
 def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
