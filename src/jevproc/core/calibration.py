@@ -146,7 +146,7 @@ class _ObservationCounts:
     pairs: Counter[tuple[str, str]]
 
     @classmethod
-    def from_predictions(cls, predictions: list[tuple[str, str]]) -> "_ObservationCounts":
+    def from_predictions(cls, predictions: list[tuple[str, str]]) -> _ObservationCounts:
         totals, pairs = _pair_counts(predictions)
         return cls(totals, pairs)
 
