@@ -33,22 +33,25 @@ def _hash_metadata_valid(info: os.stat_result, max_bytes: int) -> Coverage:
     return "truncated" if info.st_size > max_bytes else "observed"
 
 
+def _hash_handle(handle, max_bytes: int) -> tuple[str | None, Coverage]:
+    before = os.fstat(handle.fileno())
+    metadata_state = _hash_metadata_valid(before, max_bytes)
+    if metadata_state != "observed":
+        return None, metadata_state
+    digest, state = _hash_stream(handle, max_bytes)
+    if state != "observed":
+        return digest, state
+    stable = _file_identity(before) == _file_identity(os.fstat(handle.fileno()))
+    return (digest, "observed") if stable else (None, "partial")
+
+
 def _hash_file(path: str, max_bytes: int) -> tuple[str | None, Coverage]:
     """Do not follow a final symlink or block on a FIFO/device substituted for a file."""
     flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
     try:
         descriptor = os.open(path, flags)
         with os.fdopen(descriptor, "rb") as handle:
-            before = os.fstat(handle.fileno())
-            metadata_state = _hash_metadata_valid(before, max_bytes)
-            if metadata_state != "observed":
-                return None, metadata_state
-            digest, state = _hash_stream(handle, max_bytes)
-            if state != "observed":
-                return digest, state
-            after = os.fstat(handle.fileno())
-            stable = _file_identity(before) == _file_identity(after)
-            return (digest, "observed") if stable else (None, "partial")
+            return _hash_handle(handle, max_bytes)
     except PermissionError:
         return None, "denied"
     except OSError:
@@ -92,18 +95,21 @@ def _codesign_display(path: str) -> str | None:
     return display.stdout + "\n" + display.stderr
 
 
+def _identifier_field(line: str) -> tuple[str, str] | None:
+    prefix = "Identifier="
+    return ("signature_identifier", line.removeprefix(prefix)[:512]) if line.startswith(prefix) else None
+
+
+def _team_field(line: str) -> tuple[str, str] | None:
+    prefix = "TeamIdentifier="
+    if not line.startswith(prefix):
+        return None
+    value = line.removeprefix(prefix)
+    return None if value == "not set" else ("signature_team_id", value[:512])
+
+
 def _signature_field(line: str) -> tuple[str, str] | None:
-    prefixes = {
-        "Identifier=": "signature_identifier",
-        "TeamIdentifier=": "signature_team_id",
-    }
-    prefix = next((prefix for prefix in prefixes if line.startswith(prefix)), None)
-    if prefix is None:
-        return None
-    value = line.split("=", 1)[1]
-    if prefix == "TeamIdentifier=" and value == "not set":
-        return None
-    return prefixes[prefix], value[:512]
+    return _identifier_field(line) or _team_field(line)
 
 
 def _signature_metadata(text: str) -> dict[str, Any]:
@@ -115,22 +121,22 @@ def _signature_metadata(text: str) -> dict[str, Any]:
     values["signature_authorities"] = authorities
     return values
 
-def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
-    if sys.platform != "darwin":
-        return {"signature": "unavailable"}, "unavailable"
-
-    verify = _codesign_verify(path)
-    if verify is None:
-        return {"signature": "unavailable"}, "unavailable"
-
-    values = _verification_values(verify)
-    if values["signature"] == "unsigned":
-        return values, "observed"
-
+def _display_signature_metadata(path: str, values: dict[str, Any]) -> dict[str, Any]:
     display = _codesign_display(path)
     if display is not None:
         values.update(_signature_metadata(display))
-    return values, "observed"
+    return values
+
+
+def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
+    if sys.platform != "darwin":
+        return {"signature": "unavailable"}, "unavailable"
+    verify = _codesign_verify(path)
+    if verify is None:
+        return {"signature": "unavailable"}, "unavailable"
+    values = _verification_values(verify)
+    result = values if values["signature"] == "unsigned" else _display_signature_metadata(path, values)
+    return result, "observed"
 
 
 def _valid_file_path(path: str | None) -> bool:
@@ -174,6 +180,24 @@ def _remember_file(
         cache[key] = executable, dict(coverage)
 
 
+def _inspect_or_cached(
+    path: str,
+    metadata: Executable,
+    info: os.stat_result,
+    settings: CollectionSettings,
+    coverage: dict[str, Coverage],
+    cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None,
+) -> tuple[Executable, dict[str, Coverage]]:
+    key = _file_cache_key(path, info, settings)
+    cached = _cached_file(cache, key)
+    if cached is not None:
+        return cached
+    executable, final_coverage, stable = _inspect_stable_file(path, metadata, info, settings, coverage)
+    if stable:
+        _remember_file(cache, key, executable, final_coverage)
+    return executable, final_coverage
+
+
 def _file_info(
     path: str | None,
     settings: CollectionSettings,
@@ -183,20 +207,8 @@ def _file_info(
     if not _valid_file_path(path):
         return Executable(), coverage
     assert path is not None
-
     metadata, coverage["file"], info = _stat_executable(path)
-    if info is None:
-        return metadata, coverage
-
-    key = _file_cache_key(path, info, settings)
-    cached = _cached_file(cache, key)
-    if cached is not None:
-        return cached
-
-    executable, final_coverage, stable = _inspect_stable_file(path, metadata, info, settings, coverage)
-    if stable:
-        _remember_file(cache, key, executable, final_coverage)
-    return executable, final_coverage
+    return (metadata, coverage) if info is None else _inspect_or_cached(path, metadata, info, settings, coverage, cache)
 
 
 def _temporary_path(path: str | None) -> bool:
