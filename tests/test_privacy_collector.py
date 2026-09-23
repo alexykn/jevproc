@@ -487,23 +487,9 @@ def test_replaced_file_evidence_is_not_combined(tmp_path, monkeypatch):
 
 def test_lsof_field_parser_maps_tcp_and_udp_connections():
     parsed = _parse_lsof_network(
-        "\n".join([
-            "p42",
-            "ctool",
-            "f9",
-            "PTCP",
-            "n127.0.0.1:51000->198.51.100.7:443",
-            "TST=ESTABLISHED",
-            "f10",
-            "PUDP",
-            "n*:5353",
-            "p43",
-            "ctool2",
-            "f4",
-            "PTCP",
-            "n[::1]:8000",
-            "TST=LISTEN",
-        ])
+        "p42\nctool\nf9\nPTCP\nn127.0.0.1:51000->198.51.100.7:443\n"
+        "TST=ESTABLISHED\nf10\nPUDP\nn*:5353\np43\nctool2\nf4\nPTCP\n"
+        "n[::1]:8000\nTST=LISTEN"
     )
     assert parsed[42][0] == Connection(
         protocol="tcp",
@@ -598,7 +584,7 @@ def test_resource_usage_collects_short_sample_context():
 
 def test_resource_usage_is_partial_when_one_measure_is_denied():
     proc = SimpleNamespace(
-        cpu_percent=lambda interval=None: 10.0,
+        cpu_percent=lambda _interval=None: 10.0,
         memory_info=lambda: SimpleNamespace(rss=128 * 1024 * 1024),
         memory_percent=lambda: 1.2,
         num_threads=lambda: 8,
