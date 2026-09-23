@@ -3,6 +3,7 @@
 import asyncio
 import math
 import random
+from collections.abc import Iterator
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Self
@@ -97,7 +98,7 @@ def _safe_machine_value(value: object) -> str | None:
 _MACHINE_FIELD_KEYS = frozenset({"code", "type", "status", "error"})
 
 
-def _machine_items(body: object):
+def _machine_items(body: object) -> Iterator[tuple[str, str]]:
     """Iteratively walk bounded response structure and yield safe machine fields."""
     pending = [body]
     while pending:
