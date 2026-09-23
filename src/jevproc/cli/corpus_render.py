@@ -92,36 +92,51 @@ class CorpusReporter:
         self.stream.write(json.dumps(event, separators=(",", ":")) + "\n")
         self.stream.flush()
 
+    def _start_jsonl(self) -> None:
+        self._event({
+            "event": "start",
+            "schema_version": 2,
+            "model": self.model,
+            "cases": self.cases,
+            "runs": self.runs,
+            "calibrate": self.calibrating,
+        })
+
+    def _start_text(self) -> None:
+        mode = "calibration" if self.calibrating else "regression"
+        self.term.line(
+            f"jevproc-test  {mode}  model={self.model}  cases={self.cases}  runs={self.runs}", style="\x1b[1;36m"
+        )
+        self.term.line(
+            "Synthetic metadata only; no corpus executable, payload, or network target is run.", style="\x1b[2m"
+        )
+        calibration_note = (
+            "Calibration uses raw JPR001 Noul scores; candidate thresholds are never applied automatically."
+            if self.calibrating
+            else None
+        )
+        if calibration_note is not None:
+            self.term.line(calibration_note, style="\x1b[2m")
+        self.stream.flush()
+
     def start(self) -> None:
-        if self.format_name == "jsonl":
-            self._event({
-                "event": "start",
-                "schema_version": 2,
-                "model": self.model,
-                "cases": self.cases,
-                "runs": self.runs,
-                "calibrate": self.calibrating,
-            })
-        elif self.format_name == "text":
-            mode = "calibration" if self.calibrating else "regression"
-            self.term.line(
-                f"jevproc-test  {mode}  model={self.model}  cases={self.cases}  runs={self.runs}", style="\x1b[1;36m"
-            )
-            self.term.line(
-                "Synthetic metadata only; no corpus executable, payload, or network target is run.", style="\x1b[2m"
-            )
-            if self.calibrating:
-                self.term.line(
-                    "Calibration uses raw JPR001 Noul scores; candidate thresholds are never applied automatically.",
-                    style="\x1b[2m",
-                )
-            self.stream.flush()
+        handlers = {"jsonl": self._start_jsonl, "text": self._start_text}
+        handler = handlers.get(self.format_name)
+        if handler is not None:
+            handler()
+
+    def _sample_jsonl(self, payload: dict[str, Any], _assessment: Assessment) -> None:
+        self._event({"event": "sample", **payload})
+
+    def _sample_text_if_regression(self, payload: dict[str, Any], assessment: Assessment) -> None:
+        if not self.calibrating:
+            self._sample_text(payload, assessment)
 
     def sample(self, payload: dict[str, Any], assessment: Assessment) -> None:
-        if self.format_name == "jsonl":
-            self._event({"event": "sample", **payload})
-        elif self.format_name == "text" and not self.calibrating:
-            self._sample_text(payload, assessment)
+        handlers = {"jsonl": self._sample_jsonl, "text": self._sample_text_if_regression}
+        handler = handlers.get(self.format_name)
+        if handler is not None:
+            handler(payload, assessment)
 
     def _sample_text(self, payload: dict[str, Any], assessment: Assessment) -> None:
         marker, style = ("PASS", "\x1b[32m") if payload["passed"] else ("FAIL", "\x1b[31m")
@@ -136,17 +151,21 @@ class CorpusReporter:
             self.term.line(f"error: {assessment.error}", indent=6, style="\x1b[31m")
         self.stream.flush()
 
+    def _run_line(self, run: int, summary: dict[str, Any], scored: int) -> str:
+        return (
+            f"run {run}/{self.runs}: scored={scored}/{self.cases}  failures={summary['failed_processes']}  "
+            f"requests={summary['requests']}  input={summary['input_tokens']}  "
+            f"elapsed={summary['elapsed_seconds']:.2f}s"
+        )
+
+    @staticmethod
+    def _run_style(summary: dict[str, Any]) -> str:
+        return "\x1b[31m" if summary["failed_processes"] else "\x1b[2m"
+
     def run_finished(self, run: int, report: Report, scored: int) -> None:
         if self.format_name != "text" or not self.calibrating:
             return
-        summary = report.summary
-        failures = summary["failed_processes"]
-        self.term.line(
-            f"run {run}/{self.runs}: scored={scored}/{self.cases}  failures={failures}  "
-            f"requests={summary['requests']}  input={summary['input_tokens']}  "
-            f"elapsed={summary['elapsed_seconds']:.2f}s",
-            style="\x1b[2m" if not failures else "\x1b[31m",
-        )
+        self.term.line(self._run_line(run, report.summary, scored), style=self._run_style(report.summary))
         self.stream.flush()
 
     def _json_document(
