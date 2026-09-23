@@ -5,8 +5,9 @@ import os
 import sqlite3
 import stat
 import time
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from pathlib import Path
+from collections.abc import Iterator
 from typing import Self
 
 from jevproc.core.config import CacheSettings, Question
@@ -107,21 +108,32 @@ def _rollback_created_cache(path: Path, info: os.stat_result | None) -> None:
     path.unlink()
 
 
-def _prepare_cache_file(directory: Path) -> Path:
-    """Create-or-open the cache file; rollback only a file created by this call."""
-    _private_directory(directory)
-    path = directory / "answers.sqlite3"
+@contextmanager
+def _cache_descriptor(path: Path) -> Iterator[tuple[int, bool]]:
     fd, created = _open_cache_file(path)
-    info: os.stat_result | None = None
     try:
-        info = os.fstat(fd)
-        _validate_cache_info(info)
-    except BaseException:
-        if created:
-            _rollback_created_cache(path, info)
-        raise
+        yield fd, created
     finally:
         os.close(fd)
+
+
+def _validate_cache_file(path: Path) -> None:
+    info: os.stat_result | None = None
+    with _cache_descriptor(path) as (fd, created):
+        try:
+            info = os.fstat(fd)
+            _validate_cache_info(info)
+        except BaseException:
+            if created:
+                _rollback_created_cache(path, info)
+            raise
+
+
+def _prepare_cache_file(directory: Path) -> Path:
+    """Ensure the private cache file exists and validates before SQLite opens it."""
+    _private_directory(directory)
+    path = directory / "answers.sqlite3"
+    _validate_cache_file(path)
     return path
 
 def _open_cache_database(path: Path) -> sqlite3.Connection:
