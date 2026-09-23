@@ -128,7 +128,6 @@ def _corpus_reporter(args: argparse.Namespace, config: Config, cases: list[Corpu
 
 
 async def _experiment(
-    args: argparse.Namespace,
     config: Config,
     corpus: Corpus,
     cases: list[CorpusCase],
@@ -162,7 +161,7 @@ async def _run(args: argparse.Namespace) -> int:
     runs = _run_count(args)
     reporter = _corpus_reporter(args, config, cases, runs)
     reporter.start()
-    experiment = await _experiment(args, config, corpus, cases, runs, reporter)
+    experiment = await _experiment(config, corpus, cases, runs, reporter)
     calibration = experiment.calibrate(uncertain, warning) if args.calibrate else None
     reporter.finish(experiment, calibration)
     return experiment.exit_code(args.calibrate)
