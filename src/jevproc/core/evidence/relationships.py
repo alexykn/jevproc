@@ -52,6 +52,44 @@ def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
     by_parent, incomplete = _group_children(records)
     return by_parent, "partial" if incomplete else "observed"
 
+def _child_state(
+    process: Process,
+    entries: list[Child],
+    limit: int,
+    global_coverage: Coverage,
+) -> tuple[list[Child], Coverage]:
+    if process.freshness != "observed":
+        return [], "unavailable"
+    state = "truncated" if len(entries) > limit else global_coverage
+    return entries[:limit], state
+
+
+def _with_children(
+    process: Process,
+    entries: list[Child],
+    limit: int,
+    global_coverage: Coverage,
+) -> Process:
+    selected, state = _child_state(process, entries, limit, global_coverage)
+    return process.model_copy(
+        update={
+            "children": selected,
+            "child_count": len(entries),
+            "coverage": {**process.coverage, "children": state},
+        }
+    )
+
+
+def _without_children(process: Process) -> Process:
+    return process.model_copy(
+        update={
+            "children": [],
+            "child_count": 0,
+            "coverage": {**process.coverage, "children": "not_requested"},
+        }
+    )
+
+
 def _attach_children_from_index(
     processes: list[Process],
     limit: int,
@@ -59,35 +97,11 @@ def _attach_children_from_index(
     global_coverage: Coverage,
 ) -> list[Process]:
     if limit == 0:
-        return [
-            process.model_copy(
-                update={
-                    "children": [],
-                    "child_count": 0,
-                    "coverage": {**process.coverage, "children": "not_requested"},
-                }
-            )
-            for process in processes
-        ]
-    result = []
-    for process in processes:
-        entries = by_parent.get(process.pid, [])
-        state = global_coverage
-        if process.freshness != "observed":
-            entries, state = [], "unavailable"
-        elif len(entries) > limit:
-            state = "truncated"
-        result.append(
-            process.model_copy(
-                update={
-                    "children": entries[:limit],
-                    "child_count": len(entries),
-                    "coverage": {**process.coverage, "children": state},
-                }
-            )
-        )
-    return result
-
+        return list(map(_without_children, processes))
+    return [
+        _with_children(process, by_parent.get(process.pid, []), limit, global_coverage)
+        for process in processes
+    ]
 
 def attach_children(processes: list[Process], limit: int) -> list[Process]:
     if limit == 0:
@@ -96,24 +110,23 @@ def attach_children(processes: list[Process], limit: int) -> list[Process]:
     return _attach_children_from_index(processes, limit, by_parent, global_coverage)
 
 
+def _family_row(item: psutil.Process) -> tuple[int, int | None] | None:
+    pid = item.info.get("pid")
+    return None if pid is None else (int(pid), item.info.get("ppid"))
+
+
 def _process_family_index() -> tuple[dict[int, list[int]], set[int]]:
     children: dict[int, list[int]] = defaultdict(list)
     seen_pids: set[int] = set()
     try:
-        rows = psutil.process_iter(["pid", "ppid"], ad_value=None)
-        for item in rows:
-            pid = item.info.get("pid")
-            ppid = item.info.get("ppid")
-            if pid is None:
-                continue
-            pid = int(pid)
+        rows = filter(None, (_family_row(item) for item in psutil.process_iter(["pid", "ppid"], ad_value=None)))
+        for pid, ppid in rows:
             seen_pids.add(pid)
             if ppid is not None:
                 children[int(ppid)].append(pid)
     except (OSError, NotImplementedError) as exc:
         raise CollectionError("could not enumerate process family") from exc
     return children, seen_pids
-
 
 def _descendants(root_pid: int, children: dict[int, list[int]]) -> list[int]:
     ordered = [root_pid]
@@ -172,23 +185,31 @@ def attach_ancestry(processes: list[Process], depth: int, *, resolve_missing: bo
     return result
 
 
+def _child_ids(info: dict[str, Any]) -> tuple[int, int] | None:
+    ppid, pid = info.get("ppid"), info.get("pid")
+    return None if ppid is None or pid is None else (int(ppid), int(pid))
+
+
 def _child_record(
     item: psutil.Process, info: dict[str, Any], darwin_commands: dict[int, str]
 ) -> tuple[int, Child, bool] | None:
-    ppid, pid = info.get("ppid"), info.get("pid")
-    if ppid is None or pid is None:
+    ids = _child_ids(info)
+    if ids is None:
         return None
-    pid = int(pid)
+    ppid, pid = ids
     command = darwin_commands.get(pid)
     name = _process_name_without_cmdline(item, pid, command)
     executable = _process_executable_without_cmdline(item, pid, command)
     created = info.get("create_time")
     child = Child(
-        pid=pid, created_at=created, name=name, executable=executable, status=str(info.get("status") or "unknown")[:512]
+        pid=pid,
+        created_at=created,
+        name=name,
+        executable=executable,
+        status=str(info.get("status") or "unknown")[:512],
     )
-    complete = created is not None and executable is not None and name != "<unavailable>"
-    return int(ppid), child, complete
-
+    complete = all((created is not None, executable is not None, name != "<unavailable>"))
+    return ppid, child, complete
 
 def _selected_parent(process: Process) -> tuple[Parent, int | None] | None:
     if process.created_at is None or process.freshness != "observed":
@@ -199,14 +220,22 @@ def _selected_parent(process: Process) -> tuple[Parent, int | None] | None:
     )
 
 
+def _parent_link(
+    pid: int,
+    by_pid: dict[int, Process],
+    resolve_missing: bool,
+) -> tuple[Parent, int | None] | None:
+    process = by_pid.get(pid)
+    if process is not None:
+        return _selected_parent(process)
+    return _live_parent(pid) if resolve_missing else None
+
+
 def _resolve_parent(
     pid: int, created_before: float, by_pid: dict[int, Process], resolve_missing: bool
 ) -> tuple[Parent, int | None] | None:
-    process = by_pid.get(pid)
-    link = (_live_parent(pid) if resolve_missing else None) if process is None else _selected_parent(process)
-    if link is None:
-        return None
-    return link if link[0].created_at <= created_before else None
+    link = _parent_link(pid, by_pid, resolve_missing)
+    return link if link is not None and link[0].created_at <= created_before else None
 
 def _next_ancestor(
     next_pid: int | None,
