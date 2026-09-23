@@ -1,9 +1,9 @@
 """Packaged YAML defaults plus explicit, additive user configuration."""
 
-from importlib.resources import files
 from collections.abc import Mapping
+from importlib.resources import files
 from pathlib import Path
-from typing import Annotated, Literal, TypeAlias
+from typing import Annotated, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -13,7 +13,7 @@ class ConfigError(ValueError):
     pass
 
 
-ConfigMap: TypeAlias = dict[str, object]
+type ConfigMap = dict[str, object]
 
 
 class UniqueSafeLoader(yaml.SafeLoader):
