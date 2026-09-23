@@ -121,7 +121,7 @@ def _process_family_index() -> tuple[dict[int, list[int]], set[int]]:
     try:
         rows = filter(
             None,
-            (_family_row(getattr(item, "info")) for item in psutil.process_iter(["pid", "ppid"], ad_value=None)),
+            (_family_row(item.as_dict(attrs=["pid", "ppid"], ad_value=None)) for item in psutil.process_iter()),
         )
         for pid, ppid in rows:
             seen_pids.add(pid)
