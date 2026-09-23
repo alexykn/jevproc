@@ -16,6 +16,22 @@ class ConfigError(ValueError):
 type ConfigMap = dict[str, object]
 
 
+def _require(condition: bool, message: str) -> None:
+    if not condition:
+        raise ValueError(message)
+
+
+def _yaml_mapping_key(loader: yaml.SafeLoader, key_node, mapping: dict, deep: bool):
+    key = loader.construct_object(key_node, deep=deep)
+    try:
+        duplicate = key in mapping
+    except TypeError as exc:
+        raise yaml.YAMLError("configuration mapping key must be a scalar") from exc
+    if duplicate:
+        raise yaml.YAMLError("duplicate configuration mapping key")
+    return key
+
+
 class UniqueSafeLoader(yaml.SafeLoader):
     """Reject ambiguous duplicate mapping keys rather than silently changing policy."""
 
@@ -23,13 +39,7 @@ class UniqueSafeLoader(yaml.SafeLoader):
         self.flatten_mapping(node)
         mapping = {}
         for key_node, value_node in node.value:
-            key = self.construct_object(key_node, deep=deep)
-            try:
-                duplicate = key in mapping
-            except TypeError as exc:
-                raise yaml.YAMLError("configuration mapping key must be a scalar") from exc
-            if duplicate:
-                raise yaml.YAMLError("duplicate configuration mapping key")
+            key = _yaml_mapping_key(self, key_node, mapping, deep)
             mapping[key] = self.construct_object(value_node, deep=deep)
         return mapping
 
@@ -45,8 +55,8 @@ class NoulQuestion(Settings):
 
     @model_validator(mode="after")
     def labels(self) -> "NoulQuestion":
-        if self.criteria is not None and set(self.criteria) != {"true", "false"}:
-            raise ValueError("Noul criteria must use quoted 'true' and 'false' keys")
+        labels = {"true", "false"} if self.criteria is None else set(self.criteria)
+        _require(labels == {"true", "false"}, "Noul criteria must use quoted 'true' and 'false' keys")
         return self
 
 
@@ -87,11 +97,35 @@ class Policy(Settings):
 
     @model_validator(mode="after")
     def ordered(self) -> "Policy":
-        if self.uncertain_at >= self.warning_at:
-            raise ValueError("uncertain_at must be below warning_at")
-        if self.score_uncertain_at >= self.score_warning_at:
-            raise ValueError("score_uncertain_at must be below score_warning_at")
+        _require(self.uncertain_at < self.warning_at, "uncertain_at must be below warning_at")
+        _require(self.score_uncertain_at < self.score_warning_at, "score_uncertain_at must be below score_warning_at")
         return self
+
+
+def _validate_choice_policy(question: ChoiceQuestion, policy: Policy) -> None:
+    warning = set(policy.warning_choices)
+    legitimate = set(policy.legitimate_choices)
+    labels = warning | legitimate
+    _require(bool(warning), "Choice policy must name valid warning_choices")
+    _require(labels <= question.criteria.keys(), "Choice policy must name valid warning_choices")
+    _require(warning.isdisjoint(legitimate), "warning and legitimate choices must be disjoint")
+
+
+def _validate_score_policy(question: ScoreQuestion, policy: Policy) -> None:
+    _require(policy.score_warning_at <= len(question.criteria) - 1, "score threshold is outside the question scale")
+
+
+def _validate_noul_policy(policy: Policy) -> None:
+    _require(not any((policy.warning_choices, policy.legitimate_choices)), "choice labels are only supported for Choice questions")
+
+
+def _validate_question_policy(question: Question, policy: Policy) -> None:
+    if isinstance(question, ChoiceQuestion):
+        _validate_choice_policy(question, policy)
+    elif isinstance(question, ScoreQuestion):
+        _validate_score_policy(question, policy)
+    else:
+        _validate_noul_policy(policy)
 
 
 class Rule(Settings):
@@ -104,17 +138,7 @@ class Rule(Settings):
 
     @model_validator(mode="after")
     def policy_matches_question(self) -> "Rule":
-        if isinstance(self.question, ChoiceQuestion):
-            labels = set(self.policy.warning_choices + self.policy.legitimate_choices)
-            if not self.policy.warning_choices or not labels <= self.question.criteria.keys():
-                raise ValueError("Choice policy must name valid warning_choices")
-            if set(self.policy.warning_choices) & set(self.policy.legitimate_choices):
-                raise ValueError("warning and legitimate choices must be disjoint")
-        elif isinstance(self.question, ScoreQuestion):
-            if self.policy.score_warning_at > len(self.question.criteria) - 1:
-                raise ValueError("score threshold is outside the question scale")
-        elif self.policy.warning_choices or self.policy.legitimate_choices:
-            raise ValueError("choice labels are only supported for Choice questions")
+        _validate_question_policy(self.question, self.policy)
         return self
 
 
@@ -148,6 +172,33 @@ class CacheSettings(Settings):
     max_entries: int = Field(default=4096, ge=1, le=100000)
 
 
+def _rule_ids(rulesets: dict[str, list[Rule]]) -> list[str]:
+    return [rule.id for rules in rulesets.values() for rule in rules]
+
+
+def _validate_rule_ids(all_ids: list[str]) -> None:
+    _require(len(all_ids) == len(set(all_ids)), "rule IDs must be unique across rulesets")
+    _require(len(all_ids) <= 128, "at most 128 rules are supported")
+
+
+def _validate_ignore(ignore: list[str], all_ids: list[str], rulesets: dict[str, list[Rule]]) -> None:
+    unknown = set(ignore).difference(all_ids, rulesets.keys())
+    _require(not unknown, "ignore references an unknown rule or ruleset")
+
+
+def _active_ruleset(name: str, rules: list[Rule], ignored: set[str]) -> list[Rule]:
+    return [] if name in ignored else [rule for rule in rules if rule.id not in ignored]
+
+
+def _active_rules(rulesets: dict[str, list[Rule]], ignore: list[str]) -> list[Rule]:
+    ignored = set(ignore)
+    return [
+        rule
+        for name, rules in rulesets.items()
+        for rule in _active_ruleset(name, rules, ignored)
+    ]
+
+
 class Config(Settings):
     schema_version: Literal[1] = 1
     host_context: str = Field(
@@ -161,27 +212,15 @@ class Config(Settings):
 
     @model_validator(mode="after")
     def rule_identity(self) -> "Config":
-        all_ids = [r.id for rules in self.rulesets.values() for r in rules]
-        if len(all_ids) != len(set(all_ids)):
-            raise ValueError("rule IDs must be unique across rulesets")
-        if len(all_ids) > 128:
-            raise ValueError("at most 128 rules are supported")
-        unknown = set(self.ignore) - set(all_ids) - self.rulesets.keys()
-        if unknown:
-            raise ValueError("ignore references an unknown rule or ruleset")
-        if not self.active_rules:
-            raise ValueError("at least one active rule is required")
+        all_ids = _rule_ids(self.rulesets)
+        _validate_rule_ids(all_ids)
+        _validate_ignore(self.ignore, all_ids, self.rulesets)
+        _require(bool(self.active_rules), "at least one active rule is required")
         return self
 
     @property
     def active_rules(self) -> list[Rule]:
-        return [
-            r
-            for name, rules in self.rulesets.items()
-            if name not in self.ignore
-            for r in rules
-            if r.id not in self.ignore
-        ]
+        return _active_rules(self.rulesets, self.ignore)
 
 
 def default_yaml() -> str:
@@ -241,28 +280,42 @@ def _read_override(path: Path) -> ConfigMap:
     return _string_mapping(_unique_safe_load(raw), "configuration must be a YAML mapping")
 
 
+def _rule_mapping(item: object) -> ConfigMap:
+    rule = _string_mapping(item, "each ruleset must contain rule mappings with an id")
+    if not isinstance(rule.get("id"), str):
+        raise ConfigError("each ruleset must contain rule mappings with an id")
+    return rule
+
+
 def _rule_mappings(value: object) -> list[ConfigMap]:
     if not isinstance(value, list):
         raise ConfigError("each ruleset must contain rule mappings with an id")
-    rules: list[ConfigMap] = []
-    for item in value:
-        rule = _string_mapping(item, "each ruleset must contain rule mappings with an id")
-        if not isinstance(rule.get("id"), str):
-            raise ConfigError("each ruleset must contain rule mappings with an id")
-        rules.append(rule)
-    return rules
+    return list(map(_rule_mapping, value))
+
+
+def _patch_ids(rules: list[ConfigMap]) -> list[str]:
+    ids = [str(rule["id"]) for rule in rules]
+    if len(set(ids)) != len(ids):
+        raise ConfigError("duplicate rule ID in a ruleset override")
+    return ids
+
+
+def _rule_index(rules: list[ConfigMap]) -> dict[str, ConfigMap]:
+    return {str(rule["id"]): rule for rule in rules}
+
+
+def _merged_rule_index(base_rules: list[ConfigMap], patch_rules: list[ConfigMap]) -> dict[str, ConfigMap]:
+    by_id = _rule_index(base_rules)
+    by_id.update({
+        rule_id: _merge(by_id.get(rule_id, {}), rule)
+        for rule_id, rule in zip(_patch_ids(patch_rules), patch_rules, strict=True)
+    })
+    return by_id
 
 
 def _patch_rules(existing: object, patches: object) -> list[ConfigMap]:
-    base_rules = _rule_mappings(existing)
-    patch_rules = _rule_mappings(patches)
-    if len({rule["id"] for rule in patch_rules}) != len(patch_rules):
-        raise ConfigError("duplicate rule ID in a ruleset override")
-    by_id = {str(rule["id"]): rule for rule in base_rules}
-    for rule in patch_rules:
-        rule_id = str(rule["id"])
-        by_id[rule_id] = _merge(by_id.get(rule_id, {}), rule)
-    return list(by_id.values())
+    merged = _merged_rule_index(_rule_mappings(existing), _rule_mappings(patches))
+    return list(merged.values())
 
 
 def _apply_override(defaults: Mapping[str, object], override: Mapping[str, object]) -> ConfigMap:

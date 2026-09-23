@@ -6,11 +6,12 @@ import subprocess
 import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import nullcontext
+from dataclasses import dataclass, field
 
 import psutil
 
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence.access import observed
 from jevproc.core.models import (
     Connection,
     Coverage,
@@ -18,89 +19,133 @@ from jevproc.core.models import (
 )
 
 
+def _strip_endpoint_annotation(value: str) -> str:
+    return value.rsplit(" (", 1)[0] if " (" in value else value
+
+
+def _split_bracketed_endpoint(value: str) -> tuple[str, str] | None:
+    marker = value.rfind("]:")
+    return (value[1:marker], value[marker + 2 :]) if marker >= 0 else None
+
+
+def _split_plain_endpoint(value: str) -> tuple[str, str] | None:
+    host, separator, port = value.rpartition(":")
+    return (host, port) if separator else None
+
+
+def _split_endpoint(value: str) -> tuple[str, str] | None:
+    return _split_bracketed_endpoint(value) if value.startswith("[") else _split_plain_endpoint(value)
+
+
 def _endpoint(text: str) -> tuple[str, int]:
     """Parse one numeric lsof endpoint without DNS/service-name ambiguity."""
-    value = text.strip()
-    if " (" in value:
-        value = value.rsplit(" (", 1)[0]
-    if value.startswith("["):
-        marker = value.rfind("]:")
-        if marker >= 0:
-            host, port = value[1:marker], value[marker + 2 :]
-        else:
-            return value[:512], 0
-    else:
-        host, separator, port = value.rpartition(":")
-        if not separator:
-            return value[:512], 0
+    value = _strip_endpoint_annotation(text.strip())
+    parts = _split_endpoint(value)
+    if parts is None:
+        return value[:512], 0
+    host, port = parts
     if not port.isdigit():
         return value[:512], 0
     return ("" if host == "*" else host[:512], int(port))
 
 
+def _lsof_connection(
+    pid: int | None,
+    protocol: str,
+    endpoint: str,
+    status: str,
+) -> Connection | None:
+    ready = all((pid is not None, protocol in {"TCP", "UDP"}, bool(endpoint)))
+    if not ready:
+        return None
+    local_text, arrow, remote_text = endpoint.partition("->")
+    local_address, local_port = _endpoint(local_text)
+    remote_address, remote_port = _endpoint(remote_text) if arrow else ("", 0)
+    return Connection(
+        protocol="tcp" if protocol == "TCP" else "udp",
+        local_address=local_address,
+        local_port=local_port,
+        remote_address=remote_address,
+        remote_port=remote_port,
+        status=status[:512],
+    )
+
+
+def _deduplicated_connections(entries: list[Connection]) -> list[Connection]:
+    unique = {
+        (item.protocol, item.local_address, item.local_port, item.remote_address, item.remote_port, item.status): item
+        for item in entries
+    }
+    return sorted(
+        unique.values(),
+        key=lambda item: (
+            item.protocol,
+            item.local_address,
+            item.local_port,
+            item.remote_address,
+            item.remote_port,
+            item.status,
+        ),
+    )
+
+
+@dataclass
+class _LsofParser:
+    by_pid: dict[int, list[Connection]] = field(default_factory=dict)
+    pid: int | None = None
+    protocol: str = ""
+    endpoint: str = ""
+    status: str = ""
+
+    def _reset_socket(self) -> None:
+        self.protocol = self.endpoint = self.status = ""
+
+    def _flush(self) -> None:
+        connection = _lsof_connection(self.pid, self.protocol, self.endpoint, self.status)
+        if connection is not None and self.pid is not None:
+            self.by_pid.setdefault(self.pid, []).append(connection)
+        self._reset_socket()
+
+    def _process(self, value: str) -> None:
+        self._flush()
+        self.pid = int(value) if value.isdigit() else None
+
+    def _file(self, _value: str) -> None:
+        self._flush()
+
+    def _protocol(self, value: str) -> None:
+        self.protocol = value.upper()
+
+    def _endpoint(self, value: str) -> None:
+        self.endpoint = value
+
+    def _status(self, value: str) -> None:
+        if value.startswith("ST="):
+            self.status = value.removeprefix("ST=")
+
+    def feed(self, line: str) -> None:
+        handlers = {
+            "p": self._process,
+            "f": self._file,
+            "P": self._protocol,
+            "n": self._endpoint,
+            "T": self._status,
+        }
+        handler = handlers.get(line[0])
+        if handler is not None:
+            handler(line[1:])
+
+    def result(self) -> dict[int, list[Connection]]:
+        self._flush()
+        return {owner: _deduplicated_connections(entries) for owner, entries in self.by_pid.items()}
+
+
 def _parse_lsof_network(output: str) -> dict[int, list[Connection]]:
     """Parse lsof field output; f records delimit sockets and p records delimit processes."""
-    by_pid: dict[int, list[Connection]] = defaultdict(list)
-    pid: int | None = None
-    protocol = ""
-    endpoint = ""
-    status = ""
-
-    def flush() -> None:
-        nonlocal protocol, endpoint, status
-        if pid is not None and protocol in {"TCP", "UDP"} and endpoint:
-            local_text, arrow, remote_text = endpoint.partition("->")
-            local_address, local_port = _endpoint(local_text)
-            remote_address, remote_port = _endpoint(remote_text) if arrow else ("", 0)
-            by_pid[pid].append(
-                Connection(
-                    protocol="tcp" if protocol == "TCP" else "udp",
-                    local_address=local_address,
-                    local_port=local_port,
-                    remote_address=remote_address,
-                    remote_port=remote_port,
-                    status=status[:512],
-                )
-            )
-        protocol = endpoint = status = ""
-
-    for line in output.splitlines():
-        if not line:
-            continue
-        field, value = line[0], line[1:]
-        if field == "p":
-            flush()
-            try:
-                pid = int(value)
-            except ValueError:
-                pid = None
-        elif field == "f":
-            flush()
-        elif field == "P":
-            protocol = value.upper()
-        elif field == "n":
-            endpoint = value
-        elif field == "T" and value.startswith("ST="):
-            status = value[3:]
-    flush()
-
-    result: dict[int, list[Connection]] = {}
-    for owner, entries in by_pid.items():
-        unique = {
-            (c.protocol, c.local_address, c.local_port, c.remote_address, c.remote_port, c.status): c for c in entries
-        }
-        result[owner] = sorted(
-            unique.values(),
-            key=lambda c: (
-                c.protocol,
-                c.local_address,
-                c.local_port,
-                c.remote_address,
-                c.remote_port,
-                c.status,
-            ),
-        )
-    return result
+    parser = _LsofParser()
+    for line in filter(None, output.splitlines()):
+        parser.feed(line)
+    return parser.result()
 
 
 def _lsof_network() -> tuple[dict[int, list[Connection]], Coverage]:
@@ -123,37 +168,107 @@ def _lsof_network() -> tuple[dict[int, list[Connection]], Coverage]:
     return _parse_lsof_network(result.stdout), "partial"
 
 
-def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
-    if not settings.connections:
-        return {}, "not_requested"
-    try:
-        sockets = psutil.net_connections(kind="inet")
-    except psutil.AccessDenied:
-        if sys.platform == "darwin":
-            return _lsof_network()
-        return {}, "denied"
-    except (OSError, NotImplementedError):
-        return {}, "unavailable"
+def _socket_address(address) -> tuple[str, int]:
+    return (address.ip, address.port) if address else ("", 0)
+
+
+def _socket_connection(item) -> Connection:
+    local_address, local_port = _socket_address(item.laddr)
+    remote_address, remote_port = _socket_address(item.raddr)
+    return Connection(
+        protocol="tcp" if item.type == socket.SOCK_STREAM else "udp",
+        local_address=local_address,
+        local_port=local_port,
+        remote_address=remote_address,
+        remote_port=remote_port,
+        status=item.status,
+    )
+
+
+def _group_sockets(sockets) -> dict[int, list[Connection]]:
     by_pid: dict[int, list[Connection]] = defaultdict(list)
-    # Linux may silently omit inaccessible entries. Even root sees a point-in-time snapshot,
-    # not a complete history, and sockets with no owner remain unattributed.
-    incomplete = os.geteuid() != 0 or any(item.pid is None for item in sockets)
     for item in sockets:
-        if item.pid is None:
-            continue
-        by_pid[item.pid].append(
-            Connection(
-                protocol="tcp" if item.type == socket.SOCK_STREAM else "udp",
-                local_address=item.laddr.ip if item.laddr else "",
-                local_port=item.laddr.port if item.laddr else 0,
-                remote_address=item.raddr.ip if item.raddr else "",
-                remote_port=item.raddr.port if item.raddr else 0,
-                status=item.status,
-            )
-        )
+        if item.pid is not None:
+            by_pid[item.pid].append(_socket_connection(item))
     for entries in by_pid.values():
-        entries.sort(key=lambda c: (c.protocol, c.local_address, c.local_port, c.remote_address, c.remote_port))
-    return dict(by_pid), "partial" if incomplete else "observed"
+        entries.sort(key=lambda item: (item.protocol, item.local_address, item.local_port, item.remote_address, item.remote_port))
+    return dict(by_pid)
+
+
+def _unavailable_network(state: Coverage) -> tuple[dict[int, list[Connection]], Coverage]:
+    if state == "denied" and sys.platform == "darwin":
+        return _lsof_network()
+    return {}, "denied" if state == "denied" else "unavailable"
+
+
+def _socket_coverage(sockets) -> Coverage:
+    incomplete = any((os.geteuid() != 0, any(item.pid is None for item in sockets)))
+    return "partial" if incomplete else "observed"
+
+
+def _psutil_network() -> tuple[dict[int, list[Connection]], Coverage]:
+    sockets, state = observed(lambda: psutil.net_connections(kind="inet"), [])
+    return (
+        (_group_sockets(sockets), _socket_coverage(sockets))
+        if state == "observed"
+        else _unavailable_network(state)
+    )
+
+
+def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
+    return _psutil_network() if settings.connections else ({}, "not_requested")
+
+def _executable_changed(current: psutil.Process, expected: str | None) -> bool:
+    return bool(expected and current.exe() != expected)
+
+
+def _current_start(pid: int) -> tuple[psutil.Process, float]:
+    current = psutil.Process(pid)
+    return current, current.create_time()
+
+
+def _live_executable(current: psutil.Process, expected: str | None) -> tuple[str | None, Coverage]:
+    return observed(current.exe) if expected else (None, "observed")
+
+
+def _executable_mismatch(expected: str | None, actual: str | None) -> bool:
+    return bool(expected and actual != expected)
+
+
+def _unverified_state(state: Coverage) -> tuple[str, Coverage]:
+    return ("gone", "gone") if state == "gone" else ("unverified", "unavailable")
+
+
+def _revalidate_process(process: Process) -> tuple[str, Coverage]:
+    identity, state = observed(lambda: _current_start(process.pid))
+    if state != "observed":
+        return _unverified_state(state)
+
+    current, created = identity
+    if created != process.created_at:
+        return "reused", "unavailable"
+
+    executable, state = _live_executable(current, process.executable)
+    if state != "observed":
+        return _unverified_state(state)
+    return (
+        ("changed", "unavailable")
+        if _executable_mismatch(process.executable, executable)
+        else (process.freshness, "observed")
+    )
+
+
+def _network_state(
+    process: Process,
+    entries: list[Connection],
+    coverage: Coverage,
+) -> tuple[str, list[Connection], Coverage]:
+    if process.freshness != "observed" or process.created_at is None:
+        return process.freshness, [], "unavailable"
+    freshness, verified = _revalidate_process(process)
+    if verified != "observed":
+        return freshness, [], verified
+    return freshness, entries, "truncated" if len(entries) > 128 else coverage
 
 
 def _attach_network_one(
@@ -161,27 +276,8 @@ def _attach_network_one(
     network: dict[int, list[Connection]],
     coverage: Coverage,
 ) -> Process:
-    freshness = process.freshness
     entries = network.get(process.pid, [])
-    state = coverage
-    if freshness != "observed" or process.created_at is None:
-        entries, state = [], "unavailable"
-    else:
-        try:
-            # Fresh objects avoid psutil's cached executable/start-time attributes.
-            current = psutil.Process(process.pid)
-            oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
-            with oneshot:
-                if current.create_time() != process.created_at:
-                    freshness, entries, state = "reused", [], "unavailable"
-                elif process.executable and current.exe() != process.executable:
-                    freshness, entries, state = "changed", [], "unavailable"
-        except psutil.NoSuchProcess:
-            freshness, entries, state = "gone", [], "gone"
-        except (psutil.AccessDenied, OSError):
-            freshness, entries, state = "unverified", [], "unavailable"
-    if len(entries) > 128:
-        state = "truncated"
+    freshness, entries, state = _network_state(process, entries, coverage)
     return process.model_copy(
         update={
             "connections": entries[:128],
@@ -189,7 +285,6 @@ def _attach_network_one(
             "coverage": {**process.coverage, "connections": state},
         }
     )
-
 
 def attach_network(
     processes: list[Process],

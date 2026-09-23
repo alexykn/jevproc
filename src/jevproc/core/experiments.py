@@ -11,11 +11,13 @@ from jevproc.core.models import Assessment, Report, Snapshot
 from jevproc.core.protocol import JevError
 
 
+def _jpr_noul(rule) -> float | None:
+    matches = rule.rule == "JPR001" and rule.answer.get("type") == "noul"
+    return float(rule.answer["noul"]) if matches else None
+
+
 def _noul(assessment: Assessment) -> float | None:
-    for rule in assessment.rules:
-        if rule.rule == "JPR001" and rule.answer.get("type") == "noul":
-            return float(rule.answer["noul"])
-    return None
+    return next(filter(None, map(_jpr_noul, assessment.rules)), None)
 
 
 def _case_payload(case: CorpusCase, assessment: Assessment, run: int) -> dict[str, Any]:
@@ -35,6 +37,19 @@ def _case_payload(case: CorpusCase, assessment: Assessment, run: int) -> dict[st
         "error": assessment.error,
         "rules": [rule.model_dump(mode="json") for rule in assessment.rules],
     }
+
+
+def _mismatch_count(results: list[dict[str, Any]]) -> int:
+    return sum(not item["passed"] for item in results)
+
+
+def _report_totals(reports: list[Report]) -> dict[str, Any]:
+    keys = ("requests", "retries", "input_tokens", "elapsed_seconds")
+    return {key: sum(report.summary[key] for report in reports) for key in keys}
+
+
+def _operational_failures(reports: list[Report]) -> int:
+    return sum(report.summary["failed_processes"] for report in reports)
 
 
 @dataclass
@@ -66,33 +81,36 @@ class CorpusExperiment:
 
     @property
     def summary(self) -> dict[str, Any]:
-        mismatches = sum(not item["passed"] for item in self.results)
+        mismatches = _mismatch_count(self.results)
         return {
             "cases": len(self.cases),
             "runs": self.runs,
             "samples": len(self.results),
             "passed_samples": len(self.results) - mismatches,
             "mismatches": mismatches,
-            "operational_failures": sum(report.summary["failed_processes"] for report in self.reports),
-            **{
-                key: sum(report.summary[key] for report in self.reports)
-                for key in ("requests", "retries", "input_tokens", "elapsed_seconds")
-            },
+            "operational_failures": _operational_failures(self.reports),
+            **_report_totals(self.reports),
         }
+
+    def _missing_samples(self) -> list[str]:
+        return [case.id for case in self.cases if not self.samples[case.id]]
+
+    def _require_complete_samples(self) -> None:
+        missing = self._missing_samples()
+        if missing:
+            raise JevError("calibration missing JPR001 Noul samples for: " + ", ".join(missing))
 
     def calibrate(self, uncertain_at: float, warning_at: float) -> dict[str, Any] | None:
         if self.summary["operational_failures"]:
             return None
-        missing = [case.id for case in self.cases if not self.samples[case.id]]
-        if missing:
-            raise JevError("calibration missing JPR001 Noul samples for: " + ", ".join(missing))
+        self._require_complete_samples()
         return calibration_report(self.cases, self.samples, current_uncertain=uncertain_at, current_warning=warning_at)
 
     def exit_code(self, calibrating: bool) -> int:
         summary = self.summary
-        if summary["operational_failures"]:
-            return 2
-        return 0 if calibrating or not summary["mismatches"] else 1
+        operational = 2 * int(bool(summary["operational_failures"]))
+        mismatch = int(bool(summary["mismatches"])) * int(not calibrating)
+        return max(operational, mismatch)
 
 
 async def run_corpus(

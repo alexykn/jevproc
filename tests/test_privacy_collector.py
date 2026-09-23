@@ -645,13 +645,16 @@ def test_children_are_bounded_and_total_count_is_preserved(monkeypatch):
 def test_family_selection_walks_descendants_only(monkeypatch):
     import jevproc.core.evidence.relationships as module
 
+    def row(pid, ppid):
+        return SimpleNamespace(as_dict=lambda **_kwargs: {"pid": pid, "ppid": ppid})
+
     table = [
-        SimpleNamespace(info={"pid": 1, "ppid": 0}),
-        SimpleNamespace(info={"pid": 10, "ppid": 1}),
-        SimpleNamespace(info={"pid": 11, "ppid": 10}),
-        SimpleNamespace(info={"pid": 12, "ppid": 10}),
-        SimpleNamespace(info={"pid": 13, "ppid": 11}),
-        SimpleNamespace(info={"pid": 20, "ppid": 1}),
+        row(1, 0),
+        row(10, 1),
+        row(11, 10),
+        row(12, 10),
+        row(13, 11),
+        row(20, 1),
     ]
     monkeypatch.setattr(module.psutil, "pid_exists", lambda pid: pid in {1, 10, 11, 12, 13, 20})
     monkeypatch.setattr(module.psutil, "process_iter", lambda *_args, **_kwargs: iter(table))

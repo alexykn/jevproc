@@ -15,48 +15,58 @@ from jevproc.core.models import (
 )
 
 
+def _hash_stream(handle, max_bytes: int) -> tuple[str | None, Coverage]:
+    digest = hashlib.sha256()
+    remaining = max_bytes + 1
+    while remaining:
+        block = handle.read(min(1024 * 1024, remaining))
+        if not block:
+            break
+        digest.update(block)
+        remaining -= len(block)
+    return (None, "truncated") if remaining == 0 else (digest.hexdigest(), "observed")
+
+
+def _hash_metadata_valid(info: os.stat_result, max_bytes: int) -> Coverage:
+    if not stat.S_ISREG(info.st_mode):
+        return "unavailable"
+    return "truncated" if info.st_size > max_bytes else "observed"
+
+
+def _hash_handle(handle, max_bytes: int) -> tuple[str | None, Coverage]:
+    before = os.fstat(handle.fileno())
+    metadata_state = _hash_metadata_valid(before, max_bytes)
+    if metadata_state != "observed":
+        return None, metadata_state
+    digest, state = _hash_stream(handle, max_bytes)
+    if state != "observed":
+        return digest, state
+    stable = _file_identity(before) == _file_identity(os.fstat(handle.fileno()))
+    return (digest, "observed") if stable else (None, "partial")
+
+
 def _hash_file(path: str, max_bytes: int) -> tuple[str | None, Coverage]:
     """Do not follow a final symlink or block on a FIFO/device substituted for a file."""
     flags = os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW | os.O_CLOEXEC
     try:
         descriptor = os.open(path, flags)
         with os.fdopen(descriptor, "rb") as handle:
-            before = os.fstat(handle.fileno())
-            if not stat.S_ISREG(before.st_mode):
-                return None, "unavailable"
-            if before.st_size > max_bytes:
-                return None, "truncated"
-            digest = hashlib.sha256()
-            remaining = max_bytes + 1
-            while remaining:
-                block = handle.read(min(1024 * 1024, remaining))
-                if not block:
-                    break
-                digest.update(block)
-                remaining -= len(block)
-            if remaining == 0:
-                return None, "truncated"
-            after = os.fstat(handle.fileno())
-            if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
-                after.st_size,
-                after.st_mtime_ns,
-                after.st_ctime_ns,
-            ):
-                return None, "partial"
-            return digest.hexdigest(), "observed"
+            return _hash_handle(handle, max_bytes)
     except PermissionError:
         return None, "denied"
     except OSError:
         return None, "unavailable"
 
+def _codesign_failure_matches(entry: tuple[tuple[str, ...], str, str | None], text: str) -> bool:
+    phrases, _, _ = entry
+    return any(phrase in text for phrase in phrases)
+
 
 def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
     """Normalize known diagnostics without treating unknown failures as valid."""
     text = stderr.lower()
-    for phrases, state, issue in _CODESIGN_FAILURES:
-        if any(phrase in text for phrase in phrases):
-            return state, issue
-    return "verification_failed", "other"
+    match = next(filter(lambda entry: _codesign_failure_matches(entry, text), _CODESIGN_FAILURES), None)
+    return (match[1], match[2]) if match is not None else ("verification_failed", "other")
 
 
 def _codesign_verify(path: str) -> CommandResult | None:
@@ -88,38 +98,56 @@ def _codesign_display(path: str) -> str | None:
     return display.stdout + "\n" + display.stderr
 
 
+def _identifier_field(line: str) -> tuple[str, str] | None:
+    prefix = "Identifier="
+    return ("signature_identifier", line.removeprefix(prefix)[:512]) if line.startswith(prefix) else None
+
+
+def _team_field(line: str) -> tuple[str, str] | None:
+    prefix = "TeamIdentifier="
+    if not line.startswith(prefix):
+        return None
+    value = line.removeprefix(prefix)
+    return None if value == "not set" else ("signature_team_id", value[:512])
+
+
+def _signature_field(line: str) -> tuple[str, str] | None:
+    return _identifier_field(line) or _team_field(line)
+
+
+def _signature_authorities(lines: list[str]) -> list[str]:
+    return [line.split("=", 1)[1][:512] for line in lines if line.startswith("Authority=")][:8]
+
+
+def _signature_identity(lines: list[str]) -> dict[str, str]:
+    return dict(filter(None, map(_signature_field, lines)))
+
+
 def _signature_metadata(text: str) -> dict[str, Any]:
-    values: dict[str, Any] = {}
-    authorities: list[str] = []
-    for line in text.splitlines():
-        if line.startswith("Identifier="):
-            values["signature_identifier"] = line.split("=", 1)[1][:512]
-        elif line.startswith("TeamIdentifier="):
-            team = line.split("=", 1)[1]
-            if team and team != "not set":
-                values["signature_team_id"] = team[:512]
-        elif line.startswith("Authority=") and len(authorities) < 8:
-            authorities.append(line.split("=", 1)[1][:512])
-    values["signature_authorities"] = authorities
-    return values
+    lines = text.splitlines()
+    return {
+        **_signature_identity(lines),
+        "signature_authorities": _signature_authorities(lines),
+    }
 
-
-def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
-    if sys.platform != "darwin":
-        return {"signature": "unavailable"}, "unavailable"
-
-    verify = _codesign_verify(path)
-    if verify is None:
-        return {"signature": "unavailable"}, "unavailable"
-
-    values = _verification_values(verify)
-    if values["signature"] == "unsigned":
-        return values, "observed"
-
+def _display_signature_metadata(path: str, values: dict[str, Any]) -> dict[str, Any]:
     display = _codesign_display(path)
     if display is not None:
         values.update(_signature_metadata(display))
-    return values, "observed"
+    return values
+
+
+def _verified_signature(path: str) -> dict[str, Any] | None:
+    verify = _codesign_verify(path)
+    if verify is None:
+        return None
+    values = _verification_values(verify)
+    return values if values["signature"] == "unsigned" else _display_signature_metadata(path, values)
+
+
+def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
+    values = _verified_signature(path) if sys.platform == "darwin" else None
+    return (values, "observed") if values is not None else ({"signature": "unavailable"}, "unavailable")
 
 
 def _valid_file_path(path: str | None) -> bool:
@@ -140,6 +168,21 @@ def _cached_file(
     return executable, dict(coverage)
 
 
+def _inspectable_content(
+    path: str,
+    metadata: Executable,
+    info: os.stat_result,
+    settings: CollectionSettings,
+    coverage: dict[str, Coverage],
+) -> Executable:
+    return _inspect_content(path, metadata, settings, coverage) if stat.S_ISREG(info.st_mode) else metadata
+
+
+def _inspection_stable(path: str, info: os.stat_result, settings: CollectionSettings) -> bool:
+    requested = settings.hashes or settings.signatures
+    return not requested or _file_unchanged(path, info)
+
+
 def _inspect_stable_file(
     path: str,
     metadata: Executable,
@@ -147,10 +190,11 @@ def _inspect_stable_file(
     settings: CollectionSettings,
     coverage: dict[str, Coverage],
 ) -> tuple[Executable, dict[str, Coverage], bool]:
-    inspected = _inspect_content(path, metadata, settings, coverage) if stat.S_ISREG(info.st_mode) else metadata
-    if (settings.hashes or settings.signatures) and not _file_unchanged(path, info):
-        return Executable(), {**_file_coverage(settings), "file": "partial"}, False
-    return inspected, coverage, True
+    inspected = _inspectable_content(path, metadata, info, settings, coverage)
+    stable = _inspection_stable(path, info, settings)
+    partial_coverage: dict[str, Coverage] = {**_file_coverage(settings), "file": "partial"}
+    partial = (Executable(), partial_coverage, False)
+    return (inspected, coverage, True) if stable else partial
 
 
 def _remember_file(
@@ -163,6 +207,24 @@ def _remember_file(
         cache[key] = executable, dict(coverage)
 
 
+def _inspect_or_cached(
+    path: str,
+    metadata: Executable,
+    info: os.stat_result,
+    settings: CollectionSettings,
+    coverage: dict[str, Coverage],
+    cache: dict[tuple, tuple[Executable, dict[str, Coverage]]] | None,
+) -> tuple[Executable, dict[str, Coverage]]:
+    key = _file_cache_key(path, info, settings)
+    cached = _cached_file(cache, key)
+    if cached is not None:
+        return cached
+    executable, final_coverage, stable = _inspect_stable_file(path, metadata, info, settings, coverage)
+    if stable:
+        _remember_file(cache, key, executable, final_coverage)
+    return executable, final_coverage
+
+
 def _file_info(
     path: str | None,
     settings: CollectionSettings,
@@ -172,40 +234,39 @@ def _file_info(
     if not _valid_file_path(path):
         return Executable(), coverage
     assert path is not None
-
     metadata, coverage["file"], info = _stat_executable(path)
-    if info is None:
-        return metadata, coverage
+    return (metadata, coverage) if info is None else _inspect_or_cached(path, metadata, info, settings, coverage, cache)
 
-    key = _file_cache_key(path, info, settings)
-    cached = _cached_file(cache, key)
-    if cached is not None:
-        return cached
 
-    executable, final_coverage, stable = _inspect_stable_file(path, metadata, info, settings, coverage)
-    if stable:
-        _remember_file(cache, key, executable, final_coverage)
-    return executable, final_coverage
+def _temporary_path(path: str | None) -> bool:
+    prefixes = ("/tmp/", "/var/tmp/", "/private/tmp/")
+    return bool(path and path.startswith(prefixes))
+
+
+def _world_writable(info: Executable) -> bool:
+    return bool(info.mode is not None and info.mode & stat.S_IWOTH)
 
 
 def _observations(path: str | None, info: Executable) -> list[str]:
-    facts = []
-    if path and any(path.startswith(prefix) for prefix in ("/tmp/", "/var/tmp/", "/private/tmp/")):
-        facts.append(
-            "Executable path is in a temporary directory; legitimate development and installers also use these."
-        )
-    if info.deleted:
-        facts.append(
-            "Linux reports a deleted executable image; updates and anonymous executable mappings can also cause this."
-        )
-    if info.mode is not None and info.mode & stat.S_IWOTH:
-        facts.append("On-disk executable is world-writable; this is not proof of malicious execution.")
-    if info.signature == "verification_failed":
-        facts.append(
-            "On-disk code-signature verification failed; unsigned or ad-hoc development code may be legitimate."
-        )
-    return facts
-
+    facts = (
+        (
+            _temporary_path(path),
+            "Executable path is in a temporary directory; legitimate development and installers also use these.",
+        ),
+        (
+            bool(info.deleted),
+            "Linux reports a deleted executable image; updates and anonymous executable mappings can also cause this.",
+        ),
+        (
+            _world_writable(info),
+            "On-disk executable is world-writable; this is not proof of malicious execution.",
+        ),
+        (
+            info.signature == "verification_failed",
+            "On-disk code-signature verification failed; unsigned or ad-hoc development code may be legitimate.",
+        ),
+    )
+    return [message for present, message in facts if present]
 
 def _file_coverage(settings: CollectionSettings) -> dict[str, Coverage]:
     return {

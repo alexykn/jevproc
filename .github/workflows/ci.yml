@@ -39,6 +39,21 @@ jobs:
         run: uv run --no-sync ruff check .
       - name: Type-check project
         run: uv run --no-sync ty check
+      - name: Radon complexity budget
+        shell: bash
+        run: |
+          report="$(uv run --no-sync radon cc src -s -a)"
+          printf '%s\n' "$report"
+          average="$(printf '%s\n' "$report" | sed -nE 's/.*Average complexity: [A-F] \(([0-9.]+)\).*/\1/p')"
+          uv run --no-sync python - "$average" <<'PY'
+          import sys
+
+          average = float(sys.argv[1])
+          limit = 2.25
+          if average > limit:
+              raise SystemExit(f"Radon average complexity {average:.4f} exceeds budget {limit:.2f}")
+          print(f"Radon average complexity {average:.4f} <= {limit:.2f}")
+          PY
       - name: Contract and collector tests (no API keys)
         run: uv run --no-sync pytest -q
       - name: Offline behavior fingerprints (synthetic HTTP only)

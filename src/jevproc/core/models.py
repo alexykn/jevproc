@@ -1,5 +1,6 @@
 """Versioned, bounded snapshot/report contracts. Unknown is distinct from absent."""
 
+from operator import attrgetter
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -126,7 +127,8 @@ class Snapshot(Record):
 
     @model_validator(mode="after")
     def unique_processes(self) -> "Snapshot":
-        if len({p.pid for p in self.processes}) != len(self.processes):
+        unique = len(set(map(attrgetter("pid"), self.processes))) == len(self.processes)
+        if not unique:
             raise ValueError("snapshot contains duplicate PIDs")
         return self
 

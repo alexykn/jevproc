@@ -76,53 +76,67 @@ def _settings(args: argparse.Namespace) -> Config:
     return Config.model_validate(data)
 
 
+def _labelled_cases(cases: list[CorpusCase], labels: list[str]) -> list[CorpusCase]:
+    selected = set(labels)
+    return cases if not selected else [case for case in cases if case.label in selected]
+
+
 def _selected(args: argparse.Namespace, corpus: Corpus) -> list[CorpusCase]:
-    cases = selected_cases(corpus, args.case)
-    if args.label:
-        labels = set(args.label)
-        cases = [case for case in cases if case.label in labels]
+    cases = _labelled_cases(selected_cases(corpus, args.case), args.label)
     if not cases:
         raise ValueError("corpus selection is empty")
     return cases
 
 
+def _jpr_rule(config: Config):
+    return next((rule for rule in config.active_rules if rule.id == "JPR001"), None)
+
+
 def _policy(config: Config) -> tuple[float, float]:
-    rule = next((rule for rule in config.active_rules if rule.id == "JPR001"), None)
+    rule = _jpr_rule(config)
     if rule is None or not isinstance(rule.question, NoulQuestion):
         raise ConfigError("--calibrate requires active Noul rule JPR001")
     return rule.policy.uncertain_at, rule.policy.warning_at
+
+
+def _safe_error(message: str) -> int:
+    Terminal(sys.stderr, color="never").line(message)
+    return 2
+
+
+def _corpus_failure(exc: BaseException) -> int | None:
+    handlers = (
+        ((KeyboardInterrupt,), lambda _exc: 130),
+        ((BrokenPipeError,), lambda _exc: 0),
+        ((ConfigError, JevError, ValueError), lambda error: _safe_error(f"jevproc-test: {error}")),
+        (
+            (ValidationError,),
+            lambda _exc: _safe_error(
+                "jevproc-test: corpus/config validation failed; no classification result is implied"
+            ),
+        ),
+    )
+    handler = next((handler for types, handler in handlers if isinstance(exc, types)), None)
+    return handler(exc) if handler is not None else None
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     try:
         return asyncio.run(_run(args))
-    except KeyboardInterrupt:
-        return 130
-    except BrokenPipeError:
-        return 0
-    except (ConfigError, JevError, ValueError) as exc:
-        Terminal(sys.stderr, color="never").line(f"jevproc-test: {exc}")
-        return 2
-    except ValidationError:
-        Terminal(sys.stderr, color="never").line(
-            "jevproc-test: corpus/config validation failed; no classification result is implied"
-        )
-        return 2
+    except BaseException as exc:
+        code = _corpus_failure(exc)
+        if code is None:
+            raise
+        return code
 
 
-async def _run(args: argparse.Namespace) -> int:
-    corpus = load_corpus()
-    cases = _selected(args, corpus)
-    if args.list:
-        render_case_list(cases, sys.stdout, args.format)
-        return 0
-    config = _settings(args)
-    uncertain, warning = _policy(config)
-    if args.calibrate:
-        require_calibration_labels(cases)
-    runs = args.runs or (3 if args.calibrate else 1)
-    reporter = CorpusReporter(
+def _run_count(args: argparse.Namespace) -> int:
+    return args.runs or (3 if args.calibrate else 1)
+
+
+def _corpus_reporter(args: argparse.Namespace, config: Config, cases: list[CorpusCase], runs: int) -> CorpusReporter:
+    return CorpusReporter(
         sys.stdout,
         model=config.jev.model,
         cases=len(cases),
@@ -131,11 +145,19 @@ async def _run(args: argparse.Namespace) -> int:
         format_name=args.format,
         color=args.color,
     )
-    reporter.start()
+
+
+async def _experiment(
+    config: Config,
+    corpus: Corpus,
+    cases: list[CorpusCase],
+    runs: int,
+    reporter: CorpusReporter,
+):
     api_key = os.environ.get("TYPESAFE_API_KEY", "")
     origin = os.environ.get("TYPESAFE_BASE_URL", "https://api.typesafe.ai")
     async with JevClient(config.jev, api_key, base_url=origin) as client:
-        experiment = await run_corpus(
+        return await run_corpus(
             Engine(config, client),
             snapshot_for(corpus, cases),
             cases,
@@ -143,6 +165,23 @@ async def _run(args: argparse.Namespace) -> int:
             on_sample=reporter.sample,
             on_run=reporter.run_finished,
         )
+
+
+async def _run(args: argparse.Namespace) -> int:
+    corpus = load_corpus()
+    cases = _selected(args, corpus)
+    if args.list:
+        render_case_list(cases, sys.stdout, args.format)
+        return 0
+
+    config = _settings(args)
+    uncertain, warning = _policy(config)
+    if args.calibrate:
+        require_calibration_labels(cases)
+    runs = _run_count(args)
+    reporter = _corpus_reporter(args, config, cases, runs)
+    reporter.start()
+    experiment = await _experiment(config, corpus, cases, runs, reporter)
     calibration = experiment.calibrate(uncertain, warning) if args.calibrate else None
     reporter.finish(experiment, calibration)
     return experiment.exit_code(args.calibrate)

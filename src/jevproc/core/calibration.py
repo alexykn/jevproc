@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import math
 import statistics
+from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
-from itertools import pairwise
+from itertools import combinations, pairwise
 from typing import Any, Iterable
 
 from jevproc.core.corpus import CorpusCase
@@ -98,53 +100,111 @@ def _rate(matches: int, total: int) -> float:
     return matches / total if total else 0.0
 
 
+_CALIBRATION_LABELS = ("benign", "ambiguous", "suspicious")
+_TARGET_BAND = {
+    "benign": "benign",
+    "ambiguous": "ambiguous",
+    "suspicious": "warning",
+}
+
+
+def _predicted_band(score: float, uncertain_at: float, warning_at: float) -> str:
+    bands = (
+        (score >= warning_at, "warning"),
+        (score >= uncertain_at, "ambiguous"),
+    )
+    return next((band for matches, band in bands if matches), "benign")
+
+
+def _labelled_observations(observations: Iterable[tuple[str, float]]) -> list[tuple[str, float]]:
+    return [(label, score) for label, score in observations if label != "unknown"]
+
+
+def _validate_calibration_labels(observations: list[tuple[str, float]]) -> None:
+    unsupported = {label for label, _ in observations}.difference(_CALIBRATION_LABELS)
+    if unsupported:
+        raise ValueError(f"unsupported calibration label: {min(unsupported)}")
+
+
+def _labelled_predictions(
+    observations: Iterable[tuple[str, float]],
+    uncertain_at: float,
+    warning_at: float,
+) -> list[tuple[str, str]]:
+    labelled = _labelled_observations(observations)
+    _validate_calibration_labels(labelled)
+    return [(label, _predicted_band(score, uncertain_at, warning_at)) for label, score in labelled]
+
+
+def _pair_counts(predictions: list[tuple[str, str]]) -> tuple[Counter[str], Counter[tuple[str, str]]]:
+    return Counter(label for label, _ in predictions), Counter(predictions)
+
+
+@dataclass(frozen=True)
+class _ObservationCounts:
+    totals: Counter[str]
+    pairs: Counter[tuple[str, str]]
+
+    @classmethod
+    def from_predictions(cls, predictions: list[tuple[str, str]]) -> _ObservationCounts:
+        totals, pairs = _pair_counts(predictions)
+        return cls(totals, pairs)
+
+    def correct(self, label: str) -> int:
+        return self.pairs[(label, _TARGET_BAND[label])]
+
+    def total(self, label: str) -> int:
+        return self.totals[label]
+
+    @property
+    def benign_false_positive(self) -> int:
+        return self.total("benign") - self.pairs[("benign", "benign")]
+
+    @property
+    def benign_warning(self) -> int:
+        return self.pairs[("benign", "warning")]
+
+    @property
+    def suspicious_surface(self) -> int:
+        return self.pairs[("suspicious", "ambiguous")] + self.pairs[("suspicious", "warning")]
+
+    @property
+    def sample_count(self) -> int:
+        return sum(self.totals.values())
+
+
+def _valid_threshold_pair(uncertain_at: float, warning_at: float) -> bool:
+    return 0 <= uncertain_at < warning_at <= 1
+
+
 def _evaluate_observations(
     observations: Iterable[tuple[str, float]],
     uncertain_at: float,
     warning_at: float,
 ) -> PairMetrics:
-    if not 0 <= uncertain_at < warning_at <= 1:
+    if not _valid_threshold_pair(uncertain_at, warning_at):
         raise ValueError("candidate thresholds must satisfy 0 <= uncertain < warning <= 1")
 
-    totals = {"benign": 0, "ambiguous": 0, "suspicious": 0}
-    correct = {"benign": 0, "ambiguous": 0, "suspicious": 0}
-    benign_fp = benign_warning = suspicious_surface = 0
-
-    for label, score in observations:
-        if label == "unknown":
-            continue
-        if label not in totals:
-            raise ValueError(f"unsupported calibration label: {label}")
-        totals[label] += 1
-        predicted = "warning" if score >= warning_at else "ambiguous" if score >= uncertain_at else "benign"
-        target = {
-            "benign": "benign",
-            "ambiguous": "ambiguous",
-            "suspicious": "warning",
-        }[label]
-        correct[label] += predicted == target
-        if label == "benign":
-            benign_fp += predicted != "benign"
-            benign_warning += predicted == "warning"
-        elif label == "suspicious":
-            suspicious_surface += predicted in {"ambiguous", "warning"}
-
-    recalls = [_rate(correct[label], totals[label]) for label in ("benign", "ambiguous", "suspicious")]
-    total = sum(totals.values())
+    counts = _ObservationCounts.from_predictions(
+        _labelled_predictions(observations, uncertain_at, warning_at)
+    )
+    correct = {label: counts.correct(label) for label in _CALIBRATION_LABELS}
+    recalls = [_rate(correct[label], counts.total(label)) for label in _CALIBRATION_LABELS]
+    benign_total = counts.total("benign")
+    suspicious_total = counts.total("suspicious")
     return PairMetrics(
         uncertain_at=uncertain_at,
         warning_at=warning_at,
         macro_recall=sum(recalls) / len(recalls),
-        exact_accuracy=_rate(sum(correct.values()), total),
-        benign_false_positive_rate=_rate(benign_fp, totals["benign"]),
-        benign_warning_rate=_rate(benign_warning, totals["benign"]),
-        benign_surface_rate=_rate(benign_fp, totals["benign"]),
-        benign_hard_warning_rate=_rate(benign_warning, totals["benign"]),
-        ambiguous_band_recall=_rate(correct["ambiguous"], totals["ambiguous"]),
-        suspicious_surface_recall=_rate(suspicious_surface, totals["suspicious"]),
-        suspicious_warning_recall=_rate(correct["suspicious"], totals["suspicious"]),
+        exact_accuracy=_rate(sum(correct.values()), counts.sample_count),
+        benign_false_positive_rate=_rate(counts.benign_false_positive, benign_total),
+        benign_warning_rate=_rate(counts.benign_warning, benign_total),
+        benign_surface_rate=_rate(counts.benign_false_positive, benign_total),
+        benign_hard_warning_rate=_rate(counts.benign_warning, benign_total),
+        ambiguous_band_recall=_rate(correct["ambiguous"], counts.total("ambiguous")),
+        suspicious_surface_recall=_rate(counts.suspicious_surface, suspicious_total),
+        suspicious_warning_recall=_rate(correct["suspicious"], suspicious_total),
     )
-
 
 def evaluate_pair(
     case_means: dict[str, float],
@@ -179,72 +239,88 @@ def evaluate_samples(
     return _evaluate_observations(observations, uncertain_at, warning_at)
 
 
+def _balanced_key(item: PairMetrics) -> tuple:
+    return (
+        item.macro_recall,
+        item.exact_accuracy,
+        -item.benign_false_positive_rate,
+        item.suspicious_warning_recall,
+        item.ambiguous_band_recall,
+        item.uncertain_at,
+        item.warning_at,
+    )
+
+
+def _conservative_key(item: PairMetrics) -> tuple:
+    return (
+        item.suspicious_warning_recall,
+        item.ambiguous_band_recall,
+        item.macro_recall,
+        -item.warning_at,
+        item.uncertain_at,
+    )
+
+
+def _warnings_first_key(item: PairMetrics) -> tuple:
+    return (
+        item.suspicious_surface_recall,
+        -item.benign_surface_rate,
+        item.suspicious_warning_recall,
+        item.uncertain_at,
+        item.ambiguous_band_recall,
+        item.macro_recall,
+        item.warning_at,
+    )
+
+
+def _recall_first_key(item: PairMetrics) -> tuple:
+    return (
+        item.benign_false_positive_rate,
+        item.benign_warning_rate,
+        -item.ambiguous_band_recall,
+        -item.macro_recall,
+        -item.uncertain_at,
+    )
+
+
+def _filtered_pairs(
+    pairs: list[PairMetrics],
+    predicate: Callable[[PairMetrics], bool],
+) -> list[PairMetrics]:
+    selected = list(filter(predicate, pairs))
+    return selected or pairs
+
+
+def _candidate_grid(observations: list[tuple[str, float]]) -> list[PairMetrics]:
+    thresholds = _thresholds(score for _, score in observations)
+    return [
+        _evaluate_observations(observations, uncertain, warning)
+        for uncertain, warning in combinations(thresholds, 2)
+    ]
+
+
 def _candidate_pairs_from_observations(
     observations: list[tuple[str, float]],
     current_uncertain: float,
     current_warning: float,
 ) -> dict[str, Any]:
-    thresholds = _thresholds(score for _, score in observations)
-    pairs = [
-        _evaluate_observations(observations, uncertain, warning)
-        for uncertain in thresholds
-        for warning in thresholds
-        if uncertain < warning
-    ]
+    pairs = _candidate_grid(observations)
     if not pairs:
         raise ValueError("not enough labelled score values to calibrate thresholds")
 
-    balanced = max(
-        pairs,
-        key=lambda item: (
-            item.macro_recall,
-            item.exact_accuracy,
-            -item.benign_false_positive_rate,
-            item.suspicious_warning_recall,
-            item.ambiguous_band_recall,
-            item.uncertain_at,
-            item.warning_at,
-        ),
-    )
-
-    zero_fp = [item for item in pairs if item.benign_false_positive_rate == 0]
+    balanced = max(pairs, key=_balanced_key)
     conservative = max(
-        zero_fp or pairs,
-        key=lambda item: (
-            item.suspicious_warning_recall,
-            item.ambiguous_band_recall,
-            item.macro_recall,
-            -item.warning_at,
-            item.uncertain_at,
-        ),
+        _filtered_pairs(pairs, lambda item: item.benign_false_positive_rate == 0),
+        key=_conservative_key,
     )
-
-    no_hard_benign = [item for item in pairs if item.benign_hard_warning_rate == 0]
     warnings_first = max(
-        no_hard_benign or pairs,
-        key=lambda item: (
-            item.suspicious_surface_recall,
-            -item.benign_surface_rate,
-            item.suspicious_warning_recall,
-            item.uncertain_at,
-            item.ambiguous_band_recall,
-            item.macro_recall,
-            item.warning_at,
-        ),
+        _filtered_pairs(pairs, lambda item: item.benign_hard_warning_rate == 0),
+        key=_warnings_first_key,
     )
-
-    high_recall = [item for item in pairs if item.suspicious_warning_recall >= 0.95]
     recall_first = min(
-        high_recall or pairs,
-        key=lambda item: (
-            item.benign_false_positive_rate,
-            item.benign_warning_rate,
-            -item.ambiguous_band_recall,
-            -item.macro_recall,
-            -item.uncertain_at,
-        ),
+        _filtered_pairs(pairs, lambda item: item.suspicious_warning_recall >= 0.95),
+        key=_recall_first_key,
     )
-
     current = _evaluate_observations(observations, current_uncertain, current_warning)
     return {
         "current": current.as_dict(),
@@ -253,7 +329,6 @@ def _candidate_pairs_from_observations(
         "warnings_first": warnings_first.as_dict(),
         "high_suspicious_recall": recall_first.as_dict(),
     }
-
 
 def candidate_pairs(
     case_means: dict[str, float],
@@ -292,6 +367,86 @@ def sample_candidate_pairs(
     )
 
 
+def _case_calibration_data(
+    cases: list[CorpusCase],
+    samples: dict[str, list[float]],
+) -> tuple[dict[str, dict[str, Any]], dict[str, list[float]], dict[str, float]]:
+    case_stats: dict[str, dict[str, Any]] = {}
+    label_samples: dict[str, list[float]] = {label: [] for label in (*_CALIBRATION_LABELS, "unknown")}
+    case_means: dict[str, float] = {}
+    for case in cases:
+        values = samples.get(case.id, [])
+        case_stats[case.id] = {"label": case.label, "tier": case.tier, "tags": case.tags, **describe(values)}
+        if values:
+            label_samples[case.label].extend(values)
+            case_means[case.id] = statistics.fmean(values)
+    return case_stats, label_samples, case_means
+
+
+def _label_means(
+    cases: list[CorpusCase],
+    case_means: dict[str, float],
+) -> dict[str, list[float]]:
+    return {
+        label: [case_means[case.id] for case in cases if case.label == label and case.id in case_means]
+        for label in _CALIBRATION_LABELS
+    }
+
+
+def _maximum(values: list[float]) -> float | None:
+    return max(values) if values else None
+
+
+def _minimum(values: list[float]) -> float | None:
+    return min(values) if values else None
+
+
+def _gap(lower: list[float], upper: list[float]) -> float | None:
+    return min(upper) - max(lower) if lower and upper else None
+
+
+def _separation(
+    means: dict[str, list[float]],
+    samples: dict[str, list[float]],
+) -> dict[str, float | None]:
+    benign_means = means["benign"]
+    ambiguous_means = means["ambiguous"]
+    suspicious_means = means["suspicious"]
+    benign_samples = samples["benign"]
+    ambiguous_samples = samples["ambiguous"]
+    suspicious_samples = samples["suspicious"]
+    return {
+        "max_benign_mean": _maximum(benign_means),
+        "min_ambiguous_mean": _minimum(ambiguous_means),
+        "min_suspicious_mean": _minimum(suspicious_means),
+        "benign_to_ambiguous_gap": _gap(benign_means, ambiguous_means),
+        "benign_to_suspicious_gap": _gap(benign_means, suspicious_means),
+        "max_benign_sample": _maximum(benign_samples),
+        "min_ambiguous_sample": _minimum(ambiguous_samples),
+        "min_suspicious_sample": _minimum(suspicious_samples),
+        "benign_to_ambiguous_sample_gap": _gap(benign_samples, ambiguous_samples),
+        "benign_to_suspicious_sample_gap": _gap(benign_samples, suspicious_samples),
+    }
+
+
+def _unstable_case(case: CorpusCase, stats: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": case.id,
+        "label": case.label,
+        "mean": stats.get("mean"),
+        "stdev": stats.get("stdev"),
+        "min": stats.get("min"),
+        "max": stats.get("max"),
+        "span": stats["max"] - stats["min"],
+    }
+
+
+def _unstable_cases(cases: list[CorpusCase], case_stats: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    observed = (case for case in cases if case_stats[case.id].get("n", 0))
+    rows = [_unstable_case(case, case_stats[case.id]) for case in observed]
+    return sorted(rows, key=lambda item: item["span"], reverse=True)
+
+
 def calibration_report(
     cases: list[CorpusCase],
     samples: dict[str, list[float]],
@@ -300,101 +455,21 @@ def calibration_report(
     current_warning: float,
 ) -> dict[str, Any]:
     case_map = {case.id: case for case in cases}
-    case_stats: dict[str, dict[str, Any]] = {}
-    label_samples: dict[str, list[float]] = {
-        "benign": [],
-        "ambiguous": [],
-        "suspicious": [],
-        "unknown": [],
-    }
-    case_means: dict[str, float] = {}
-
-    for case in cases:
-        values = samples.get(case.id, [])
-        stats = describe(values)
-        case_stats[case.id] = {
-            "label": case.label,
-            "tier": case.tier,
-            "tags": case.tags,
-            **stats,
-        }
-        if values:
-            label_samples[case.label].extend(values)
-            case_means[case.id] = statistics.fmean(values)
-
-    distributions = {label: describe(values) for label, values in label_samples.items()}
-    candidates = sample_candidate_pairs(
-        samples,
-        case_map,
-        current_uncertain=current_uncertain,
-        current_warning=current_warning,
-    )
-    case_mean_candidates = candidate_pairs(
-        case_means,
-        case_map,
-        current_uncertain=current_uncertain,
-        current_warning=current_warning,
-    )
-
-    benign_means = [case_means[c.id] for c in cases if c.label == "benign" and c.id in case_means]
-    ambiguous_means = [case_means[c.id] for c in cases if c.label == "ambiguous" and c.id in case_means]
-    suspicious_means = [case_means[c.id] for c in cases if c.label == "suspicious" and c.id in case_means]
-    benign_samples = label_samples["benign"]
-    ambiguous_samples = label_samples["ambiguous"]
-    suspicious_samples = label_samples["suspicious"]
-
-    separation = {
-        "max_benign_mean": max(benign_means) if benign_means else None,
-        "min_ambiguous_mean": min(ambiguous_means) if ambiguous_means else None,
-        "min_suspicious_mean": min(suspicious_means) if suspicious_means else None,
-        "benign_to_ambiguous_gap": (
-            min(ambiguous_means) - max(benign_means) if benign_means and ambiguous_means else None
-        ),
-        "benign_to_suspicious_gap": (
-            min(suspicious_means) - max(benign_means) if benign_means and suspicious_means else None
-        ),
-        "max_benign_sample": max(benign_samples) if benign_samples else None,
-        "min_ambiguous_sample": min(ambiguous_samples) if ambiguous_samples else None,
-        "min_suspicious_sample": min(suspicious_samples) if suspicious_samples else None,
-        "benign_to_ambiguous_sample_gap": (
-            min(ambiguous_samples) - max(benign_samples) if benign_samples and ambiguous_samples else None
-        ),
-        "benign_to_suspicious_sample_gap": (
-            min(suspicious_samples) - max(benign_samples) if benign_samples and suspicious_samples else None
-        ),
-    }
-
-    unstable = sorted(
-        (
-            {
-                "id": case.id,
-                "label": case.label,
-                "mean": case_stats[case.id].get("mean"),
-                "stdev": case_stats[case.id].get("stdev"),
-                "min": case_stats[case.id].get("min"),
-                "max": case_stats[case.id].get("max"),
-                "span": (
-                    case_stats[case.id]["max"] - case_stats[case.id]["min"] if case_stats[case.id].get("n", 0) else None
-                ),
-            }
-            for case in cases
-            if case_stats[case.id].get("n", 0)
-        ),
-        key=lambda item: item["span"] or 0,
-        reverse=True,
-    )
-
+    case_stats, label_samples, case_means = _case_calibration_data(cases, samples)
+    candidates = sample_candidate_pairs(samples, case_map, current_uncertain, current_warning)
+    case_mean_candidates = candidate_pairs(case_means, case_map, current_uncertain, current_warning)
     return {
-        "distributions": distributions,
+        "distributions": {label: describe(values) for label, values in label_samples.items()},
         "cases": case_stats,
-        "separation": separation,
+        "separation": _separation(_label_means(cases, case_means), label_samples),
         "candidates": candidates,
         "case_mean_candidates": case_mean_candidates,
         "candidate_basis": "individual_samples",
-        "most_unstable": unstable[:10],
+        "most_unstable": _unstable_cases(cases, case_stats)[:10],
         "note": (
             "Operational candidate thresholds use individual repeated-run samples. "
             "Case-mean candidates are retained only as a stability view. "
             "All candidates are descriptive synthetic-corpus operating points and are never applied automatically."
         ),
     }
+

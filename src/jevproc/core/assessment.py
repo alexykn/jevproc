@@ -1,6 +1,7 @@
 """Local, testable warning policy. Model confidence is not threat severity."""
 
 from dataclasses import dataclass
+from functools import singledispatch
 
 from jevproc.core.config import Policy, Rule
 from jevproc.core.models import Assessment, Process, RuleResult, Status
@@ -20,30 +21,45 @@ def evidence_limited(rule: Rule, process: Process) -> bool:
     return any(process.coverage.get(source) != "observed" for source in sources)
 
 
+def _missing_sources(rule: Rule, process: Process) -> list[str]:
+    available = {"observed", "partial", "truncated"}
+    return [source for source in rule.requires if process.coverage.get(source) not in available]
+
+
+def _missing_message(missing: list[str], process: Process) -> str:
+    details = ", ".join(f"{source}={process.coverage.get(source, 'unavailable')}" for source in missing)
+    return f"Not evaluated: {details}."
+
+
 def skipped_rule(rule: Rule, process: Process) -> RuleResult:
-    missing = [s for s in rule.requires if process.coverage.get(s) not in {"observed", "partial", "truncated"}]
-    if missing:
-        details = ", ".join(f"{s}={process.coverage.get(s, 'unavailable')}" for s in missing)
-        return RuleResult(rule=rule.id, title=rule.title, status="unknown", message=f"Not evaluated: {details}.")
-    return RuleResult(
-        rule=rule.id,
-        title=rule.title,
-        status="not_applicable",
-        message="No relevant evidence items were observed; this is not proof of absence.",
+    missing = _missing_sources(rule, process)
+    status: Status = "unknown" if missing else "not_applicable"
+    message = (
+        _missing_message(missing, process)
+        if missing
+        else "No relevant evidence items were observed; this is not proof of absence."
     )
+    return RuleResult(rule=rule.id, title=rule.title, status=status, message=message)
+
+
+_LIMITED_SUFFIX = " Relevant evidence is partial or unavailable; this finding remains uncertain."
+
+
+def _decision_message(rule: Rule, status: Status, limited: bool) -> str:
+    visible = status in VISIBLE
+    base = {False: "", True: rule.message}[visible]
+    suffix = {(True, True): _LIMITED_SUFFIX}.get((limited, visible), "")
+    return base + suffix
 
 
 def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
     limited = evidence_limited(rule, process)
     decision = _decide(rule.policy, answer, limited)
-    message = rule.message if decision.status in VISIBLE else ""
-    if limited and decision.status in VISIBLE:
-        message += " Relevant evidence is partial or unavailable; this finding remains uncertain."
     return RuleResult(
         rule=rule.id,
         title=rule.title,
         status=decision.status,
-        message=message,
+        message=_decision_message(rule, decision.status, limited),
         value=decision.value,
         probability=decision.probability,
         confidence=decision.confidence,
@@ -51,14 +67,24 @@ def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
     )
 
 
+_AGGREGATE_PRIORITY: tuple[Status, ...] = (
+    "warning",
+    "uncertain_warning",
+    "unknown",
+    "probably_legitimate",
+    "no_warning",
+)
+
+
+_AGGREGATE_RANK = {status: index for index, status in enumerate(_AGGREGATE_PRIORITY)}
+
+
 def aggregate(rules: list[RuleResult]) -> Status:
-    statuses = {r.status for r in rules}
-    for status in ("warning", "uncertain_warning", "unknown"):
-        if status in statuses:
-            return status
-    if "probably_legitimate" in statuses:
-        return "probably_legitimate"
-    return "no_warning" if "no_warning" in statuses else "not_evaluated"
+    return min(
+        (result.status for result in rules),
+        key=lambda status: _AGGREGATE_RANK.get(status, len(_AGGREGATE_PRIORITY)),
+        default="not_evaluated",
+    )
 
 
 def assess(process: Process, rules: list[Rule], answers: dict[str, Answer], model: str, cached: bool) -> Assessment:
@@ -79,48 +105,83 @@ class _Decision:
     confidence: float | None = None
 
 
+def _first_status(options: tuple[tuple[bool, Status], ...], fallback: Status) -> Status:
+    return next((status for matches, status in options if matches), fallback)
+
+
 def _noul_decision(policy: Policy, answer: NoulAnswer, limited: bool) -> _Decision:
     value = answer.noul
-    if value >= policy.warning_at and not limited:
-        status: Status = "warning"
-    elif value >= policy.uncertain_at:
-        status = "uncertain_warning"
-    else:
-        status = "unknown" if limited else "probably_legitimate"
+    status = _first_status(
+        (
+            (all((value >= policy.warning_at, not limited)), "warning"),
+            (value >= policy.uncertain_at, "uncertain_warning"),
+        ),
+        "unknown" if limited else "probably_legitimate",
+    )
     return _Decision(status, value, probability=value)
 
 
 def _choice_decision(policy: Policy, answer: ChoiceAnswer, limited: bool) -> _Decision:
     probability = answer.probabilities[answer.choice]
-    confident = probability >= policy.warning_at and answer.confidence >= policy.confidence_min and not limited
+    confident = all(
+        (
+            probability >= policy.warning_at,
+            answer.confidence >= policy.confidence_min,
+            not limited,
+        )
+    )
     selected_risk = answer.choice in policy.warning_choices
-    # Provider supports need not sum to one: never synthesize a summed risk.
     risk_support = max(answer.probabilities[label] for label in policy.warning_choices)
-    if selected_risk and confident:
-        status: Status = "warning"
-    elif selected_risk or risk_support >= policy.uncertain_at:
-        status = "uncertain_warning"
-    elif answer.choice in policy.legitimate_choices and confident:
-        status = "probably_legitimate"
-    else:
-        status = "unknown"
+    status = _first_status(
+        (
+            (all((selected_risk, confident)), "warning"),
+            (any((selected_risk, risk_support >= policy.uncertain_at)), "uncertain_warning"),
+            (all((answer.choice in policy.legitimate_choices, confident)), "probably_legitimate"),
+        ),
+        "unknown",
+    )
     return _Decision(status, answer.choice, probability, answer.confidence)
 
 
 def _score_decision(policy: Policy, answer: ScoreAnswer, limited: bool) -> _Decision:
-    if answer.score >= policy.score_warning_at and answer.confidence >= policy.confidence_min and not limited:
-        status: Status = "warning"
-    elif answer.score >= policy.score_uncertain_at:
-        status = "uncertain_warning"
-    else:
-        status = "unknown" if answer.confidence < policy.confidence_min else "no_warning"
+    status = _first_status(
+        (
+            (
+                all(
+                    (
+                        answer.score >= policy.score_warning_at,
+                        answer.confidence >= policy.confidence_min,
+                        not limited,
+                    )
+                ),
+                "warning",
+            ),
+            (answer.score >= policy.score_uncertain_at, "uncertain_warning"),
+        ),
+        "unknown" if answer.confidence < policy.confidence_min else "no_warning",
+    )
     return _Decision(status, answer.score, confidence=answer.confidence)
 
 
-def _decide(policy: Policy, answer: Answer, limited: bool) -> _Decision:
-    if isinstance(answer, NoulAnswer):
-        return _noul_decision(policy, answer, limited)
-    if isinstance(answer, ChoiceAnswer):
-        return _choice_decision(policy, answer, limited)
-    assert isinstance(answer, ScoreAnswer)
+@singledispatch
+def _answer_decision(answer: Answer, _policy: Policy, _limited: bool) -> _Decision:
+    raise TypeError(f"unsupported answer type: {type(answer).__name__}")
+
+
+@_answer_decision.register
+def _noul_answer_decision(answer: NoulAnswer, policy: Policy, limited: bool) -> _Decision:
+    return _noul_decision(policy, answer, limited)
+
+
+@_answer_decision.register
+def _choice_answer_decision(answer: ChoiceAnswer, policy: Policy, limited: bool) -> _Decision:
+    return _choice_decision(policy, answer, limited)
+
+
+@_answer_decision.register
+def _score_answer_decision(answer: ScoreAnswer, policy: Policy, limited: bool) -> _Decision:
     return _score_decision(policy, answer, limited)
+
+
+def _decide(policy: Policy, answer: Answer, limited: bool) -> _Decision:
+    return _answer_decision(answer, policy, limited)

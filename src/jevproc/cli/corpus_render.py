@@ -9,20 +9,19 @@ from jevproc.core.experiments import CorpusExperiment
 from jevproc.core.models import Assessment, Report
 
 
+def _rule_answer_summary(rule) -> str:
+    answer = rule.answer
+    formatters = {
+        "noul": lambda: f"{rule.rule}=noul:{answer['noul']:.3f}",
+        "choice": lambda: f"{rule.rule}={answer['choice']}",
+        "score": lambda: f"{rule.rule}=score:{answer['score']:.3f}",
+    }
+    formatter = formatters.get(answer.get("type"))
+    return formatter() if formatter is not None else f"{rule.rule}={rule.status}"
+
+
 def _answer_summary(assessment: Assessment) -> str:
-    parts = []
-    for rule in assessment.rules:
-        answer = rule.answer
-        if answer.get("type") == "noul":
-            value = f"{rule.rule}=noul:{answer['noul']:.3f}"
-        elif answer.get("type") == "choice":
-            value = f"{rule.rule}={answer['choice']}"
-        elif answer.get("type") == "score":
-            value = f"{rule.rule}=score:{answer['score']:.3f}"
-        else:
-            value = f"{rule.rule}={rule.status}"
-        parts.append(value)
-    return " ".join(parts)
+    return " ".join(_rule_answer_summary(rule) for rule in assessment.rules)
 
 
 def _fmt_stats(stats: dict[str, Any]) -> str:
@@ -50,21 +49,26 @@ def _fmt_pair(name: str, pair: dict[str, float]) -> str:
 _PAIR_ORDER = ("current", "warnings_first", "balanced", "zero_benign_fp", "high_suspicious_recall")
 
 
+def _case_row(case: CorpusCase) -> dict[str, Any]:
+    keys = ("id", "label", "tier", "tags", "expected_statuses", "description")
+    return {key: getattr(case, key) for key in keys}
+
+
+def _case_tsv(row: dict[str, Any]) -> str:
+    expected = "|".join(row["expected_statuses"])
+    tags = ",".join(row["tags"])
+    return (
+        f"{row['id']}\tlabel={row['label']}\ttier={row['tier']}\t"
+        f"expected={expected}\ttags={tags}\t{row['description']}\n"
+    )
+
+
 def render_case_list(cases: list[CorpusCase], stream: TextIO, format_name: str) -> None:
-    rows = [
-        {key: getattr(case, key) for key in ("id", "label", "tier", "tags", "expected_statuses", "description")}
-        for case in cases
-    ]
+    rows = list(map(_case_row, cases))
     if format_name == "json":
         stream.write(json.dumps(rows, indent=2) + "\n")
         return
-    # Keep the established --list contract: both text and jsonl select TSV listings.
-    for row in rows:
-        expected, tags = "|".join(row["expected_statuses"]), ",".join(row["tags"])
-        stream.write(
-            f"{row['id']}\tlabel={row['label']}\ttier={row['tier']}\t"
-            f"expected={expected}\ttags={tags}\t{row['description']}\n"
-        )
+    stream.writelines(_case_tsv(row) for row in rows)
 
 
 class CorpusReporter:
@@ -88,36 +92,51 @@ class CorpusReporter:
         self.stream.write(json.dumps(event, separators=(",", ":")) + "\n")
         self.stream.flush()
 
+    def _start_jsonl(self) -> None:
+        self._event({
+            "event": "start",
+            "schema_version": 2,
+            "model": self.model,
+            "cases": self.cases,
+            "runs": self.runs,
+            "calibrate": self.calibrating,
+        })
+
+    def _start_text(self) -> None:
+        mode = "calibration" if self.calibrating else "regression"
+        self.term.line(
+            f"jevproc-test  {mode}  model={self.model}  cases={self.cases}  runs={self.runs}", style="\x1b[1;36m"
+        )
+        self.term.line(
+            "Synthetic metadata only; no corpus executable, payload, or network target is run.", style="\x1b[2m"
+        )
+        calibration_note = (
+            "Calibration uses raw JPR001 Noul scores; candidate thresholds are never applied automatically."
+            if self.calibrating
+            else None
+        )
+        if calibration_note is not None:
+            self.term.line(calibration_note, style="\x1b[2m")
+        self.stream.flush()
+
     def start(self) -> None:
-        if self.format_name == "jsonl":
-            self._event({
-                "event": "start",
-                "schema_version": 2,
-                "model": self.model,
-                "cases": self.cases,
-                "runs": self.runs,
-                "calibrate": self.calibrating,
-            })
-        elif self.format_name == "text":
-            mode = "calibration" if self.calibrating else "regression"
-            self.term.line(
-                f"jevproc-test  {mode}  model={self.model}  cases={self.cases}  runs={self.runs}", style="\x1b[1;36m"
-            )
-            self.term.line(
-                "Synthetic metadata only; no corpus executable, payload, or network target is run.", style="\x1b[2m"
-            )
-            if self.calibrating:
-                self.term.line(
-                    "Calibration uses raw JPR001 Noul scores; candidate thresholds are never applied automatically.",
-                    style="\x1b[2m",
-                )
-            self.stream.flush()
+        handlers = {"jsonl": self._start_jsonl, "text": self._start_text}
+        handler = handlers.get(self.format_name)
+        if handler is not None:
+            handler()
+
+    def _sample_jsonl(self, payload: dict[str, Any], _assessment: Assessment) -> None:
+        self._event({"event": "sample", **payload})
+
+    def _sample_text_if_regression(self, payload: dict[str, Any], assessment: Assessment) -> None:
+        if not self.calibrating:
+            self._sample_text(payload, assessment)
 
     def sample(self, payload: dict[str, Any], assessment: Assessment) -> None:
-        if self.format_name == "jsonl":
-            self._event({"event": "sample", **payload})
-        elif self.format_name == "text" and not self.calibrating:
-            self._sample_text(payload, assessment)
+        handlers = {"jsonl": self._sample_jsonl, "text": self._sample_text_if_regression}
+        handler = handlers.get(self.format_name)
+        if handler is not None:
+            handler(payload, assessment)
 
     def _sample_text(self, payload: dict[str, Any], assessment: Assessment) -> None:
         marker, style = ("PASS", "\x1b[32m") if payload["passed"] else ("FAIL", "\x1b[31m")
@@ -132,39 +151,60 @@ class CorpusReporter:
             self.term.line(f"error: {assessment.error}", indent=6, style="\x1b[31m")
         self.stream.flush()
 
+    def _run_line(self, run: int, summary: dict[str, Any], scored: int) -> str:
+        return (
+            f"run {run}/{self.runs}: scored={scored}/{self.cases}  failures={summary['failed_processes']}  "
+            f"requests={summary['requests']}  input={summary['input_tokens']}  "
+            f"elapsed={summary['elapsed_seconds']:.2f}s"
+        )
+
+    @staticmethod
+    def _run_style(summary: dict[str, Any]) -> str:
+        return "\x1b[31m" if summary["failed_processes"] else "\x1b[2m"
+
     def run_finished(self, run: int, report: Report, scored: int) -> None:
         if self.format_name != "text" or not self.calibrating:
             return
-        summary = report.summary
-        failures = summary["failed_processes"]
-        self.term.line(
-            f"run {run}/{self.runs}: scored={scored}/{self.cases}  failures={failures}  "
-            f"requests={summary['requests']}  input={summary['input_tokens']}  "
-            f"elapsed={summary['elapsed_seconds']:.2f}s",
-            style="\x1b[2m" if not failures else "\x1b[31m",
-        )
+        self.term.line(self._run_line(run, report.summary, scored), style=self._run_style(report.summary))
         self.stream.flush()
 
-    def finish(self, experiment: CorpusExperiment, calibration: dict[str, Any] | None) -> None:
-        summary = experiment.summary
-        if self.format_name == "json":
-            document = {
-                "schema_version": 2,
-                "model": self.model,
-                "results": experiment.ordered_results,
-                "summary": summary,
-            }
-            if calibration is not None:
-                document["calibration"] = calibration
-            self.stream.write(json.dumps(document, indent=2) + "\n")
-        elif self.format_name == "jsonl":
-            if calibration is not None:
-                self._event({"event": "calibration", **calibration})
-            self._event({"event": "summary", **summary})
-        elif calibration is not None:
+    def _json_document(
+        self,
+        experiment: CorpusExperiment,
+        summary: dict[str, Any],
+        calibration: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        document = {
+            "schema_version": 2,
+            "model": self.model,
+            "results": experiment.ordered_results,
+            "summary": summary,
+        }
+        if calibration is not None:
+            document["calibration"] = calibration
+        return document
+
+    def _finish_jsonl(self, summary: dict[str, Any], calibration: dict[str, Any] | None) -> None:
+        if calibration is not None:
+            self._event({"event": "calibration", **calibration})
+        self._event({"event": "summary", **summary})
+
+    def _finish_text(self, summary: dict[str, Any], calibration: dict[str, Any] | None) -> None:
+        if calibration is not None:
             _render_calibration(self.term, calibration, summary)
         else:
             _render_regression_summary(self.term, summary)
+
+    def finish(self, experiment: CorpusExperiment, calibration: dict[str, Any] | None) -> None:
+        summary = experiment.summary
+        handlers = {
+            "json": lambda: self.stream.write(
+                json.dumps(self._json_document(experiment, summary, calibration), indent=2) + "\n"
+            ),
+            "jsonl": lambda: self._finish_jsonl(summary, calibration),
+            "text": lambda: self._finish_text(summary, calibration),
+        }
+        handlers[self.format_name]()
         self.stream.flush()
 
 
