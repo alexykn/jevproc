@@ -1,8 +1,9 @@
 """Packaged YAML defaults plus explicit, additive user configuration."""
 
 from importlib.resources import files
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Literal, TypeAlias
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -10,6 +11,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 
 class ConfigError(ValueError):
     pass
+
+
+ConfigMap: TypeAlias = dict[str, object]
 
 
 class UniqueSafeLoader(yaml.SafeLoader):
@@ -184,12 +188,34 @@ def default_yaml() -> str:
     return files("jevproc").joinpath("data/default.yaml").read_text(encoding="utf-8")
 
 
-def _merge(base: dict, override: dict) -> dict:
-    result = dict(base)
+def _string_mapping(value: object, message: str) -> ConfigMap:
+    if not isinstance(value, dict):
+        raise ConfigError(message)
+    result: ConfigMap = {}
+    for key, item in value.items():
+        if not isinstance(key, str):
+            raise ConfigError("configuration mapping keys must be strings")
+        result[key] = item
+    return result
+
+
+def _unique_safe_load(value: str | bytes) -> object:
+    loader = UniqueSafeLoader(value)
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
+
+
+def _merge(base: Mapping[str, object], override: Mapping[str, object]) -> ConfigMap:
+    result: ConfigMap = dict(base)
     for key, value in override.items():
         old = result.get(key)
         if isinstance(old, dict) and isinstance(value, dict):
-            result[key] = _merge(old, value)
+            result[key] = _merge(
+                _string_mapping(old, "configuration section must be a mapping"),
+                _string_mapping(value, "configuration section must be a mapping"),
+            )
         else:
             result[key] = value
     return result
@@ -198,7 +224,7 @@ def _merge(base: dict, override: dict) -> dict:
 def load_config(path: Path | None = None) -> Config:
     """Load packaged defaults and only an explicitly selected operator override."""
     try:
-        data = yaml.load(default_yaml(), Loader=UniqueSafeLoader)
+        data = _string_mapping(_unique_safe_load(default_yaml()), "packaged configuration must be a YAML mapping")
         if path is not None:
             data = _apply_override(data, _read_override(path))
         return Config.model_validate(data)
@@ -207,36 +233,43 @@ def load_config(path: Path | None = None) -> Config:
         raise ConfigError(f"invalid or unreadable configuration ({type(exc).__name__})") from exc
 
 
-def _read_override(path: Path) -> dict:
+def _read_override(path: Path) -> ConfigMap:
     with path.open("rb") as handle:
         raw = handle.read(262145)
     if len(raw) > 262144:
         raise ConfigError("configuration exceeds 256 KiB")
-    override = yaml.load(raw, Loader=UniqueSafeLoader)
-    if not isinstance(override, dict):
-        raise ConfigError("configuration must be a YAML mapping")
-    return override
+    return _string_mapping(_unique_safe_load(raw), "configuration must be a YAML mapping")
 
 
-def _patch_rules(existing: list[dict], patches: object) -> list[dict]:
-    if not isinstance(patches, list) or not all(
-        isinstance(rule, dict) and isinstance(rule.get("id"), str) for rule in patches
-    ):
+def _rule_mappings(value: object) -> list[ConfigMap]:
+    if not isinstance(value, list):
         raise ConfigError("each ruleset must contain rule mappings with an id")
-    if len({rule["id"] for rule in patches}) != len(patches):
+    rules: list[ConfigMap] = []
+    for item in value:
+        rule = _string_mapping(item, "each ruleset must contain rule mappings with an id")
+        if not isinstance(rule.get("id"), str):
+            raise ConfigError("each ruleset must contain rule mappings with an id")
+        rules.append(rule)
+    return rules
+
+
+def _patch_rules(existing: object, patches: object) -> list[ConfigMap]:
+    base_rules = _rule_mappings(existing)
+    patch_rules = _rule_mappings(patches)
+    if len({rule["id"] for rule in patch_rules}) != len(patch_rules):
         raise ConfigError("duplicate rule ID in a ruleset override")
-    by_id = {rule["id"]: rule for rule in existing}
-    for rule in patches:
-        by_id[rule["id"]] = _merge(by_id.get(rule["id"], {}), rule)
+    by_id = {str(rule["id"]): rule for rule in base_rules}
+    for rule in patch_rules:
+        rule_id = str(rule["id"])
+        by_id[rule_id] = _merge(by_id.get(rule_id, {}), rule)
     return list(by_id.values())
 
 
-def _apply_override(defaults: dict, override: dict) -> dict:
-    additions = override.get("rulesets", {})
-    if not isinstance(additions, dict):
-        raise ConfigError("rulesets must be a mapping")
-    rulesets = dict(defaults["rulesets"])
+def _apply_override(defaults: ConfigMap, override: ConfigMap) -> ConfigMap:
+    additions = _string_mapping(override.get("rulesets", {}), "rulesets must be a mapping")
+    default_rulesets = _string_mapping(defaults.get("rulesets", {}), "packaged rulesets must be a mapping")
+    rulesets: ConfigMap = dict(default_rulesets)
     for name, rules in additions.items():
-        rulesets[name] = _patch_rules(rulesets.get(name, []), rules)
+        rulesets[name] = _patch_rules(default_rulesets.get(name, []), rules)
     settings = {key: value for key, value in override.items() if key != "rulesets"}
     return _merge({**defaults, "rulesets": rulesets}, settings)
