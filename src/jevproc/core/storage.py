@@ -135,10 +135,7 @@ class AnswerCache:
     @staticmethod
     def _usable_row(row: tuple | None) -> bool:
         return bool(
-            row is not None
-            and isinstance(row[1], bytes)
-            and row[0] > time.time()
-            and len(row[1]) <= 2 * 1024 * 1024
+            row is not None and isinstance(row[1], bytes) and row[0] > time.time() and len(row[1]) <= 2 * 1024 * 1024
         )
 
     @staticmethod
@@ -192,14 +189,12 @@ def _open_cache_file(path: Path) -> tuple[int, bool]:
 
 
 def _validate_cache_info(info: os.stat_result) -> None:
-    invalid = any(
-        (
-            not stat.S_ISREG(info.st_mode),
-            info.st_uid != os.geteuid(),
-            bool(info.st_mode & 0o077),
-            info.st_nlink != 1,
-        )
-    )
+    invalid = any((
+        not stat.S_ISREG(info.st_mode),
+        info.st_uid != os.geteuid(),
+        bool(info.st_mode & 0o077),
+        info.st_nlink != 1,
+    ))
     if invalid:
         raise StorageError("cache must be a private, owned regular file with one link")
 

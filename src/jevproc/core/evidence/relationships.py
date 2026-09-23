@@ -50,6 +50,7 @@ def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
     by_parent, incomplete = _group_children(records)
     return by_parent, "partial" if incomplete else "observed"
 
+
 def _child_state(
     process: Process,
     entries: list[Child],
@@ -96,10 +97,8 @@ def _attach_children_from_index(
 ) -> list[Process]:
     if limit == 0:
         return list(map(_without_children, processes))
-    return [
-        _with_children(process, by_parent.get(process.pid, []), limit, global_coverage)
-        for process in processes
-    ]
+    return [_with_children(process, by_parent.get(process.pid, []), limit, global_coverage) for process in processes]
+
 
 def attach_children(processes: list[Process], limit: int) -> list[Process]:
     if limit == 0:
@@ -132,6 +131,7 @@ def _process_family_index() -> tuple[dict[int, list[int]], set[int]]:
     )
     return _index_family_rows(list(rows))
 
+
 def _descendants(root_pid: int, children: dict[int, list[int]]) -> list[int]:
     ordered = [root_pid]
     seen = {root_pid}
@@ -149,6 +149,7 @@ def _family_pids(root_pid: int) -> list[int]:
     if root_pid not in seen_pids and not psutil.pid_exists(root_pid):
         raise CollectionError(f"process family root PID {root_pid} exited")
     return _descendants(root_pid, children)
+
 
 def _parent_snapshot(pid: int) -> tuple[Parent, int | None]:
     proc = psutil.Process(pid)
@@ -216,6 +217,7 @@ def _child_record(
     complete = all((created is not None, executable is not None, name != "<unavailable>"))
     return ppid, child, complete
 
+
 def _selected_parent(process: Process) -> tuple[Parent, int | None] | None:
     if process.created_at is None or process.freshness != "observed":
         return None
@@ -242,6 +244,7 @@ def _resolve_parent(
     link = _parent_link(pid, by_pid, resolve_missing)
     return link if link is not None and link[0].created_at <= created_before else None
 
+
 def _next_ancestor(
     next_pid: int | None,
     created: float | None,
@@ -261,7 +264,9 @@ def _ancestry_state(process: Process, depth: int) -> tuple[list[Parent], set[int
     return [], {process.pid}, process.ppid, process.created_at, state
 
 
-def _append_ancestor(parents: list[Parent], seen: set[int], link: tuple[Parent, int | None]) -> tuple[int | None, float]:
+def _append_ancestor(
+    parents: list[Parent], seen: set[int], link: tuple[Parent, int | None]
+) -> tuple[int | None, float]:
     parent, next_pid = link
     parents.append(parent)
     seen.add(parent.pid)
@@ -282,4 +287,3 @@ def _ancestry(
 
     truncated = depth > 0 and next_pid not in (0, None)
     return parents, "truncated" if truncated else state
-

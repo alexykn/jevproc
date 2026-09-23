@@ -116,7 +116,10 @@ def _validate_score_policy(question: ScoreQuestion, policy: Policy) -> None:
 
 
 def _validate_noul_policy(policy: Policy) -> None:
-    _require(not any((policy.warning_choices, policy.legitimate_choices)), "choice labels are only supported for Choice questions")
+    _require(
+        not any((policy.warning_choices, policy.legitimate_choices)),
+        "choice labels are only supported for Choice questions",
+    )
 
 
 def _validate_question_policy(question: Question, policy: Policy) -> None:
@@ -192,11 +195,7 @@ def _active_ruleset(name: str, rules: list[Rule], ignored: set[str]) -> list[Rul
 
 def _active_rules(rulesets: dict[str, list[Rule]], ignore: list[str]) -> list[Rule]:
     ignored = set(ignore)
-    return [
-        rule
-        for name, rules in rulesets.items()
-        for rule in _active_ruleset(name, rules, ignored)
-    ]
+    return [rule for name, rules in rulesets.items() for rule in _active_ruleset(name, rules, ignored)]
 
 
 class Config(Settings):

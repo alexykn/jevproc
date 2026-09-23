@@ -191,7 +191,9 @@ def _group_sockets(sockets) -> dict[int, list[Connection]]:
         if item.pid is not None:
             by_pid[item.pid].append(_socket_connection(item))
     for entries in by_pid.values():
-        entries.sort(key=lambda item: (item.protocol, item.local_address, item.local_port, item.remote_address, item.remote_port))
+        entries.sort(
+            key=lambda item: (item.protocol, item.local_address, item.local_port, item.remote_address, item.remote_port)
+        )
     return dict(by_pid)
 
 
@@ -208,15 +210,12 @@ def _socket_coverage(sockets) -> Coverage:
 
 def _psutil_network() -> tuple[dict[int, list[Connection]], Coverage]:
     sockets, state = observed(lambda: psutil.net_connections(kind="inet"), [])
-    return (
-        (_group_sockets(sockets), _socket_coverage(sockets))
-        if state == "observed"
-        else _unavailable_network(state)
-    )
+    return (_group_sockets(sockets), _socket_coverage(sockets)) if state == "observed" else _unavailable_network(state)
 
 
 def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
     return _psutil_network() if settings.connections else ({}, "not_requested")
+
 
 def _executable_changed(current: psutil.Process, expected: str | None) -> bool:
     return bool(expected and current.exe() != expected)
@@ -285,6 +284,7 @@ def _attach_network_one(
             "coverage": {**process.coverage, "connections": state},
         }
     )
+
 
 def attach_network(
     processes: list[Process],

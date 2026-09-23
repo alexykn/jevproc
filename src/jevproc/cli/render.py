@@ -66,6 +66,7 @@ def _color_enabled(stream: TextIO, color: str) -> bool:
     )
     return all(conditions)
 
+
 class Terminal:
     def __init__(self, stream: TextIO, *, width: int | None = None, color: str = "auto"):
         self.stream = stream
@@ -127,6 +128,7 @@ def _value(result: RuleResult) -> str:
     text = formatter(result) if formatter is not None else result.status.replace("_", " ")
     suffix = _VALUE_SUFFIXES.get(result.status, "") if result.answer or result.status == "uncertain_warning" else ""
     return text + suffix
+
 
 def _incomplete_warning(report: Report) -> tuple[str, str] | None:
     if not report.summary["incomplete"]:

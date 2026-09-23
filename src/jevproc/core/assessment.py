@@ -123,13 +123,11 @@ def _noul_decision(policy: Policy, answer: NoulAnswer, limited: bool) -> _Decisi
 
 def _choice_decision(policy: Policy, answer: ChoiceAnswer, limited: bool) -> _Decision:
     probability = answer.probabilities[answer.choice]
-    confident = all(
-        (
-            probability >= policy.warning_at,
-            answer.confidence >= policy.confidence_min,
-            not limited,
-        )
-    )
+    confident = all((
+        probability >= policy.warning_at,
+        answer.confidence >= policy.confidence_min,
+        not limited,
+    ))
     selected_risk = answer.choice in policy.warning_choices
     risk_support = max(answer.probabilities[label] for label in policy.warning_choices)
     status = _first_status(
@@ -147,13 +145,11 @@ def _score_decision(policy: Policy, answer: ScoreAnswer, limited: bool) -> _Deci
     status = _first_status(
         (
             (
-                all(
-                    (
-                        answer.score >= policy.score_warning_at,
-                        answer.confidence >= policy.confidence_min,
-                        not limited,
-                    )
-                ),
+                all((
+                    answer.score >= policy.score_warning_at,
+                    answer.confidence >= policy.confidence_min,
+                    not limited,
+                )),
                 "warning",
             ),
             (answer.score >= policy.score_uncertain_at, "uncertain_warning"),

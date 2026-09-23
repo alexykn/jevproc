@@ -243,6 +243,7 @@ def _scan_summary(
         "synthetic": snapshot.synthetic or mode == "demo",
     }
 
+
 def _initial_assessment(process: Process, mode: str) -> Assessment | None:
     identity_ready = all((process.freshness == "observed", process.created_at is not None))
     messages = {

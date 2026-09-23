@@ -69,9 +69,7 @@ def _clean_optional(value: str | None, limit: int, source: str, coverage: dict[s
 
 def _sanitize_file(data: dict[str, Any], process: Process, coverage: dict[str, Any]) -> None:
     file_data = data["file"]
-    file_data["signature_identifier"] = _clean_optional(
-        process.file.signature_identifier, 512, "signature", coverage
-    )
+    file_data["signature_identifier"] = _clean_optional(process.file.signature_identifier, 512, "signature", coverage)
     file_data["signature_team_id"] = _clean_optional(process.file.signature_team_id, 512, "signature", coverage)
     file_data["signature_authorities"] = [
         _clean_value(value, 512, "signature", coverage) for value in process.file.signature_authorities

@@ -185,9 +185,7 @@ def _evaluate_observations(
     if not _valid_threshold_pair(uncertain_at, warning_at):
         raise ValueError("candidate thresholds must satisfy 0 <= uncertain < warning <= 1")
 
-    counts = _ObservationCounts.from_predictions(
-        _labelled_predictions(observations, uncertain_at, warning_at)
-    )
+    counts = _ObservationCounts.from_predictions(_labelled_predictions(observations, uncertain_at, warning_at))
     correct = {label: counts.correct(label) for label in _CALIBRATION_LABELS}
     recalls = [_rate(correct[label], counts.total(label)) for label in _CALIBRATION_LABELS]
     benign_total = counts.total("benign")
@@ -205,6 +203,7 @@ def _evaluate_observations(
         suspicious_surface_recall=_rate(counts.suspicious_surface, suspicious_total),
         suspicious_warning_recall=_rate(correct["suspicious"], suspicious_total),
     )
+
 
 def evaluate_pair(
     case_means: dict[str, float],
@@ -294,8 +293,7 @@ def _filtered_pairs(
 def _candidate_grid(observations: list[tuple[str, float]]) -> list[PairMetrics]:
     thresholds = _thresholds(score for _, score in observations)
     return [
-        _evaluate_observations(observations, uncertain, warning)
-        for uncertain, warning in combinations(thresholds, 2)
+        _evaluate_observations(observations, uncertain, warning) for uncertain, warning in combinations(thresholds, 2)
     ]
 
 
@@ -329,6 +327,7 @@ def _candidate_pairs_from_observations(
         "warnings_first": warnings_first.as_dict(),
         "high_suspicious_recall": recall_first.as_dict(),
     }
+
 
 def candidate_pairs(
     case_means: dict[str, float],
@@ -472,4 +471,3 @@ def calibration_report(
             "All candidates are descriptive synthetic-corpus operating points and are never applied automatically."
         ),
     }
-

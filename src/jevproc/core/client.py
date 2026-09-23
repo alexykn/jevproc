@@ -55,12 +55,10 @@ def _origin_shape_valid(parts) -> bool:
 
 
 def _origin_scheme_valid(parts) -> bool:
-    loopback_http = all(
-        (
-            parts.scheme == "http",
-            parts.hostname in {"localhost", "127.0.0.1", "::1"},
-        )
-    )
+    loopback_http = all((
+        parts.scheme == "http",
+        parts.hostname in {"localhost", "127.0.0.1", "::1"},
+    ))
     return any((parts.scheme == "https", loopback_http))
 
 
@@ -162,6 +160,7 @@ def _machine_items(body: object) -> Iterator[tuple[str, str]]:
         value = pending.pop()
         yield from _direct_machine_items(value)
         pending.extend(reversed(_nested_values(value)))
+
 
 def _machine_fields(body: object) -> dict[str, tuple[str, ...]]:
     found: dict[str, set[str]] = {}
@@ -375,4 +374,3 @@ def _raise_permanent_failure(response: httpx.Response) -> None:
     error = _permanent_failure(response)
     if error is not None:
         raise error
-

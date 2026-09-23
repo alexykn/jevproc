@@ -105,21 +105,17 @@ def encode(value: Any) -> bytes:
 
 
 def _choice_answer_matches(question: ChoiceQuestion, answer: Answer) -> bool:
-    return isinstance(answer, ChoiceAnswer) and all(
-        (
-            answer.choice in question.criteria,
-            set(answer.probabilities) == set(question.criteria),
-        )
-    )
+    return isinstance(answer, ChoiceAnswer) and all((
+        answer.choice in question.criteria,
+        set(answer.probabilities) == set(question.criteria),
+    ))
 
 
 def _score_answer_matches(question: ScoreQuestion, answer: Answer) -> bool:
-    return isinstance(answer, ScoreAnswer) and all(
-        (
-            0 <= answer.score <= len(question.criteria) - 1,
-            set(answer.probabilities) == {str(i) for i in range(len(question.criteria))},
-        )
-    )
+    return isinstance(answer, ScoreAnswer) and all((
+        0 <= answer.score <= len(question.criteria) - 1,
+        set(answer.probabilities) == {str(i) for i in range(len(question.criteria))},
+    ))
 
 
 def _answer_matches(question: Question, answer: Answer) -> bool:

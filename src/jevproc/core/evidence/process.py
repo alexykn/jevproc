@@ -77,6 +77,7 @@ def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUs
     states = [result[1] for _, result in measurements]
     return ResourceUsage.model_validate(values), _resource_coverage(states)
 
+
 def _prime_resource_probe(pid: int) -> psutil.Process | None:
     proc, state = observed(lambda: psutil.Process(pid))
     if state != "observed":
@@ -99,6 +100,7 @@ def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dic
     _sample_resource_probes(probes, settings.resource_sample_seconds)
     return probes
 
+
 def _comm_entry(line: str) -> tuple[int, str] | None:
     pid_text, separator, command = line.strip().partition(" ")
     command = command.strip()
@@ -112,6 +114,7 @@ def _darwin_comm_table() -> dict[int, str]:
         return {}
     entries = filter(None, (_comm_entry(line) for line in result.stdout.splitlines()))
     return dict(entries)
+
 
 def _darwin_comm(pid: int) -> str | None:
     result = run_fixed("/bin/ps", ("-p", str(pid), "-o", "comm="), timeout=2)
@@ -163,9 +166,10 @@ def _process_executable_without_cmdline(
         "linux": lambda: _linux_executable(pid),
         "darwin": lambda: _darwin_executable(pid, darwin_comm),
     }
-    action = resolvers.get(sys.platform, lambda: (proc.exe() or None))
+    action = resolvers.get(sys.platform, lambda: proc.exe() or None)
     value, state = observed(action)
     return value[:8192] if state == "observed" and value else None
+
 
 def _age_band(created: float | None, now: float) -> str:
     if created is None or created > now:

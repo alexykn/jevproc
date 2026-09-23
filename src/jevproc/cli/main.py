@@ -61,9 +61,7 @@ def _present_overrides(args: argparse.Namespace, fields: tuple[tuple[str, str], 
 
 
 def _collection_limits(args: argparse.Namespace, collection: dict[str, Any]) -> None:
-    collection.update(
-        _present_overrides(args, (("max_processes", "max_processes"), ("collection_workers", "workers")))
-    )
+    collection.update(_present_overrides(args, (("max_processes", "max_processes"), ("collection_workers", "workers"))))
 
 
 def _jev_overrides(args: argparse.Namespace, jev: dict[str, Any]) -> None:
@@ -161,14 +159,13 @@ async def _cycles(args: argparse.Namespace, config: Config, engine: Engine, stdo
             return code
         await asyncio.sleep(args.watch)
 
+
 def _live_api_key(args: argparse.Namespace) -> str:
     return "synthetic-demo-key" if args.demo else os.environ.get("TYPESAFE_API_KEY", "")
 
 
 def _live_origin(args: argparse.Namespace) -> str:
-    return "https://api.typesafe.ai" if args.demo else os.environ.get(
-        "TYPESAFE_BASE_URL", "https://api.typesafe.ai"
-    )
+    return "https://api.typesafe.ai" if args.demo else os.environ.get("TYPESAFE_BASE_URL", "https://api.typesafe.ai")
 
 
 def _live_notice(args: argparse.Namespace, stderr: TextIO) -> None:
@@ -203,6 +200,7 @@ async def _run(args: argparse.Namespace, config: Config, stdout: TextIO, stderr:
             cache = _answer_cache(args, config, stack)
             return await _cycles(args, config, Engine(config, client, cache), stdout)
 
+
 def _conflict(active: object, conflicts: tuple[object, ...], message: str) -> str | None:
     return message if active and any(conflicts) else None
 
@@ -232,6 +230,7 @@ def _validate_args(p: argparse.ArgumentParser, args: argparse.Namespace) -> None
     message = next(filter(None, (validate(args) for validate in validators)), None)
     if message is not None:
         p.error(message)
+
 
 def _safe_error(message: str) -> int:
     Terminal(sys.stderr, color="never").line(message)

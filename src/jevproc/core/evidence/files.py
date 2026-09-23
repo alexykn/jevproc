@@ -57,6 +57,7 @@ def _hash_file(path: str, max_bytes: int) -> tuple[str | None, Coverage]:
     except OSError:
         return None, "unavailable"
 
+
 def _codesign_failure_matches(entry: tuple[tuple[str, ...], str, str | None], text: str) -> bool:
     phrases, _, _ = entry
     return any(phrase in text for phrase in phrases)
@@ -129,6 +130,7 @@ def _signature_metadata(text: str) -> dict[str, Any]:
         **_signature_identity(lines),
         "signature_authorities": _signature_authorities(lines),
     }
+
 
 def _display_signature_metadata(path: str, values: dict[str, Any]) -> dict[str, Any]:
     display = _codesign_display(path)
@@ -267,6 +269,7 @@ def _observations(path: str | None, info: Executable) -> list[str]:
         ),
     )
     return [message for present, message in facts if present]
+
 
 def _file_coverage(settings: CollectionSettings) -> dict[str, Coverage]:
     return {
