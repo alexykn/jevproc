@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Finish the maintainability pass by simplifying provider error traversal, top-level collection orchestration, argv redaction state, codesign/file inspection phases, and cache-file lifecycle.
+- Roll back only newly-created cache files when validation fails; never delete a pre-existing invalid cache file.
+
+
 - Separate evidence backends from parallel collection orchestration.
 - Separate synthetic experiment execution/accounting from corpus CLI rendering.
 - Clarify answer-type policy dispatch, configuration merging, redaction, and transport retry paths.
