@@ -26,6 +26,20 @@ class CorpusCase(CorpusRecord):
     process: Process
 
 
+def _unique(values: list[object]) -> bool:
+    return len(values) == len(set(values))
+
+
+def _validate_case_identity(cases: list[CorpusCase]) -> None:
+    identities = (
+        ([case.id for case in cases], "corpus case IDs must be unique"),
+        ([case.process.pid for case in cases], "corpus process PIDs must be unique"),
+    )
+    message = next((message for values, message in identities if not _unique(values)), None)
+    if message is not None:
+        raise ValueError(message)
+
+
 class Corpus(CorpusRecord):
     schema_version: Literal[1] = 1
     captured_at: float
@@ -34,10 +48,7 @@ class Corpus(CorpusRecord):
 
     @model_validator(mode="after")
     def unique_cases(self) -> "Corpus":
-        if len({case.id for case in self.cases}) != len(self.cases):
-            raise ValueError("corpus case IDs must be unique")
-        if len({case.process.pid for case in self.cases}) != len(self.cases):
-            raise ValueError("corpus process PIDs must be unique")
+        _validate_case_identity(self.cases)
         return self
 
 
@@ -45,14 +56,21 @@ def load_corpus() -> Corpus:
     return Corpus.model_validate_json(files("jevproc").joinpath("data/test-corpus.json").read_bytes())
 
 
+def _unknown_cases(corpus: Corpus, wanted: set[str]) -> set[str]:
+    return wanted.difference(case.id for case in corpus.cases)
+
+
+def _require_known_cases(corpus: Corpus, wanted: set[str]) -> None:
+    unknown = _unknown_cases(corpus, wanted)
+    if unknown:
+        raise ValueError("unknown corpus case(s): " + ", ".join(sorted(unknown)))
+
+
 def selected_cases(corpus: Corpus, selected: list[str] | None) -> list[CorpusCase]:
     if not selected:
         return list(corpus.cases)
     wanted = set(selected)
-    known = {case.id for case in corpus.cases}
-    unknown = wanted - known
-    if unknown:
-        raise ValueError("unknown corpus case(s): " + ", ".join(sorted(unknown)))
+    _require_known_cases(corpus, wanted)
     return [case for case in corpus.cases if case.id in wanted]
 
 
