@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Simplify the final Jevscan hotspots: retry driving, argv redaction stages, and cache-file preparation/resource ownership.
+
+
 - Finish the maintainability pass by simplifying provider error traversal, top-level collection orchestration, argv redaction state, codesign/file inspection phases, and cache-file lifecycle.
 - Roll back only newly-created cache files when validation fails; never delete a pre-existing invalid cache file.
 
