@@ -57,13 +57,16 @@ def _hash_file(path: str, max_bytes: int) -> tuple[str | None, Coverage]:
     except OSError:
         return None, "unavailable"
 
+def _codesign_failure_matches(entry: tuple[tuple[str, ...], str, str | None], text: str) -> bool:
+    phrases, _, _ = entry
+    return any(phrase in text for phrase in phrases)
+
+
 def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
     """Normalize known diagnostics without treating unknown failures as valid."""
     text = stderr.lower()
-    for phrases, state, issue in _CODESIGN_FAILURES:
-        if any(phrase in text for phrase in phrases):
-            return state, issue
-    return "verification_failed", "other"
+    match = next(filter(lambda entry: _codesign_failure_matches(entry, text), _CODESIGN_FAILURES), None)
+    return (match[1], match[2]) if match is not None else ("verification_failed", "other")
 
 
 def _codesign_verify(path: str) -> CommandResult | None:
@@ -112,14 +115,20 @@ def _signature_field(line: str) -> tuple[str, str] | None:
     return _identifier_field(line) or _team_field(line)
 
 
+def _signature_authorities(lines: list[str]) -> list[str]:
+    return [line.split("=", 1)[1][:512] for line in lines if line.startswith("Authority=")][:8]
+
+
+def _signature_identity(lines: list[str]) -> dict[str, str]:
+    return dict(filter(None, map(_signature_field, lines)))
+
+
 def _signature_metadata(text: str) -> dict[str, Any]:
-    values: dict[str, Any] = {}
-    authorities = [line.split("=", 1)[1][:512] for line in text.splitlines() if line.startswith("Authority=")][:8]
-    for field in filter(None, (_signature_field(line) for line in text.splitlines())):
-        key, value = field
-        values[key] = value
-    values["signature_authorities"] = authorities
-    return values
+    lines = text.splitlines()
+    return {
+        **_signature_identity(lines),
+        "signature_authorities": _signature_authorities(lines),
+    }
 
 def _display_signature_metadata(path: str, values: dict[str, Any]) -> dict[str, Any]:
     display = _codesign_display(path)
@@ -128,15 +137,17 @@ def _display_signature_metadata(path: str, values: dict[str, Any]) -> dict[str, 
     return values
 
 
-def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
-    if sys.platform != "darwin":
-        return {"signature": "unavailable"}, "unavailable"
+def _verified_signature(path: str) -> dict[str, Any] | None:
     verify = _codesign_verify(path)
     if verify is None:
-        return {"signature": "unavailable"}, "unavailable"
+        return None
     values = _verification_values(verify)
-    result = values if values["signature"] == "unsigned" else _display_signature_metadata(path, values)
-    return result, "observed"
+    return values if values["signature"] == "unsigned" else _display_signature_metadata(path, values)
+
+
+def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
+    values = _verified_signature(path) if sys.platform == "darwin" else None
+    return (values, "observed") if values is not None else ({"signature": "unavailable"}, "unavailable")
 
 
 def _valid_file_path(path: str | None) -> bool:
@@ -157,6 +168,21 @@ def _cached_file(
     return executable, dict(coverage)
 
 
+def _inspectable_content(
+    path: str,
+    metadata: Executable,
+    info: os.stat_result,
+    settings: CollectionSettings,
+    coverage: dict[str, Coverage],
+) -> Executable:
+    return _inspect_content(path, metadata, settings, coverage) if stat.S_ISREG(info.st_mode) else metadata
+
+
+def _inspection_stable(path: str, info: os.stat_result, settings: CollectionSettings) -> bool:
+    requested = settings.hashes or settings.signatures
+    return not requested or _file_unchanged(path, info)
+
+
 def _inspect_stable_file(
     path: str,
     metadata: Executable,
@@ -164,10 +190,10 @@ def _inspect_stable_file(
     settings: CollectionSettings,
     coverage: dict[str, Coverage],
 ) -> tuple[Executable, dict[str, Coverage], bool]:
-    inspected = _inspect_content(path, metadata, settings, coverage) if stat.S_ISREG(info.st_mode) else metadata
-    if (settings.hashes or settings.signatures) and not _file_unchanged(path, info):
-        return Executable(), {**_file_coverage(settings), "file": "partial"}, False
-    return inspected, coverage, True
+    inspected = _inspectable_content(path, metadata, info, settings, coverage)
+    stable = _inspection_stable(path, info, settings)
+    partial = (Executable(), {**_file_coverage(settings), "file": "partial"}, False)
+    return (inspected, coverage, True) if stable else partial
 
 
 def _remember_file(
