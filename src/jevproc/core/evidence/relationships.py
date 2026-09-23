@@ -135,10 +135,9 @@ def _descendants(root_pid: int, children: dict[int, list[int]]) -> list[int]:
     ordered = [root_pid]
     seen = {root_pid}
     for parent in ordered:
-        unseen = (child for child in sorted(children.get(parent, [])) if child not in seen)
-        for child in unseen:
-            seen.add(child)
-            ordered.append(child)
+        unseen = sorted(set(children.get(parent, ())).difference(seen))
+        seen.update(unseen)
+        ordered.extend(unseen)
     return ordered
 
 
@@ -247,9 +246,8 @@ def _next_ancestor(
     by_pid: dict[int, Process],
     resolve_missing: bool,
 ) -> tuple[Parent, int | None] | None:
-    if next_pid in (0, None) or next_pid in seen or created is None:
-        return None
-    return _resolve_parent(next_pid, created, by_pid, resolve_missing)
+    blocked = any((next_pid in (0, None), next_pid in seen, created is None))
+    return None if blocked else _resolve_parent(next_pid, created, by_pid, resolve_missing)
 
 
 def _ancestry(
