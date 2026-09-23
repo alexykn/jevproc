@@ -213,24 +213,39 @@ def _executable_changed(current: psutil.Process, expected: str | None) -> bool:
     return bool(expected and current.exe() != expected)
 
 
-def _live_identity(process: Process) -> tuple[float, str | None]:
-    current = psutil.Process(process.pid)
-    oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
-    with oneshot:
-        return current.create_time(), current.exe() if process.executable else None
+def _live_process(pid: int) -> tuple[psutil.Process | None, Coverage]:
+    return observed(lambda: psutil.Process(pid))
+
+
+def _live_created_at(current: psutil.Process) -> tuple[float | None, Coverage]:
+    return observed(current.create_time)
+
+
+def _live_executable(current: psutil.Process, expected: str | None) -> tuple[str | None, Coverage]:
+    return observed(current.exe) if expected else (None, "observed")
+
+
+def _unverified_state(state: Coverage) -> tuple[str, Coverage]:
+    return ("gone", "gone") if state == "gone" else ("unverified", "unavailable")
 
 
 def _revalidate_process(process: Process) -> tuple[str, Coverage]:
-    identity, state = observed(lambda: _live_identity(process))
+    current, state = _live_process(process.pid)
+    if state != "observed" or current is None:
+        return _unverified_state(state)
+
+    created, state = _live_created_at(current)
     if state != "observed":
-        freshness = "gone" if state == "gone" else "unverified"
-        return freshness, "gone" if state == "gone" else "unavailable"
-    created, executable = identity
-    outcomes = (
-        (created != process.created_at, ("reused", "unavailable")),
-        (bool(process.executable and executable != process.executable), ("changed", "unavailable")),
-    )
-    return next((result for changed, result in outcomes if changed), (process.freshness, "observed"))
+        return _unverified_state(state)
+    if created != process.created_at:
+        return "reused", "unavailable"
+
+    executable, state = _live_executable(current, process.executable)
+    if state != "observed":
+        return _unverified_state(state)
+    if process.executable and executable != process.executable:
+        return "changed", "unavailable"
+    return process.freshness, "observed"
 
 
 def _network_state(
