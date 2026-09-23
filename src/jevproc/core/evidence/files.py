@@ -192,7 +192,8 @@ def _inspect_stable_file(
 ) -> tuple[Executable, dict[str, Coverage], bool]:
     inspected = _inspectable_content(path, metadata, info, settings, coverage)
     stable = _inspection_stable(path, info, settings)
-    partial = (Executable(), {**_file_coverage(settings), "file": "partial"}, False)
+    partial_coverage: dict[str, Coverage] = {**_file_coverage(settings), "file": "partial"}
+    partial = (Executable(), partial_coverage, False)
     return (inspected, coverage, True) if stable else partial
 
 
