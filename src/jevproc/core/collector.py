@@ -74,33 +74,33 @@ def _file_evidence_futures(
     return {path: executor.submit(_file_info, path, settings, None) for path in paths}
 
 
+def _with_file_evidence(
+    process: Process,
+    item: tuple[Executable, dict[str, Coverage]] | None,
+) -> Process:
+    if item is None:
+        return process
+    file_info, file_coverage = item
+    file_info = file_info.model_copy(update={"deleted": process.file.deleted})
+    return process.model_copy(
+        update={
+            "file": file_info,
+            "coverage": {**process.coverage, **file_coverage},
+            "observations": _observations(process.executable, file_info),
+        }
+    )
+
+
 def _apply_file_evidence(
     processes: list[Process],
     evidence: dict[str, tuple[Executable, dict[str, Coverage]]],
 ) -> list[Process]:
     if not evidence:
         return processes
-    result = []
-    for process in processes:
-        path = process.executable
-        item = evidence.get(path) if path else None
-        if item is None:
-            result.append(process)
-            continue
-        file_info, file_coverage = item
-        # Deleted-image state belongs to the process instance, while the remaining
-        # file evidence is shared by every process referencing this inspected path.
-        file_info = file_info.model_copy(update={"deleted": process.file.deleted})
-        result.append(
-            process.model_copy(
-                update={
-                    "file": file_info,
-                    "coverage": {**process.coverage, **file_coverage},
-                    "observations": _observations(path, file_info),
-                }
-            )
-        )
-    return result
+    return [
+        _with_file_evidence(process, evidence.get(process.executable) if process.executable else None)
+        for process in processes
+    ]
 
 
 def _candidate_process_ids(pids: list[int] | None, family_pid: int | None) -> list[int]:
