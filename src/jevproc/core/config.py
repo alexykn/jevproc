@@ -50,8 +50,8 @@ class NoulQuestion(Settings):
 
     @model_validator(mode="after")
     def labels(self) -> "NoulQuestion":
-        if self.criteria is not None and set(self.criteria) != {"true", "false"}:
-            raise ValueError("Noul criteria must use quoted 'true' and 'false' keys")
+        labels = {"true", "false"} if self.criteria is None else set(self.criteria)
+        _require(labels == {"true", "false"}, "Noul criteria must use quoted 'true' and 'false' keys")
         return self
 
 
@@ -92,10 +92,8 @@ class Policy(Settings):
 
     @model_validator(mode="after")
     def ordered(self) -> "Policy":
-        if self.uncertain_at >= self.warning_at:
-            raise ValueError("uncertain_at must be below warning_at")
-        if self.score_uncertain_at >= self.score_warning_at:
-            raise ValueError("score_uncertain_at must be below score_warning_at")
+        _require(self.uncertain_at < self.warning_at, "uncertain_at must be below warning_at")
+        _require(self.score_uncertain_at < self.score_warning_at, "score_uncertain_at must be below score_warning_at")
         return self
 
 
@@ -103,7 +101,8 @@ def _validate_choice_policy(question: ChoiceQuestion, policy: Policy) -> None:
     warning = set(policy.warning_choices)
     legitimate = set(policy.legitimate_choices)
     labels = warning | legitimate
-    _require(bool(warning) and labels <= question.criteria.keys(), "Choice policy must name valid warning_choices")
+    _require(bool(warning), "Choice policy must name valid warning_choices")
+    _require(labels <= question.criteria.keys(), "Choice policy must name valid warning_choices")
     _require(warning.isdisjoint(legitimate), "warning and legitimate choices must be disjoint")
 
 
@@ -211,8 +210,7 @@ class Config(Settings):
         all_ids = _rule_ids(self.rulesets)
         _validate_rule_ids(all_ids)
         _validate_ignore(self.ignore, all_ids, self.rulesets)
-        if not self.active_rules:
-            raise ValueError("at least one active rule is required")
+        _require(bool(self.active_rules), "at least one active rule is required")
         return self
 
     @property
