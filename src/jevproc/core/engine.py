@@ -164,6 +164,38 @@ class Engine:
         )
 
 
+_LIMITED_COVERAGE = frozenset({"denied", "unavailable", "partial", "truncated", "gone"})
+
+
+def _coverage_limited(process: Process) -> bool:
+    return bool(_LIMITED_COVERAGE.intersection(process.coverage.values()))
+
+
+def _status_summary(assessments: list[Assessment]) -> dict[str, int]:
+    counts = Counter(assessment.status for assessment in assessments)
+    return {
+        "warnings": counts["warning"],
+        "uncertain_warnings": counts["uncertain_warning"],
+        "unknown": counts["unknown"],
+        "not_evaluated": counts["not_evaluated"],
+        "probably_legitimate": counts["probably_legitimate"],
+        "no_warning": counts["no_warning"],
+    }
+
+
+def _request_summary(
+    before: tuple[int, int, int, int],
+    after: tuple[int, int, int, int],
+) -> dict[str, int]:
+    return {
+        "requests": after[0] - before[0],
+        "request_attempts_total": after[0],
+        "retries": after[1] - before[1],
+        "input_tokens": after[2] - before[2],
+        "output_tokens": after[3] - before[3],
+    }
+
+
 def _scan_summary(
     snapshot: Snapshot,
     assessments: list[Assessment],
@@ -172,34 +204,18 @@ def _scan_summary(
     started: float,
     mode: str,
 ) -> dict:
-    counts = Counter(assessment.status for assessment in assessments)
     operational_failures = sum(assessment.error is not None for assessment in assessments)
     return {
         "processes": len(snapshot.processes),
         "omitted": snapshot.omitted,
         "evaluated": sum(assessment.model is not None for assessment in assessments),
-        "warnings": counts["warning"],
-        "uncertain_warnings": counts["uncertain_warning"],
-        "unknown": counts["unknown"],
-        "not_evaluated": counts["not_evaluated"],
-        "probably_legitimate": counts["probably_legitimate"],
-        "no_warning": counts["no_warning"],
-        "coverage_limited": sum(
-            any(
-                value in {"denied", "unavailable", "partial", "truncated", "gone"}
-                for value in process.coverage.values()
-            )
-            for process in snapshot.processes
-        ),
+        **_status_summary(assessments),
+        "coverage_limited": sum(map(_coverage_limited, snapshot.processes)),
         "unstable_processes": sum(process.freshness != "observed" for process in snapshot.processes),
         "failed_processes": operational_failures,
         "incomplete": bool(operational_failures or snapshot.omitted),
         "cached_processes": sum(assessment.cached for assessment in assessments),
-        "requests": after[0] - before[0],
-        "request_attempts_total": after[0],
-        "retries": after[1] - before[1],
-        "input_tokens": after[2] - before[2],
-        "output_tokens": after[3] - before[3],
+        **_request_summary(before, after),
         "elapsed_seconds": round(time.monotonic() - started, 3),
         "synthetic": snapshot.synthetic or mode == "demo",
     }
