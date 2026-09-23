@@ -94,6 +94,35 @@ class Policy(Settings):
         return self
 
 
+def _validate_choice_policy(question: ChoiceQuestion, policy: Policy) -> None:
+    warning = set(policy.warning_choices)
+    legitimate = set(policy.legitimate_choices)
+    labels = warning | legitimate
+    if not warning or not labels <= question.criteria.keys():
+        raise ValueError("Choice policy must name valid warning_choices")
+    if warning.intersection(legitimate):
+        raise ValueError("warning and legitimate choices must be disjoint")
+
+
+def _validate_score_policy(question: ScoreQuestion, policy: Policy) -> None:
+    if policy.score_warning_at > len(question.criteria) - 1:
+        raise ValueError("score threshold is outside the question scale")
+
+
+def _validate_noul_policy(policy: Policy) -> None:
+    if any((policy.warning_choices, policy.legitimate_choices)):
+        raise ValueError("choice labels are only supported for Choice questions")
+
+
+def _validate_question_policy(question: Question, policy: Policy) -> None:
+    if isinstance(question, ChoiceQuestion):
+        _validate_choice_policy(question, policy)
+    elif isinstance(question, ScoreQuestion):
+        _validate_score_policy(question, policy)
+    else:
+        _validate_noul_policy(policy)
+
+
 class Rule(Settings):
     id: str = Field(pattern=r"^[A-Z][A-Z0-9_]{2,31}$")
     title: str = Field(min_length=1, max_length=100)
@@ -104,17 +133,7 @@ class Rule(Settings):
 
     @model_validator(mode="after")
     def policy_matches_question(self) -> "Rule":
-        if isinstance(self.question, ChoiceQuestion):
-            labels = set(self.policy.warning_choices + self.policy.legitimate_choices)
-            if not self.policy.warning_choices or not labels <= self.question.criteria.keys():
-                raise ValueError("Choice policy must name valid warning_choices")
-            if set(self.policy.warning_choices) & set(self.policy.legitimate_choices):
-                raise ValueError("warning and legitimate choices must be disjoint")
-        elif isinstance(self.question, ScoreQuestion):
-            if self.policy.score_warning_at > len(self.question.criteria) - 1:
-                raise ValueError("score threshold is outside the question scale")
-        elif self.policy.warning_choices or self.policy.legitimate_choices:
-            raise ValueError("choice labels are only supported for Choice questions")
+        _validate_question_policy(self.question, self.policy)
         return self
 
 
@@ -148,6 +167,34 @@ class CacheSettings(Settings):
     max_entries: int = Field(default=4096, ge=1, le=100000)
 
 
+def _rule_ids(rulesets: dict[str, list[Rule]]) -> list[str]:
+    return [rule.id for rules in rulesets.values() for rule in rules]
+
+
+def _validate_rule_ids(all_ids: list[str]) -> None:
+    if len(all_ids) != len(set(all_ids)):
+        raise ValueError("rule IDs must be unique across rulesets")
+    if len(all_ids) > 128:
+        raise ValueError("at most 128 rules are supported")
+
+
+def _validate_ignore(ignore: list[str], all_ids: list[str], rulesets: dict[str, list[Rule]]) -> None:
+    unknown = set(ignore).difference(all_ids, rulesets.keys())
+    if unknown:
+        raise ValueError("ignore references an unknown rule or ruleset")
+
+
+def _active_rules(rulesets: dict[str, list[Rule]], ignore: list[str]) -> list[Rule]:
+    ignored = set(ignore)
+    return [
+        rule
+        for name, rules in rulesets.items()
+        if name not in ignored
+        for rule in rules
+        if rule.id not in ignored
+    ]
+
+
 class Config(Settings):
     schema_version: Literal[1] = 1
     host_context: str = Field(
@@ -161,27 +208,16 @@ class Config(Settings):
 
     @model_validator(mode="after")
     def rule_identity(self) -> "Config":
-        all_ids = [r.id for rules in self.rulesets.values() for r in rules]
-        if len(all_ids) != len(set(all_ids)):
-            raise ValueError("rule IDs must be unique across rulesets")
-        if len(all_ids) > 128:
-            raise ValueError("at most 128 rules are supported")
-        unknown = set(self.ignore) - set(all_ids) - self.rulesets.keys()
-        if unknown:
-            raise ValueError("ignore references an unknown rule or ruleset")
+        all_ids = _rule_ids(self.rulesets)
+        _validate_rule_ids(all_ids)
+        _validate_ignore(self.ignore, all_ids, self.rulesets)
         if not self.active_rules:
             raise ValueError("at least one active rule is required")
         return self
 
     @property
     def active_rules(self) -> list[Rule]:
-        return [
-            r
-            for name, rules in self.rulesets.items()
-            if name not in self.ignore
-            for r in rules
-            if r.id not in self.ignore
-        ]
+        return _active_rules(self.rulesets, self.ignore)
 
 
 def default_yaml() -> str:
