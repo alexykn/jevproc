@@ -7,6 +7,7 @@ import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
+from dataclasses import dataclass, field
 
 import psutil
 
@@ -18,21 +19,31 @@ from jevproc.core.models import (
 )
 
 
+def _strip_endpoint_annotation(value: str) -> str:
+    return value.rsplit(" (", 1)[0] if " (" in value else value
+
+
+def _split_bracketed_endpoint(value: str) -> tuple[str, str] | None:
+    marker = value.rfind("]:")
+    return (value[1:marker], value[marker + 2 :]) if marker >= 0 else None
+
+
+def _split_plain_endpoint(value: str) -> tuple[str, str] | None:
+    host, separator, port = value.rpartition(":")
+    return (host, port) if separator else None
+
+
+def _split_endpoint(value: str) -> tuple[str, str] | None:
+    return _split_bracketed_endpoint(value) if value.startswith("[") else _split_plain_endpoint(value)
+
+
 def _endpoint(text: str) -> tuple[str, int]:
     """Parse one numeric lsof endpoint without DNS/service-name ambiguity."""
-    value = text.strip()
-    if " (" in value:
-        value = value.rsplit(" (", 1)[0]
-    if value.startswith("["):
-        marker = value.rfind("]:")
-        if marker >= 0:
-            host, port = value[1:marker], value[marker + 2 :]
-        else:
-            return value[:512], 0
-    else:
-        host, separator, port = value.rpartition(":")
-        if not separator:
-            return value[:512], 0
+    value = _strip_endpoint_annotation(text.strip())
+    parts = _split_endpoint(value)
+    if parts is None:
+        return value[:512], 0
+    host, port = parts
     if not port.isdigit():
         return value[:512], 0
     return ("" if host == "*" else host[:512], int(port))
@@ -44,7 +55,8 @@ def _lsof_connection(
     endpoint: str,
     status: str,
 ) -> Connection | None:
-    if pid is None or protocol not in {"TCP", "UDP"} or not endpoint:
+    ready = all((pid is not None, protocol in {"TCP", "UDP"}, bool(endpoint)))
+    if not ready:
         return None
     local_text, arrow, remote_text = endpoint.partition("->")
     local_address, local_port = _endpoint(local_text)
@@ -77,33 +89,64 @@ def _deduplicated_connections(entries: list[Connection]) -> list[Connection]:
     )
 
 
+@dataclass
+class _LsofParser:
+    by_pid: dict[int, list[Connection]] = field(default_factory=dict)
+    pid: int | None = None
+    protocol: str = ""
+    endpoint: str = ""
+    status: str = ""
+
+    def _reset_socket(self) -> None:
+        self.protocol = self.endpoint = self.status = ""
+
+    def _flush(self) -> None:
+        connection = _lsof_connection(self.pid, self.protocol, self.endpoint, self.status)
+        if connection is not None and self.pid is not None:
+            self.by_pid.setdefault(self.pid, []).append(connection)
+        self._reset_socket()
+
+    def _process(self, value: str) -> None:
+        self._flush()
+        self.pid = int(value) if value.isdigit() else None
+
+    def _file(self, _value: str) -> None:
+        self._flush()
+
+    def _protocol(self, value: str) -> None:
+        self.protocol = value.upper()
+
+    def _endpoint(self, value: str) -> None:
+        self.endpoint = value
+
+    def _status(self, value: str) -> None:
+        if value.startswith("ST="):
+            self.status = value.removeprefix("ST=")
+
+    def feed(self, line: str) -> None:
+        handlers = {
+            "p": self._process,
+            "f": self._file,
+            "P": self._protocol,
+            "n": self._endpoint,
+            "T": self._status,
+        }
+        handler = handlers.get(line[0])
+        if handler is not None:
+            handler(line[1:])
+
+    def result(self) -> dict[int, list[Connection]]:
+        self._flush()
+        return {owner: _deduplicated_connections(entries) for owner, entries in self.by_pid.items()}
+
+
 def _parse_lsof_network(output: str) -> dict[int, list[Connection]]:
     """Parse lsof field output; f records delimit sockets and p records delimit processes."""
-    by_pid: dict[int, list[Connection]] = defaultdict(list)
-    pid: int | None = None
-    protocol = endpoint = status = ""
-
-    def flush() -> None:
-        nonlocal protocol, endpoint, status
-        connection = _lsof_connection(pid, protocol, endpoint, status)
-        if connection is not None and pid is not None:
-            by_pid[pid].append(connection)
-        protocol = endpoint = status = ""
-
+    parser = _LsofParser()
     for line in filter(None, output.splitlines()):
-        field, value = line[0], line[1:]
-        if field in {"p", "f"}:
-            flush()
-        if field == "p":
-            pid = int(value) if value.isdigit() else None
-        elif field == "P":
-            protocol = value.upper()
-        elif field == "n":
-            endpoint = value
-        elif field == "T":
-            status = value.removeprefix("ST=") if value.startswith("ST=") else status
-    flush()
-    return {owner: _deduplicated_connections(entries) for owner, entries in by_pid.items()}
+        parser.feed(line)
+    return parser.result()
+
 
 def _lsof_network() -> tuple[dict[int, list[Connection]], Coverage]:
     """Best-effort macOS fallback when psutil cannot enumerate system sockets unprivileged."""
@@ -125,13 +168,19 @@ def _lsof_network() -> tuple[dict[int, list[Connection]], Coverage]:
     return _parse_lsof_network(result.stdout), "partial"
 
 
+def _socket_address(address) -> tuple[str, int]:
+    return (address.ip, address.port) if address else ("", 0)
+
+
 def _socket_connection(item) -> Connection:
+    local_address, local_port = _socket_address(item.laddr)
+    remote_address, remote_port = _socket_address(item.raddr)
     return Connection(
         protocol="tcp" if item.type == socket.SOCK_STREAM else "udp",
-        local_address=item.laddr.ip if item.laddr else "",
-        local_port=item.laddr.port if item.laddr else 0,
-        remote_address=item.raddr.ip if item.raddr else "",
-        remote_port=item.raddr.port if item.raddr else 0,
+        local_address=local_address,
+        local_port=local_port,
+        remote_address=remote_address,
+        remote_port=remote_port,
         status=item.status,
     )
 
