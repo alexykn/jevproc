@@ -3,7 +3,7 @@ import json
 import pytest
 
 from jevproc.core.config import ChoiceQuestion, NoulQuestion
-from jevproc.core.protocol import JevError, encode, make_request, validate_response
+from jevproc.core.protocol import ChoiceAnswer, JevError, NoulAnswer, encode, make_request, validate_response
 
 
 def test_process_evidence_is_in_state_and_target_is_bound_in_question(config, snapshot):
@@ -44,8 +44,10 @@ def test_noul_is_scalar_without_confidence():
         }),
         {"q": question},
     )
-    assert value.answers["q"].noul == 0.7
-    assert not hasattr(value.answers["q"], "confidence")
+    answer = value.answers["q"]
+    assert isinstance(answer, NoulAnswer)
+    assert answer.noul == 0.7
+    assert not hasattr(answer, "confidence")
 
 
 def choice_question():
@@ -72,7 +74,9 @@ def test_provider_distributions_not_normalized_or_rejected():
         encode({"model": "jev-1.13.0", "answers": {"q": answer}}),
         {"q": question},
     )
-    assert response.answers["q"].probabilities == answer["probabilities"]
+    validated = response.answers["q"]
+    assert isinstance(validated, ChoiceAnswer)
+    assert validated.probabilities == answer["probabilities"]
 
 
 @pytest.mark.parametrize(

@@ -17,19 +17,19 @@ from jevproc.core.storage import AnswerCache
 @pytest.mark.parametrize("step", [1, 2, 3])
 @pytest.mark.parametrize("error_type", [sqlite3.DatabaseError, KeyboardInterrupt])
 def test_cache_setup_failure_always_releases_connection(tmp_path, monkeypatch, step, error_type):
-    import jevproc.core.storage as storage
+    from jevproc.core import storage
 
     calls = 0
     closed = []
 
-    def operation(*args):
+    def operation(*_args):
         nonlocal calls
         calls += 1
         if calls == step:
             raise error_type("synthetic setup failure")
 
     connection = SimpleNamespace(execute=operation, commit=operation, close=lambda: closed.append(True))
-    monkeypatch.setattr(storage.sqlite3, "connect", lambda *args, **kwargs: connection)
+    monkeypatch.setattr(storage.sqlite3, "connect", lambda *_args, **_kwargs: connection)
     cache = AnswerCache.__new__(AnswerCache)
     with pytest.raises(error_type):
         cache.__init__(tmp_path / "cache", CacheSettings())
@@ -41,7 +41,13 @@ def test_config_patches_do_not_mutate_the_supplied_mapping():
     defaults = {"rulesets": {"process": [{"id": "JPR001", "policy": {"warning_at": 0.12}}]}}
     override = {"rulesets": {"process": [{"id": "JPR001", "policy": {"uncertain_at": 0.08}}]}}
     result = _apply_override(defaults, override)
-    assert result["rulesets"]["process"][0]["policy"] == {"warning_at": 0.12, "uncertain_at": 0.08}
+    rulesets = result["rulesets"]
+    assert isinstance(rulesets, dict)
+    process_rules = rulesets["process"]
+    assert isinstance(process_rules, list)
+    rule = process_rules[0]
+    assert isinstance(rule, dict)
+    assert rule["policy"] == {"warning_at": 0.12, "uncertain_at": 0.08}
     assert defaults["rulesets"]["process"][0]["policy"] == {"warning_at": 0.12}
     assert "rulesets" in override
 

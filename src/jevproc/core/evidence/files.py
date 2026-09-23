@@ -3,11 +3,12 @@
 import hashlib
 import os
 import stat
-import subprocess
 import sys
+from pathlib import Path
 from typing import Any
 
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence.command import CommandResult, run_fixed
 from jevproc.core.models import (
     Coverage,
     Executable,
@@ -58,19 +59,12 @@ def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
     return "verification_failed", "other"
 
 
-def _codesign_verify(path: str) -> subprocess.CompletedProcess[str] | None:
-    try:
-        return subprocess.run(
-            ["/usr/bin/codesign", "--verify", "--strict", "--", path],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=3,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
+def _codesign_verify(path: str) -> CommandResult | None:
+    return run_fixed(
+        "/usr/bin/codesign",
+        ("--verify", "--strict", "--", path),
+        timeout=3,
+    )
 
 
 def _verification_values(verify) -> dict[str, Any]:
@@ -84,19 +78,14 @@ def _verification_values(verify) -> dict[str, Any]:
 
 
 def _codesign_display(path: str) -> str | None:
-    try:
-        display = subprocess.run(
-            ["/usr/bin/codesign", "--display", "--verbose=4", "--", path],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=3,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+    display = run_fixed(
+        "/usr/bin/codesign",
+        ("--display", "--verbose=4", "--", path),
+        timeout=3,
+    )
+    if display is None:
         return None
-    return (getattr(display, "stdout", "") or "") + "\n" + (getattr(display, "stderr", "") or "")
+    return display.stdout + "\n" + display.stderr
 
 
 def _signature_metadata(text: str) -> dict[str, Any]:
@@ -134,7 +123,7 @@ def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
 
 
 def _valid_file_path(path: str | None) -> bool:
-    return bool(path and os.path.isabs(path) and "\x00" not in path)
+    return bool(path and Path(path).is_absolute() and "\x00" not in path)
 
 
 def _file_cache_key(path: str, info: os.stat_result, settings: CollectionSettings) -> tuple:
@@ -228,7 +217,7 @@ def _file_coverage(settings: CollectionSettings) -> dict[str, Coverage]:
 
 def _stat_executable(path: str) -> tuple[Executable, Coverage, os.stat_result | None]:
     try:
-        info = os.stat(path)
+        info = Path(path).stat()
     except FileNotFoundError:
         return Executable(exists=False), "observed", None
     except PermissionError:
@@ -254,7 +243,7 @@ def _file_identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
 
 def _file_unchanged(path: str, before: os.stat_result) -> bool:
     try:
-        return _file_identity(before) == _file_identity(os.stat(path))
+        return _file_identity(before) == _file_identity(Path(path).stat())
     except OSError:
         return False
 

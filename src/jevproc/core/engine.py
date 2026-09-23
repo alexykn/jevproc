@@ -3,11 +3,10 @@
 import asyncio
 import time
 from collections import Counter
-from collections.abc import Callable
-from typing import Literal
+from collections.abc import Callable, Mapping
+from typing import Literal, Protocol
 
 from jevproc.core.assessment import assess
-from jevproc.core.client import JevClient
 from jevproc.core.config import Config, Question
 from jevproc.core.models import Assessment, Process, Report, RuleResult, Snapshot
 from jevproc.core.protocol import (
@@ -18,6 +17,16 @@ from jevproc.core.protocol import (
     make_request,
 )
 from jevproc.core.storage import AnswerCache, request_key
+
+
+class EvaluationClient(Protocol):
+    base_url: str
+    requests: int
+    retries: int
+    input_tokens: int
+    output_tokens: int
+
+    async def evaluate(self, body: bytes, questions: Mapping[str, Question]) -> JevResponse: ...
 
 
 def _unavailable(process: Process, reason: str, *, failure: bool = False) -> Assessment:
@@ -40,12 +49,12 @@ class Engine:
     def __init__(
         self,
         config: Config,
-        client: JevClient | None = None,
+        client: EvaluationClient | None = None,
         cache: AnswerCache | None = None,
     ):
         self.config, self.client, self.cache = config, client, cache
 
-    def _cached_answer(self, key: str, questions: dict[str, Question]) -> JevResponse | None:
+    def _cached_answer(self, key: str, questions: Mapping[str, Question]) -> JevResponse | None:
         if self.cache is None:
             return None
         answer = self.cache.get(key, questions)

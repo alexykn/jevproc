@@ -2,8 +2,8 @@
 
 import asyncio
 import math
-import random
-from collections.abc import Iterator
+import secrets
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -204,7 +204,7 @@ class JevClient:
                 self.fatal_error = f"Jev authentication/authorization failed (HTTP {result.status_code})"
             return result
 
-    async def evaluate(self, body: bytes, questions: dict[str, Question]) -> JevResponse:
+    async def evaluate(self, body: bytes, questions: Mapping[str, Question]) -> JevResponse:
         for attempt in range(self.settings.retries + 1):
             outcome = await self._attempt(body, questions, attempt)
             if isinstance(outcome, JevResponse):
@@ -215,7 +215,7 @@ class JevClient:
     async def _attempt(
         self,
         body: bytes,
-        questions: dict[str, Question],
+        questions: Mapping[str, Question],
         attempt: int,
     ) -> JevResponse | _Retry:
         try:
@@ -232,7 +232,7 @@ class JevClient:
         self.retries += 1
         await asyncio.sleep(retry.delay)
 
-    def _accept_response(self, response: httpx.Response, questions: dict[str, Question]) -> JevResponse:
+    def _accept_response(self, response: httpx.Response, questions: Mapping[str, Question]) -> JevResponse:
         validated = validate_response(response.content, questions)
         if self.settings.model not in {"jev-latest", "jev-preview"} and validated.model != self.settings.model:
             raise JevError("Jev returned a different model than the requested pinned version")
@@ -256,7 +256,7 @@ class JevClient:
         return delay
 
     def _backoff(self, attempt: int) -> float:
-        return min(self.settings.max_retry_delay, 0.5 * 2**attempt + random.random() * 0.2)
+        return min(self.settings.max_retry_delay, 0.5 * 2**attempt + secrets.randbelow(200_000) / 1_000_000)
 
     async def __aenter__(self) -> Self:
         return self

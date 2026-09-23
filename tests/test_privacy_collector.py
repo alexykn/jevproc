@@ -14,6 +14,7 @@ from jevproc.core.collector import (
     load_snapshot,
 )
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence.command import CommandResult
 from jevproc.core.evidence.files import (
     _classify_codesign_failure,
     _file_info,
@@ -108,7 +109,7 @@ def test_ancestry_cycles_and_depth_are_bounded():
 
 def test_pid_reuse_drops_socket_evidence(monkeypatch):
     process = Process(pid=42, created_at=10, executable="/bin/tool")
-    monkeypatch.setattr(psutil, "Process", lambda pid: SimpleNamespace(create_time=lambda: 20))
+    monkeypatch.setattr(psutil, "Process", lambda _pid: SimpleNamespace(create_time=lambda: 20))
     results = attach_network(
         [process], {42: [Connection(protocol="tcp", remote_address="192.0.2.1", remote_port=443)]}, "observed"
     )
@@ -138,10 +139,10 @@ def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
     monkeypatch.setattr(module.sys, "platform", "darwin")
     calls = []
 
-    def run(argv, **kwargs):
-        calls.append((argv, kwargs))
-        if "--display" in argv:
-            return SimpleNamespace(
+    def run(executable, arguments, *, timeout):
+        calls.append((executable, tuple(arguments), timeout))
+        if "--display" in arguments:
+            return CommandResult(
                 returncode=0,
                 stdout="",
                 stderr=(
@@ -151,9 +152,9 @@ def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
                     "Authority=Developer ID Certification Authority\n"
                 ),
             )
-        return SimpleNamespace(returncode=0)
+        return CommandResult(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(module.subprocess, "run", run)
+    monkeypatch.setattr(module, "run_fixed", run)
     values, coverage = _signature("/tmp/a;echo owned")
     assert coverage == "observed"
     assert values == {
@@ -165,10 +166,16 @@ def test_codesign_never_runs_target_or_shell_and_parses_identity(monkeypatch):
             "Developer ID Certification Authority",
         ],
     }
-    assert calls[0][0] == ["/usr/bin/codesign", "--verify", "--strict", "--", "/tmp/a;echo owned"]
-    assert calls[1][0] == ["/usr/bin/codesign", "--display", "--verbose=4", "--", "/tmp/a;echo owned"]
-    assert all("shell" not in kwargs for _, kwargs in calls)
-    assert all(kwargs["timeout"] == 3 for _, kwargs in calls)
+    assert calls[0] == (
+        "/usr/bin/codesign",
+        ("--verify", "--strict", "--", "/tmp/a;echo owned"),
+        3,
+    )
+    assert calls[1] == (
+        "/usr/bin/codesign",
+        ("--display", "--verbose=4", "--", "/tmp/a;echo owned"),
+        3,
+    )
 
 
 @pytest.mark.parametrize(
@@ -205,18 +212,19 @@ def test_legacy_codesign_keeps_signer_metadata(monkeypatch):
     monkeypatch.setattr(module.sys, "platform", "darwin")
     calls = []
 
-    def run(argv, **kwargs):
-        calls.append((argv, kwargs))
-        if "--verify" in argv:
-            return SimpleNamespace(
+    def run(executable, arguments, *, timeout):
+        calls.append((executable, tuple(arguments), timeout))
+        if "--verify" in arguments:
+            return CommandResult(
                 returncode=1,
+                stdout="",
                 stderr=(
                     "/Library/Apple/System/Library/CoreServices/XProtect.app/"
                     "Contents/XPCServices/XProtectPluginService.xpc: "
                     "resource envelope is obsolete (custom omit rules)\n"
                 ),
             )
-        return SimpleNamespace(
+        return CommandResult(
             returncode=0,
             stdout="",
             stderr=(
@@ -227,7 +235,7 @@ def test_legacy_codesign_keeps_signer_metadata(monkeypatch):
             ),
         )
 
-    monkeypatch.setattr(module.subprocess, "run", run)
+    monkeypatch.setattr(module, "run_fixed", run)
     values, coverage = _signature("/Library/Apple/System/Library/CoreServices/XProtect")
     assert coverage == "observed"
     assert values == {
@@ -241,9 +249,10 @@ def test_legacy_codesign_keeps_signer_metadata(monkeypatch):
         ],
     }
     assert len(calls) == 2
-    assert calls[0][0][:3] == ["/usr/bin/codesign", "--verify", "--strict"]
-    assert calls[1][0][:3] == ["/usr/bin/codesign", "--display", "--verbose=4"]
-    assert all("shell" not in kwargs for _, kwargs in calls)
+    assert calls[0][0] == "/usr/bin/codesign"
+    assert calls[0][1][:2] == ("--verify", "--strict")
+    assert calls[1][0] == "/usr/bin/codesign"
+    assert calls[1][1][:2] == ("--display", "--verbose=4")
 
 
 def test_unsigned_codesign_skips_display(monkeypatch):
@@ -252,15 +261,17 @@ def test_unsigned_codesign_skips_display(monkeypatch):
     monkeypatch.setattr(module.sys, "platform", "darwin")
     calls = []
 
-    def run(argv, **kwargs):
-        calls.append(argv)
-        return SimpleNamespace(returncode=1, stderr="code object is not signed at all")
+    def run(executable, arguments, *, timeout):
+        calls.append((executable, tuple(arguments), timeout))
+        return CommandResult(returncode=1, stdout="", stderr="code object is not signed at all")
 
-    monkeypatch.setattr(module.subprocess, "run", run)
+    monkeypatch.setattr(module, "run_fixed", run)
     values, coverage = _signature("/tmp/unsigned")
     assert coverage == "observed"
     assert values == {"signature": "unsigned"}
-    assert calls == [["/usr/bin/codesign", "--verify", "--strict", "--", "/tmp/unsigned"]]
+    assert calls == [
+        ("/usr/bin/codesign", ("--verify", "--strict", "--", "/tmp/unsigned"), 3)
+    ]
 
 
 def test_failed_codesign_can_preserve_display_identity(monkeypatch):
@@ -268,16 +279,17 @@ def test_failed_codesign_can_preserve_display_identity(monkeypatch):
 
     monkeypatch.setattr(module.sys, "platform", "darwin")
 
-    def run(argv, **kwargs):
-        if "--verify" in argv:
-            return SimpleNamespace(returncode=1, stderr="code or signature modified")
-        return SimpleNamespace(
+    def run(_executable, arguments, *, timeout):
+        assert timeout == 3
+        if "--verify" in arguments:
+            return CommandResult(returncode=1, stdout="", stderr="code or signature modified")
+        return CommandResult(
             returncode=0,
             stdout="",
             stderr="Identifier=com.example.tool\nTeamIdentifier=TEAM123456\n",
         )
 
-    monkeypatch.setattr(module.subprocess, "run", run)
+    monkeypatch.setattr(module, "run_fixed", run)
     values, coverage = _signature("/tmp/tool")
     assert coverage == "observed"
     assert values["signature"] == "verification_failed"
@@ -294,7 +306,7 @@ def test_process_metadata_collection_runs_in_parallel(monkeypatch):
     max_active = 0
     lock = threading.Lock()
 
-    def fake_process(pid, settings, now, file_cache=None, resource_probe=None):
+    def fake_process(pid, _settings, now, _file_cache=None, _resource_probe=None):
         nonlocal active, max_active
         with lock:
             active += 1
@@ -341,7 +353,7 @@ def test_file_evidence_is_deduplicated_and_parallel(monkeypatch):
     max_active = 0
     lock = threading.Lock()
 
-    def fake_file_info(path, settings, cache=None):
+    def fake_file_info(path, _settings, _cache=None):
         nonlocal active, max_active
         calls.append(path)
         with lock:
@@ -385,7 +397,7 @@ def test_file_evidence_is_deduplicated_and_parallel(monkeypatch):
 
 
 def test_live_self_inventory_does_not_read_environment_or_cmdline(monkeypatch):
-    def forbidden(*args, **kwargs):
+    def forbidden(*_args, **_kwargs):
         raise AssertionError("sensitive collector used")
 
     monkeypatch.setattr(psutil.Process, "environ", forbidden)
@@ -444,7 +456,7 @@ def test_exec_image_change_discards_network_evidence(monkeypatch):
     monkeypatch.setattr(
         psutil,
         "Process",
-        lambda pid: SimpleNamespace(
+        lambda _pid: SimpleNamespace(
             create_time=lambda: 10,
             exe=lambda: "/bin/replacement",
         ),
@@ -475,23 +487,9 @@ def test_replaced_file_evidence_is_not_combined(tmp_path, monkeypatch):
 
 def test_lsof_field_parser_maps_tcp_and_udp_connections():
     parsed = _parse_lsof_network(
-        "\n".join([
-            "p42",
-            "ctool",
-            "f9",
-            "PTCP",
-            "n127.0.0.1:51000->198.51.100.7:443",
-            "TST=ESTABLISHED",
-            "f10",
-            "PUDP",
-            "n*:5353",
-            "p43",
-            "ctool2",
-            "f4",
-            "PTCP",
-            "n[::1]:8000",
-            "TST=LISTEN",
-        ])
+        "p42\nctool\nf9\nPTCP\nn127.0.0.1:51000->198.51.100.7:443\n"
+        "TST=ESTABLISHED\nf10\nPUDP\nn*:5353\np43\nctool2\nf4\nPTCP\n"
+        "n[::1]:8000\nTST=LISTEN"
     )
     assert parsed[42][0] == Connection(
         protocol="tcp",
@@ -516,7 +514,7 @@ def test_macos_network_falls_back_to_lsof(monkeypatch):
     monkeypatch.setattr(
         module.psutil,
         "net_connections",
-        lambda **kwargs: (_ for _ in ()).throw(psutil.AccessDenied()),
+        lambda **_kwargs: (_ for _ in ()).throw(psutil.AccessDenied()),
     )
     calls = []
 
@@ -567,13 +565,48 @@ def test_file_inspection_cache_deduplicates_hash_and_signature(tmp_path, monkeyp
     assert first[0].signature_identifier == "com.example.binary"
 
 
+class FakeResourceProcess:
+    def __init__(
+        self,
+        *,
+        cpu_percent: float,
+        rss_bytes: int,
+        memory_percent: float,
+        thread_count: int,
+        fd_count: int | None,
+    ) -> None:
+        self._cpu_percent = cpu_percent
+        self._rss_bytes = rss_bytes
+        self._memory_percent = memory_percent
+        self._thread_count = thread_count
+        self._fd_count = fd_count
+
+    def cpu_percent(self, interval: float | None = None) -> float:
+        assert interval is None
+        return self._cpu_percent
+
+    def memory_info(self):
+        return SimpleNamespace(rss=self._rss_bytes)
+
+    def memory_percent(self) -> float:
+        return self._memory_percent
+
+    def num_threads(self) -> int:
+        return self._thread_count
+
+    def num_fds(self) -> int:
+        if self._fd_count is None:
+            raise psutil.AccessDenied()
+        return self._fd_count
+
+
 def test_resource_usage_collects_short_sample_context():
-    proc = SimpleNamespace(
-        cpu_percent=lambda interval=None: 87.5,
-        memory_info=lambda: SimpleNamespace(rss=3 * 1024 * 1024 * 1024),
-        memory_percent=lambda: 12.5,
-        num_threads=lambda: 42,
-        num_fds=lambda: 99,
+    proc = FakeResourceProcess(
+        cpu_percent=87.5,
+        rss_bytes=3 * 1024 * 1024 * 1024,
+        memory_percent=12.5,
+        thread_count=42,
+        fd_count=99,
     )
     resources, coverage = _resource_usage(proc, cpu_primed=True)
     assert coverage == "observed"
@@ -585,12 +618,12 @@ def test_resource_usage_collects_short_sample_context():
 
 
 def test_resource_usage_is_partial_when_one_measure_is_denied():
-    proc = SimpleNamespace(
-        cpu_percent=lambda interval=None: 10.0,
-        memory_info=lambda: SimpleNamespace(rss=128 * 1024 * 1024),
-        memory_percent=lambda: 1.2,
-        num_threads=lambda: 8,
-        num_fds=lambda: (_ for _ in ()).throw(psutil.AccessDenied()),
+    proc = FakeResourceProcess(
+        cpu_percent=10.0,
+        rss_bytes=128 * 1024 * 1024,
+        memory_percent=1.2,
+        thread_count=8,
+        fd_count=None,
     )
     resources, coverage = _resource_usage(proc, cpu_primed=True)
     assert coverage == "partial"
@@ -623,7 +656,7 @@ def test_family_selection_walks_descendants_only(monkeypatch):
         SimpleNamespace(info={"pid": 20, "ppid": 1}),
     ]
     monkeypatch.setattr(module.psutil, "pid_exists", lambda pid: pid in {1, 10, 11, 12, 13, 20})
-    monkeypatch.setattr(module.psutil, "process_iter", lambda *args, **kwargs: iter(table))
+    monkeypatch.setattr(module.psutil, "process_iter", lambda *_args, **_kwargs: iter(table))
     assert _family_pids(10) == [10, 11, 12, 13]
 
 

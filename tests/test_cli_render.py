@@ -84,7 +84,7 @@ def test_missing_api_key_fails_before_collection(capsys, monkeypatch):
     import jevproc.cli.main as module
 
     monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
-    monkeypatch.setattr(module, "collect", lambda *a: pytest.fail("should fail before collecting"))
+    monkeypatch.setattr(module, "collect", lambda *_args: pytest.fail("should fail before collecting"))
     assert main([]) == 2
     assert "TYPESAFE_API_KEY" in capsys.readouterr().err
 

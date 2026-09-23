@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 import statistics
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any, Iterable
 
 from jevproc.core.corpus import CorpusCase
@@ -59,7 +60,7 @@ def _thresholds(values: Iterable[float]) -> list[float]:
     if not unique:
         return []
     candidates = {0.0, 1.0, *unique}
-    candidates.update((left + right) / 2 for left, right in zip(unique, unique[1:]))
+    candidates.update((left + right) / 2 for left, right in pairwise(unique))
     return sorted(max(0.0, min(1.0, value)) for value in candidates)
 
 
