@@ -92,12 +92,10 @@ def _snapshot(args: argparse.Namespace, config: Config) -> Snapshot:
 
 
 def exit_code(report: Report, fail_on: str) -> int:
-    outcomes = (
-        (bool(report.summary["incomplete"]), 2),
-        (bool(fail_on != "none" and report.summary["warnings"]), 1),
-        (bool(fail_on == "any" and report.summary["uncertain_warnings"]), 1),
-    )
-    return next((code for matches, code in outcomes if matches), 0)
+    incomplete = 2 * int(bool(report.summary["incomplete"]))
+    confirmed = int(bool(report.summary["warnings"])) * int(fail_on in {"warning", "any"})
+    uncertain = int(bool(report.summary["uncertain_warnings"])) * int(fail_on == "any")
+    return max(incomplete, confirmed, uncertain)
 
 
 def _scan_mode(args: argparse.Namespace) -> Literal["live", "offline", "demo"]:
