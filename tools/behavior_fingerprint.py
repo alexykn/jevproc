@@ -10,7 +10,6 @@ import io
 import itertools
 import json
 import os
-import random
 import re
 from unittest.mock import patch
 
@@ -45,8 +44,10 @@ wire = [hashlib.sha256(make_request(snapshot, p, config).body).hexdigest() for p
 results = []
 processes = [snapshot.processes[0], snapshot.processes[-1]]
 for process in processes:
-    for value in [i / 100 for i in range(101)] + [0.079, 0.119]:
-        results.append(judge(config.active_rules[0], process, NoulAnswer(type="noul", noul=value)).model_dump())
+    results.extend(
+        judge(config.active_rules[0], process, NoulAnswer(type="noul", noul=value)).model_dump()
+        for value in [i / 100 for i in range(101)] + [0.079, 0.119]
+    )
 choice_rule = Rule.model_validate({
     "id": "LOCALC",
     "title": "test",
@@ -83,7 +84,6 @@ for process, value, confidence in itertools.product(
     )
     results.append(judge(score_rule, process, answer).model_dump())
 
-rng = random.Random(818)
 words = [
     "tool",
     "--token",
@@ -100,7 +100,10 @@ words = [
     "https://user:password@example.test/?token=value",
     "/Users/test/project",
 ]
-arguments = [[rng.choice(words) for _ in range(rng.randrange(1, 80))] for _ in range(500)]
+arguments = [
+    [words[(row * 17 + column * 7) % len(words)] for column in range(1 + (row * 29) % 79)]
+    for row in range(500)
+]
 redacted = [redact_argv(row) for row in arguments]
 
 by_pid = {case.process.pid: case for case in corpus.cases}
@@ -121,6 +124,8 @@ async def handler(request):
 
 
 def mock_client(settings, api_key, *, base_url):
+    assert api_key
+    assert base_url
     return JevClient(
         settings, "synthetic-contract-key", base_url="http://localhost", transport=httpx.MockTransport(handler)
     )
