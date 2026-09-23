@@ -4,12 +4,14 @@ import os
 import subprocess
 import sys
 import time
-from contextlib import nullcontext
-from typing import Any, Callable
+from contextlib import nullcontext, suppress
+from pathlib import Path
+from typing import Any, Callable, Protocol
 
 import psutil
 
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence.command import run_fixed
 from jevproc.core.evidence.files import _file_info, _observations
 from jevproc.core.models import (
     Coverage,
@@ -23,15 +25,24 @@ from jevproc.core.privacy import redact_argv
 def _get(field: str, action: Callable[[], Any], coverage: dict[str, Coverage], default: Any = None) -> Any:
     try:
         value = action()
-        coverage[field] = "observed"
-        return value
     except psutil.AccessDenied:
         coverage[field] = "denied"
     except (psutil.NoSuchProcess, psutil.ZombieProcess):
         coverage[field] = "gone"
     except (OSError, NotImplementedError):
         coverage[field] = "unavailable"
+    else:
+        coverage[field] = "observed"
+        return value
     return default
+
+
+class ResourceProcess(Protocol):
+    def cpu_percent(self, interval: float | None = None) -> float: ...
+    def memory_info(self) -> Any: ...
+    def memory_percent(self) -> float: ...
+    def num_threads(self) -> int: ...
+    def num_fds(self) -> int: ...
 
 
 def _resource_value(action: Callable[[], Any]) -> tuple[Any, Coverage]:
@@ -45,7 +56,7 @@ def _resource_value(action: Callable[[], Any]) -> tuple[Any, Coverage]:
         return None, "unavailable"
 
 
-def _resource_usage(proc: psutil.Process, cpu_primed: bool) -> tuple[ResourceUsage, Coverage]:
+def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUsage, Coverage]:
     values: dict[str, Any] = {}
     states: list[Coverage] = []
 
@@ -133,20 +144,10 @@ def _darwin_comm_table() -> dict[int, str]:
 
 
 def _darwin_comm(pid: int) -> str | None:
-    try:
-        result = subprocess.run(
-            ["/bin/ps", "-p", str(pid), "-o", "comm="],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=2,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
+    result = run_fixed("/bin/ps", ("-p", str(pid), "-o", "comm="), timeout=2)
+    if result is None or result.returncode != 0:
         return None
-    value = result.stdout.strip() if result.returncode == 0 else ""
-    return value[:8192] or None
+    return result.stdout.strip()[:8192] or None
 
 
 def _process_name_without_cmdline(
@@ -173,9 +174,7 @@ def _process_executable_without_cmdline(
 ) -> str | None:
     try:
         if sys.platform == "linux":
-            value = os.readlink(f"/proc/{pid}/exe")
-            if value.endswith(" (deleted)"):
-                value = value[:-10]
+            value = str(Path(f"/proc/{pid}/exe").readlink()).removesuffix(" (deleted)")
             return value[:8192] or None
         if sys.platform == "darwin":
             value = darwin_comm or _darwin_comm(pid)
@@ -288,10 +287,8 @@ def _process_file(
 ) -> Executable:
     deleted = None
     if sys.platform == "linux":
-        try:
-            deleted = os.readlink(f"/proc/{pid}/exe").endswith(" (deleted)")
-        except OSError:
-            pass
+        with suppress(OSError):
+            deleted = str(Path(f"/proc/{pid}/exe").readlink()).endswith(" (deleted)")
     file_coverage: dict[str, Coverage]
     if executable and coverage["executable"] != "truncated":
         file_info, file_coverage = _file_info(executable, settings, file_cache)
