@@ -5,6 +5,7 @@ import signal
 import tempfile
 import time
 from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Literal
 
@@ -28,14 +29,10 @@ def _wait_for_process(pid: int, timeout: float) -> int | None:
         if waited == pid:
             return os.waitstatus_to_exitcode(status)
         if time.monotonic() >= deadline:
-            try:
+            with suppress(ProcessLookupError):
                 os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-            try:
+            with suppress(ChildProcessError):
                 os.waitpid(pid, 0)
-            except ChildProcessError:
-                pass
             return None
         time.sleep(0.01)
 
