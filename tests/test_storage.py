@@ -52,6 +52,43 @@ def test_unsafe_cache_directory_is_rejected(tmp_path):
         AnswerCache(directory,CacheSettings())
 
 
+def test_new_private_directory_is_rolled_back_when_validation_fails(tmp_path, monkeypatch):
+    import jevproc.core.storage as storage
+
+    directory = tmp_path / "parent" / "nested" / "cache"
+    monkeypatch.setattr(
+        storage,
+        "_validate_private_directory",
+        lambda path: (_ for _ in ()).throw(StorageError("synthetic directory validation failure")),
+    )
+    with pytest.raises(StorageError, match="synthetic"):
+        AnswerCache(directory, CacheSettings())
+
+    assert not directory.exists()
+    assert not (tmp_path / "parent" / "nested").exists()
+    assert not (tmp_path / "parent").exists()
+
+
+def test_existing_private_directory_is_never_rolled_back(tmp_path, monkeypatch):
+    import jevproc.core.storage as storage
+
+    directory = tmp_path / "cache"
+    directory.mkdir(mode=0o700)
+    marker_file = directory / "keep"
+    marker_file.write_text("existing")
+
+    monkeypatch.setattr(
+        storage,
+        "_validate_private_directory",
+        lambda path: (_ for _ in ()).throw(StorageError("synthetic directory validation failure")),
+    )
+    with pytest.raises(StorageError, match="synthetic"):
+        AnswerCache(directory, CacheSettings())
+
+    assert directory.is_dir()
+    assert marker_file.read_text() == "existing"
+
+
 def test_cache_symlinks_are_rejected(tmp_path):
     target=tmp_path/"target"
     target.mkdir(mode=0o700)
