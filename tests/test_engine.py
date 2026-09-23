@@ -8,6 +8,7 @@ from jevproc.core.client import JevClient
 from jevproc.core.config import CacheSettings, Config, Question
 from jevproc.core.demo import demo_transport
 from jevproc.core.engine import Engine
+from jevproc.core.models import Assessment
 from jevproc.core.protocol import JevResponse, make_request
 from jevproc.core.storage import AnswerCache
 
@@ -153,17 +154,17 @@ def test_request_contains_all_applicable_questions_for_one_process(config, snaps
     assert set(request.questions) == {"p7700_JPR001"}
 
 
-async def test_assessment_callback_streams_before_scan_completes(config, snapshot):
-    source = snapshot.model_copy(update={"processes": snapshot.processes[:2]})
-    release_slow = asyncio.Event()
-    fast_emitted = asyncio.Event()
-    emitted = []
+class StreamingAssessmentProbe:
+    def __init__(self) -> None:
+        self.release_slow = asyncio.Event()
+        self.fast_emitted = asyncio.Event()
+        self.emitted: list[int] = []
 
-    async def handler(request):
+    async def handler(self, request: httpx.Request) -> httpx.Response:
         payload = json.loads(request.content)
         pid = payload["state"]["process"]["pid"]
         if pid == 4819:
-            await release_slow.wait()
+            await self.release_slow.wait()
         answers = {key: {"type": "noul", "noul": 0.08} for key in payload["questions"]}
         return httpx.Response(
             200,
@@ -174,25 +175,31 @@ async def test_assessment_callback_streams_before_scan_completes(config, snapsho
             },
         )
 
-    def on_assessment(assessment):
-        emitted.append(assessment.process.pid)
-        if assessment.process.pid == 3101:
-            fast_emitted.set()
+    def record(self, assessment: Assessment) -> None:
+        pid = assessment.process.pid
+        self.emitted.append(pid)
+        if pid == 3101:
+            self.fast_emitted.set()
 
-    async with JevClient(config.jev, "demo", transport=httpx.MockTransport(handler)) as client:
+
+async def test_assessment_callback_streams_before_scan_completes(config, snapshot):
+    source = snapshot.model_copy(update={"processes": snapshot.processes[:2]})
+    probe = StreamingAssessmentProbe()
+
+    async with JevClient(config.jev, "demo", transport=httpx.MockTransport(probe.handler)) as client:
         task = asyncio.create_task(
             Engine(config, client).scan(
                 source,
                 "demo",
-                on_assessment=on_assessment,
+                on_assessment=probe.record,
             )
         )
-        await asyncio.wait_for(fast_emitted.wait(), timeout=1)
+        await asyncio.wait_for(probe.fast_emitted.wait(), timeout=1)
         assert not task.done()
-        assert 3101 in emitted
-        assert 4819 not in emitted
-        release_slow.set()
+        assert 3101 in probe.emitted
+        assert 4819 not in probe.emitted
+        probe.release_slow.set()
         report = await task
 
     assert report.summary["evaluated"] == 2
-    assert set(emitted) == {3101, 4819}
+    assert set(probe.emitted) == {3101, 4819}

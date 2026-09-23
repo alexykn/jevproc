@@ -41,15 +41,18 @@ def test_config_patches_do_not_mutate_the_supplied_mapping():
     defaults = {"rulesets": {"process": [{"id": "JPR001", "policy": {"warning_at": 0.12}}]}}
     override = {"rulesets": {"process": [{"id": "JPR001", "policy": {"uncertain_at": 0.08}}]}}
     result = _apply_override(defaults, override)
-    rulesets = result["rulesets"]
-    assert isinstance(rulesets, dict)
-    process_rules = rulesets["process"]
-    assert isinstance(process_rules, list)
-    rule = process_rules[0]
-    assert isinstance(rule, dict)
-    assert rule["policy"] == {"warning_at": 0.12, "uncertain_at": 0.08}
-    assert defaults["rulesets"]["process"][0]["policy"] == {"warning_at": 0.12}
-    assert "rulesets" in override
+    assert result == {
+        "rulesets": {
+            "process": [
+                {
+                    "id": "JPR001",
+                    "policy": {"warning_at": 0.12, "uncertain_at": 0.08},
+                }
+            ]
+        }
+    }
+    assert defaults == {"rulesets": {"process": [{"id": "JPR001", "policy": {"warning_at": 0.12}}]}}
+    assert override == {"rulesets": {"process": [{"id": "JPR001", "policy": {"uncertain_at": 0.08}}]}}
 
 
 def test_corpus_accounting_preserves_every_raw_sample_and_review_contract():

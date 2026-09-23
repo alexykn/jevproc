@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Finish the static/semantic cleanup by simplifying Retry-After parsing, narrowing the config contract test without dynamic nested indexing, and isolating streaming-test orchestration.
+
+
 - Make cache-directory creation transactional: roll back only directory inodes created by the current call when validation fails.
 
 
