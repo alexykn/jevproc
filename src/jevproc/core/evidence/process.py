@@ -4,9 +4,10 @@ import os
 import sys
 import time
 from bisect import bisect_right
+from collections.abc import Callable
 from contextlib import nullcontext, suppress
 from pathlib import Path
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 import psutil
 
