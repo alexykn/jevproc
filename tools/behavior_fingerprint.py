@@ -101,8 +101,7 @@ words = [
     "/Users/test/project",
 ]
 arguments = [
-    [words[(row * 17 + column * 7) % len(words)] for column in range(1 + (row * 29) % 79)]
-    for row in range(500)
+    [words[(row * 17 + column * 7) % len(words)] for column in range(1 + (row * 29) % 79)] for row in range(500)
 ]
 redacted = [redact_argv(row) for row in arguments]
 

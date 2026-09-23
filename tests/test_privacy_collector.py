@@ -269,9 +269,7 @@ def test_unsigned_codesign_skips_display(monkeypatch):
     values, coverage = _signature("/tmp/unsigned")
     assert coverage == "observed"
     assert values == {"signature": "unsigned"}
-    assert calls == [
-        ("/usr/bin/codesign", ("--verify", "--strict", "--", "/tmp/unsigned"), 3)
-    ]
+    assert calls == [("/usr/bin/codesign", ("--verify", "--strict", "--", "/tmp/unsigned"), 3)]
 
 
 def test_failed_codesign_can_preserve_display_identity(monkeypatch):
