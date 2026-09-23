@@ -22,19 +22,27 @@ from jevproc.core.models import (
 from jevproc.core.privacy import redact_argv
 
 
-def _get(field: str, action: Callable[[], Any], coverage: dict[str, Coverage], default: Any = None) -> Any:
+_FAILURE_COVERAGE = (
+    (psutil.AccessDenied, "denied"),
+    ((psutil.NoSuchProcess, psutil.ZombieProcess), "gone"),
+    ((OSError, NotImplementedError, AttributeError), "unavailable"),
+)
+
+
+def _failure_coverage(exc: BaseException) -> Coverage:
+    return next(state for types, state in _FAILURE_COVERAGE if isinstance(exc, types))
+
+
+def _observed(action: Callable[[], Any], default: Any = None) -> tuple[Any, Coverage]:
     try:
-        value = action()
-    except psutil.AccessDenied:
-        coverage[field] = "denied"
-    except (psutil.NoSuchProcess, psutil.ZombieProcess):
-        coverage[field] = "gone"
-    except (OSError, NotImplementedError):
-        coverage[field] = "unavailable"
-    else:
-        coverage[field] = "observed"
-        return value
-    return default
+        return action(), "observed"
+    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError, NotImplementedError, AttributeError) as exc:
+        return default, _failure_coverage(exc)
+
+
+def _get(field: str, action: Callable[[], Any], coverage: dict[str, Coverage], default: Any = None) -> Any:
+    value, coverage[field] = _observed(action, default)
+    return value
 
 
 class ResourceProcess(Protocol):
@@ -46,14 +54,7 @@ class ResourceProcess(Protocol):
 
 
 def _resource_value(action: Callable[[], Any]) -> tuple[Any, Coverage]:
-    try:
-        return action(), "observed"
-    except psutil.AccessDenied:
-        return None, "denied"
-    except (psutil.NoSuchProcess, psutil.ZombieProcess):
-        return None, "gone"
-    except (OSError, NotImplementedError, AttributeError):
-        return None, "unavailable"
+    return _observed(action)
 
 
 def _resource_coverage(states: list[Coverage]) -> Coverage:
@@ -82,13 +83,11 @@ def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUs
     return ResourceUsage.model_validate(values), _resource_coverage(states)
 
 def _prime_resource_probe(pid: int) -> psutil.Process | None:
-    try:
-        proc = psutil.Process(pid)
-        proc.cpu_percent(interval=None)
-    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
+    proc, state = _observed(lambda: psutil.Process(pid))
+    if state != "observed":
         return None
-    else:
-        return proc
+    _, state = _observed(lambda: proc.cpu_percent(interval=None))
+    return proc if state == "observed" else None
 
 
 def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dict[int, psutil.Process]:
@@ -141,10 +140,8 @@ def _process_name_without_cmdline(
         "darwin": lambda: _darwin_process_name(pid, darwin_comm),
     }
     action = resolvers.get(sys.platform, lambda: proc.name()[:512])
-    try:
-        return action()
-    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
-        return "<unavailable>"
+    value, state = _observed(action, "<unavailable>")
+    return value if state == "observed" else "<unavailable>"
 
 
 def _linux_executable(pid: int) -> str | None:
@@ -167,11 +164,8 @@ def _process_executable_without_cmdline(
         "darwin": lambda: _darwin_executable(pid, darwin_comm),
     }
     action = resolvers.get(sys.platform, lambda: (proc.exe() or None))
-    try:
-        value = action()
-    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
-        return None
-    return value[:8192] if value else None
+    value, state = _observed(action)
+    return value[:8192] if state == "observed" and value else None
 
 def _age_band(created: float | None, now: float) -> str:
     if created is None or created > now:
