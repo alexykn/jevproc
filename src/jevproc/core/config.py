@@ -21,6 +21,17 @@ def _require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
+def _yaml_mapping_key(loader: yaml.SafeLoader, key_node, mapping: dict, deep: bool):
+    key = loader.construct_object(key_node, deep=deep)
+    try:
+        duplicate = key in mapping
+    except TypeError as exc:
+        raise yaml.YAMLError("configuration mapping key must be a scalar") from exc
+    if duplicate:
+        raise yaml.YAMLError("duplicate configuration mapping key")
+    return key
+
+
 class UniqueSafeLoader(yaml.SafeLoader):
     """Reject ambiguous duplicate mapping keys rather than silently changing policy."""
 
@@ -28,13 +39,7 @@ class UniqueSafeLoader(yaml.SafeLoader):
         self.flatten_mapping(node)
         mapping = {}
         for key_node, value_node in node.value:
-            key = self.construct_object(key_node, deep=deep)
-            try:
-                duplicate = key in mapping
-            except TypeError as exc:
-                raise yaml.YAMLError("configuration mapping key must be a scalar") from exc
-            if duplicate:
-                raise yaml.YAMLError("duplicate configuration mapping key")
+            key = _yaml_mapping_key(self, key_node, mapping, deep)
             mapping[key] = self.construct_object(value_node, deep=deep)
         return mapping
 
