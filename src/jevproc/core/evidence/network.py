@@ -195,14 +195,24 @@ def _group_sockets(sockets) -> dict[int, list[Connection]]:
     return dict(by_pid)
 
 
-def _psutil_network() -> tuple[dict[int, list[Connection]], Coverage]:
-    sockets, state = observed(lambda: psutil.net_connections(kind="inet"), [])
+def _unavailable_network(state: Coverage) -> tuple[dict[int, list[Connection]], Coverage]:
     if state == "denied" and sys.platform == "darwin":
         return _lsof_network()
-    if state != "observed":
-        return {}, "denied" if state == "denied" else "unavailable"
+    return {}, "denied" if state == "denied" else "unavailable"
+
+
+def _socket_coverage(sockets) -> Coverage:
     incomplete = any((os.geteuid() != 0, any(item.pid is None for item in sockets)))
-    return _group_sockets(sockets), "partial" if incomplete else "observed"
+    return "partial" if incomplete else "observed"
+
+
+def _psutil_network() -> tuple[dict[int, list[Connection]], Coverage]:
+    sockets, state = observed(lambda: psutil.net_connections(kind="inet"), [])
+    return (
+        (_group_sockets(sockets), _socket_coverage(sockets))
+        if state == "observed"
+        else _unavailable_network(state)
+    )
 
 
 def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
@@ -212,16 +222,17 @@ def _executable_changed(current: psutil.Process, expected: str | None) -> bool:
     return bool(expected and current.exe() != expected)
 
 
-def _live_process(pid: int) -> tuple[psutil.Process | None, Coverage]:
-    return observed(lambda: psutil.Process(pid))
-
-
-def _live_created_at(current: psutil.Process) -> tuple[float | None, Coverage]:
-    return observed(current.create_time)
+def _current_start(pid: int) -> tuple[psutil.Process, float]:
+    current = psutil.Process(pid)
+    return current, current.create_time()
 
 
 def _live_executable(current: psutil.Process, expected: str | None) -> tuple[str | None, Coverage]:
     return observed(current.exe) if expected else (None, "observed")
+
+
+def _executable_mismatch(expected: str | None, actual: str | None) -> bool:
+    return bool(expected and actual != expected)
 
 
 def _unverified_state(state: Coverage) -> tuple[str, Coverage]:
@@ -229,22 +240,22 @@ def _unverified_state(state: Coverage) -> tuple[str, Coverage]:
 
 
 def _revalidate_process(process: Process) -> tuple[str, Coverage]:
-    current, state = _live_process(process.pid)
-    if state != "observed" or current is None:
-        return _unverified_state(state)
-
-    created, state = _live_created_at(current)
+    identity, state = observed(lambda: _current_start(process.pid))
     if state != "observed":
         return _unverified_state(state)
+
+    current, created = identity
     if created != process.created_at:
         return "reused", "unavailable"
 
     executable, state = _live_executable(current, process.executable)
     if state != "observed":
         return _unverified_state(state)
-    if process.executable and executable != process.executable:
-        return "changed", "unavailable"
-    return process.freshness, "observed"
+    return (
+        ("changed", "unavailable")
+        if _executable_mismatch(process.executable, executable)
+        else (process.freshness, "observed")
+    )
 
 
 def _network_state(
