@@ -57,10 +57,14 @@ def test_corpus_resources_do_not_encode_the_label():
     benign = {case.id: case.process for case in corpus.cases if case.label == "benign"}
     suspicious = {case.id: case.process for case in corpus.cases if case.label == "suspicious"}
 
-    assert benign["benign-clang-build"].resources.cpu_percent > 100
-    assert benign["benign-browser-renderer"].resources.rss_bytes > 1024 * 1024 * 1024
-    assert suspicious["susp-world-writable-root-no-network"].resources.cpu_percent < 1
-    assert suspicious["susp-temp-dropper-network"].resources.rss_bytes < 100 * 1024 * 1024
+    benign_cpu = benign["benign-clang-build"].resources.cpu_percent
+    benign_rss = benign["benign-browser-renderer"].resources.rss_bytes
+    suspicious_cpu = suspicious["susp-world-writable-root-no-network"].resources.cpu_percent
+    suspicious_rss = suspicious["susp-temp-dropper-network"].resources.rss_bytes
+    assert benign_cpu is not None and benign_cpu > 100
+    assert benign_rss is not None and benign_rss > 1024 * 1024 * 1024
+    assert suspicious_cpu is not None and suspicious_cpu < 1
+    assert suspicious_rss is not None and suspicious_rss < 100 * 1024 * 1024
 
     assert benign["benign-container-runtime"].child_count > 0
     assert suspicious["susp-browser-shell-hidden-child"].child_count > 0
@@ -134,6 +138,7 @@ def _mock_client(monkeypatch, score_for_label):
         return httpx.MockTransport(handler)
 
     def client(settings, api_key, *, base_url):
+        assert base_url
         return RealJevClient(
             settings,
             api_key or "test-key",
