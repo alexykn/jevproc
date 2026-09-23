@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import psutil
 
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence.access import observed
 from jevproc.core.models import (
     Connection,
     Coverage,
@@ -196,12 +197,11 @@ def _group_sockets(sockets) -> dict[int, list[Connection]]:
 
 
 def _psutil_network() -> tuple[dict[int, list[Connection]], Coverage]:
-    try:
-        sockets = psutil.net_connections(kind="inet")
-    except psutil.AccessDenied:
-        return _lsof_network() if sys.platform == "darwin" else ({}, "denied")
-    except (OSError, NotImplementedError):
-        return {}, "unavailable"
+    sockets, state = observed(lambda: psutil.net_connections(kind="inet"), [])
+    if state == "denied" and sys.platform == "darwin":
+        return _lsof_network()
+    if state != "observed":
+        return {}, "denied" if state == "denied" else "unavailable"
     incomplete = any((os.geteuid() != 0, any(item.pid is None for item in sockets)))
     return _group_sockets(sockets), "partial" if incomplete else "observed"
 
@@ -213,20 +213,24 @@ def _executable_changed(current: psutil.Process, expected: str | None) -> bool:
     return bool(expected and current.exe() != expected)
 
 
+def _live_identity(process: Process) -> tuple[float, str | None]:
+    current = psutil.Process(process.pid)
+    oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
+    with oneshot:
+        return current.create_time(), current.exe() if process.executable else None
+
+
 def _revalidate_process(process: Process) -> tuple[str, Coverage]:
-    try:
-        current = psutil.Process(process.pid)
-        oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
-        with oneshot:
-            if current.create_time() != process.created_at:
-                return "reused", "unavailable"
-            if _executable_changed(current, process.executable):
-                return "changed", "unavailable"
-    except psutil.NoSuchProcess:
-        return "gone", "gone"
-    except (psutil.AccessDenied, OSError):
-        return "unverified", "unavailable"
-    return process.freshness, "observed"
+    identity, state = observed(lambda: _live_identity(process))
+    if state != "observed":
+        freshness = "gone" if state == "gone" else "unverified"
+        return freshness, "gone" if state == "gone" else "unavailable"
+    created, executable = identity
+    outcomes = (
+        (created != process.created_at, ("reused", "unavailable")),
+        (bool(process.executable and executable != process.executable), ("changed", "unavailable")),
+    )
+    return next((result for changed, result in outcomes if changed), (process.freshness, "observed"))
 
 
 def _network_state(
