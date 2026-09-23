@@ -2,6 +2,7 @@
 
 import asyncio
 import math
+import re
 import secrets
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
@@ -110,9 +111,13 @@ def retry_after(headers: httpx.Headers) -> float | None:
     return numeric if numeric is not None else _http_date_delay(raw)
 
 
+_REQUEST_ID_UNSAFE = re.compile(r"[^A-Za-z0-9_-]")
+_MACHINE_VALUE = re.compile(r"[A-Za-z0-9._:-]{1,80}\Z")
+_API_KEY = re.compile(r"[!-~]+\Z")
+
+
 def _safe_request_id(response: httpx.Response) -> str:
-    value = response.headers.get("x-typesafe-request-id", "")[:100]
-    return "".join(char for char in value if char.isalnum() or char in "-_")
+    return _REQUEST_ID_UNSAFE.sub("", response.headers.get("x-typesafe-request-id", "")[:100])
 
 
 def _machine_scalar(value: object) -> str | None:
@@ -126,9 +131,7 @@ def _machine_scalar(value: object) -> str | None:
 
 def _safe_machine_value(value: object) -> str | None:
     text = _machine_scalar(value)
-    valid = text is not None and 1 <= len(text) <= 80
-    safe = valid and all(char.isalnum() or char in "._:-" for char in text)
-    return text if safe else None
+    return text if text is not None and _MACHINE_VALUE.fullmatch(text) else None
 
 
 _MACHINE_FIELD_KEYS = frozenset({"code", "type", "status", "error"})
@@ -183,9 +186,9 @@ def _machine_values(response: httpx.Response) -> Iterator[str]:
 
 
 def _context_error(response: httpx.Response) -> bool:
-    return response.status_code == 413 or (
-        response.status_code in {400, 422}
-        and any(value in _CONTEXT_CODES for value in _machine_values(response))
+    payload_status = response.status_code in {400, 422}
+    return response.status_code == 413 or bool(
+        payload_status and _CONTEXT_CODES.intersection(_machine_values(response))
     )
 
 
@@ -198,7 +201,7 @@ class _Retry:
 def _validate_api_key(api_key: str) -> None:
     if not api_key.strip():
         raise JevError("set TYPESAFE_API_KEY for live analysis, or use --offline or --demo")
-    if any(ord(char) < 33 or ord(char) > 126 for char in api_key):
+    if _API_KEY.fullmatch(api_key) is None:
         raise JevError("TYPESAFE_API_KEY contains invalid header characters")
 
 
@@ -345,12 +348,10 @@ def _generic_http_error(response: httpx.Response) -> JevError:
 
 
 def _permanent_failure(response: httpx.Response) -> JevError | None:
-    if _context_error(response):
-        return ContextLimitError("Jev rejected the context size")
-    if response.status_code in {400, 422}:
-        return _request_rejected(response)
+    contextual = ContextLimitError("Jev rejected the context size") if _context_error(response) else None
+    rejected = _request_rejected(response) if response.status_code in {400, 422} else None
     transient = response.status_code in {408, 429} or response.status_code >= 500
-    return None if transient else _generic_http_error(response)
+    return contextual or rejected or (None if transient else _generic_http_error(response))
 
 
 def _raise_permanent_failure(response: httpx.Response) -> None:
