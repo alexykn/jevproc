@@ -22,43 +22,53 @@ from jevproc.core.protocol import JevError
 from jevproc.core.storage import AnswerCache, StorageError, default_cache_dir, write_private
 
 
+def _apply_boolean_flags(
+    args: argparse.Namespace,
+    target: dict[str, Any],
+    flags: tuple[tuple[str, str], ...],
+    value: bool,
+) -> None:
+    target.update({key: value for flag, key in flags if getattr(args, flag)})
+
+
 def _enable_collection_flags(args: argparse.Namespace, collection: dict[str, Any]) -> None:
-    for flag, key in (
-        ("include_command_line", "command_line"),
-        ("hashes", "hashes"),
-        ("signatures", "signatures"),
-    ):
-        if getattr(args, flag):
-            collection[key] = True
+    _apply_boolean_flags(
+        args,
+        collection,
+        (("include_command_line", "command_line"), ("hashes", "hashes"), ("signatures", "signatures")),
+        True,
+    )
 
 
 def _disable_collection_flags(args: argparse.Namespace, collection: dict[str, Any]) -> None:
-    for flag, key in (
-        ("no_command_line", "command_line"),
-        ("no_hashes", "hashes"),
-        ("no_signatures", "signatures"),
-        ("no_resources", "resources"),
-        ("no_connections", "connections"),
-    ):
-        if getattr(args, flag):
-            collection[key] = False
+    _apply_boolean_flags(
+        args,
+        collection,
+        (
+            ("no_command_line", "command_line"),
+            ("no_hashes", "hashes"),
+            ("no_signatures", "signatures"),
+            ("no_resources", "resources"),
+            ("no_connections", "connections"),
+        ),
+        False,
+    )
+
+
+def _present_overrides(args: argparse.Namespace, fields: tuple[tuple[str, str], ...]) -> dict[str, Any]:
+    values = ((key, getattr(args, attribute)) for attribute, key in fields)
+    return {key: value for key, value in values if value is not None}
 
 
 def _collection_limits(args: argparse.Namespace, collection: dict[str, Any]) -> None:
-    overrides = {
-        "max_processes": args.max_processes,
-        "workers": args.collection_workers,
-    }
-    collection.update({key: value for key, value in overrides.items() if value is not None})
+    collection.update(
+        _present_overrides(args, (("max_processes", "max_processes"), ("collection_workers", "workers")))
+    )
 
 
 def _jev_overrides(args: argparse.Namespace, jev: dict[str, Any]) -> None:
-    for name in ("model", "max_requests", "concurrency"):
-        value = getattr(args, name)
-        if value is not None:
-            jev[name] = value
-    if args.demo:
-        jev["requests_per_minute"] = 0
+    jev.update(_present_overrides(args, tuple((name, name) for name in ("model", "max_requests", "concurrency"))))
+    jev.update({"requests_per_minute": 0} if args.demo else {})
 
 
 def _settings(args: argparse.Namespace) -> Config:
@@ -195,19 +205,28 @@ async def _run(args: argparse.Namespace, config: Config, stdout: TextIO, stderr:
             cache = _answer_cache(args, config, stack)
             return await _cycles(args, config, Engine(config, client, cache), stdout)
 
+def _conflict(active: object, conflicts: tuple[object, ...], message: str) -> str | None:
+    return message if active and any(conflicts) else None
+
+
 def _watch_error(args: argparse.Namespace) -> str | None:
-    invalid = args.watch and any((args.demo, args.input, args.save_snapshot, args.format == "json"))
-    return "--watch requires live collection, text/jsonl output, and no --save-snapshot" if invalid else None
+    return _conflict(
+        args.watch,
+        (args.demo, args.input, args.save_snapshot, args.format == "json"),
+        "--watch requires live collection, text/jsonl output, and no --save-snapshot",
+    )
 
 
 def _demo_error(args: argparse.Namespace) -> str | None:
-    invalid = args.demo and any((args.input, args.pid, args.family, args.save_snapshot))
-    return "--demo cannot be combined with --input, --pid, --family or --save-snapshot" if invalid else None
+    return _conflict(
+        args.demo,
+        (args.input, args.pid, args.family, args.save_snapshot),
+        "--demo cannot be combined with --input, --pid, --family or --save-snapshot",
+    )
 
 
 def _input_error(args: argparse.Namespace) -> str | None:
-    invalid = args.input and any((args.pid, args.family))
-    return "--pid/--family cannot be combined with --input" if invalid else None
+    return _conflict(args.input, (args.pid, args.family), "--pid/--family cannot be combined with --input")
 
 
 def _validate_args(p: argparse.ArgumentParser, args: argparse.Namespace) -> None:
