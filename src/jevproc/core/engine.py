@@ -54,18 +54,18 @@ class Engine:
     ):
         self.config, self.client, self.cache = config, client, cache
 
+    def _model_matches(self, answer: JevResponse) -> bool:
+        requested = self.config.jev.model
+        return requested in {"jev-latest", "jev-preview"} or answer.model == requested
+
     def _cached_answer(self, key: str, questions: Mapping[str, Question]) -> JevResponse | None:
         if self.cache is None:
             return None
         answer = self.cache.get(key, questions)
-        if (
-            answer
-            and self.config.jev.model not in {"jev-latest", "jev-preview"}
-            and answer.model != self.config.jev.model
-        ):
-            self.cache.delete(key)
-            return None
-        return answer
+        if answer is None or self._model_matches(answer):
+            return answer
+        self.cache.delete(key)
+        return None
 
     async def _answer(self, request: EvaluationRequest) -> tuple[JevResponse, bool]:
         assert self.client is not None
@@ -196,6 +196,25 @@ def _request_summary(
     }
 
 
+def _assessment_counts(assessments: list[Assessment]) -> dict[str, int | bool]:
+    operational_failures = sum(assessment.error is not None for assessment in assessments)
+    return {
+        "evaluated": sum(assessment.model is not None for assessment in assessments),
+        "failed_processes": operational_failures,
+        "cached_processes": sum(assessment.cached for assessment in assessments),
+        "has_failures": bool(operational_failures),
+    }
+
+
+def _snapshot_counts(snapshot: Snapshot) -> dict[str, int]:
+    return {
+        "processes": len(snapshot.processes),
+        "omitted": snapshot.omitted,
+        "coverage_limited": sum(map(_coverage_limited, snapshot.processes)),
+        "unstable_processes": sum(process.freshness != "observed" for process in snapshot.processes),
+    }
+
+
 def _scan_summary(
     snapshot: Snapshot,
     assessments: list[Assessment],
@@ -204,22 +223,19 @@ def _scan_summary(
     started: float,
     mode: str,
 ) -> dict:
-    operational_failures = sum(assessment.error is not None for assessment in assessments)
+    assessment = _assessment_counts(assessments)
+    snapshot_counts = _snapshot_counts(snapshot)
     return {
-        "processes": len(snapshot.processes),
-        "omitted": snapshot.omitted,
-        "evaluated": sum(assessment.model is not None for assessment in assessments),
+        **snapshot_counts,
+        "evaluated": assessment["evaluated"],
         **_status_summary(assessments),
-        "coverage_limited": sum(map(_coverage_limited, snapshot.processes)),
-        "unstable_processes": sum(process.freshness != "observed" for process in snapshot.processes),
-        "failed_processes": operational_failures,
-        "incomplete": bool(operational_failures or snapshot.omitted),
-        "cached_processes": sum(assessment.cached for assessment in assessments),
+        "failed_processes": assessment["failed_processes"],
+        "incomplete": bool(assessment["has_failures"] or snapshot.omitted),
+        "cached_processes": assessment["cached_processes"],
         **_request_summary(before, after),
         "elapsed_seconds": round(time.monotonic() - started, 3),
         "synthetic": snapshot.synthetic or mode == "demo",
     }
-
 
 def _initial_assessment(process: Process, mode: str) -> Assessment | None:
     if mode == "offline":
