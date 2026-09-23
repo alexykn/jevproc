@@ -32,12 +32,16 @@ def _unique(values: Iterable[Hashable]) -> bool:
     return len(items) == len(set(items))
 
 
+def _duplicate_error(values: Iterable[Hashable], message: str) -> str | None:
+    return None if _unique(values) else message
+
+
 def _validate_case_identity(cases: list[CorpusCase]) -> None:
-    identities = (
-        ([case.id for case in cases], "corpus case IDs must be unique"),
-        ([case.process.pid for case in cases], "corpus process PIDs must be unique"),
+    checks = (
+        _duplicate_error((case.id for case in cases), "corpus case IDs must be unique"),
+        _duplicate_error((case.process.pid for case in cases), "corpus process PIDs must be unique"),
     )
-    message = next((message for values, message in identities if not _unique(values)), None)
+    message = next(filter(None, checks), None)
     if message is not None:
         raise ValueError(message)
 
