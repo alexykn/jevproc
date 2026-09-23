@@ -4,6 +4,7 @@ import asyncio
 import math
 import random
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from typing import Self
@@ -142,6 +143,12 @@ def _context_error(response: httpx.Response) -> bool:
     )
 
 
+@dataclass(frozen=True)
+class _Retry:
+    delay: float
+    defer_shared: bool = False
+
+
 class JevClient:
     def __init__(
         self,
@@ -199,19 +206,31 @@ class JevClient:
 
     async def evaluate(self, body: bytes, questions: dict[str, Question]) -> JevResponse:
         for attempt in range(self.settings.retries + 1):
-            try:
-                response = await self._post(body)
-            except httpx.RequestError as exc:
-                delay = self._transport_retry(exc, attempt)
-            else:
-                if response.is_success:
-                    return self._accept_response(response, questions)
-                delay = self._response_retry(response, attempt)
-                # Preserve shared overload pacing, independently of a worker's own sleep.
-                self.limiter.defer(delay)
-            self.retries += 1
-            await asyncio.sleep(delay)
+            outcome = await self._attempt(body, questions, attempt)
+            if isinstance(outcome, JevResponse):
+                return outcome
+            await self._wait_before_retry(outcome)
         raise AssertionError("retry loop must return or raise")
+
+    async def _attempt(
+        self,
+        body: bytes,
+        questions: dict[str, Question],
+        attempt: int,
+    ) -> JevResponse | _Retry:
+        try:
+            response = await self._post(body)
+        except httpx.RequestError as exc:
+            return _Retry(self._transport_retry(exc, attempt))
+        if response.is_success:
+            return self._accept_response(response, questions)
+        return _Retry(self._response_retry(response, attempt), defer_shared=True)
+
+    async def _wait_before_retry(self, retry: _Retry) -> None:
+        if retry.defer_shared:
+            self.limiter.defer(retry.delay)
+        self.retries += 1
+        await asyncio.sleep(retry.delay)
 
     def _accept_response(self, response: httpx.Response, questions: dict[str, Question]) -> JevResponse:
         validated = validate_response(response.content, questions)
