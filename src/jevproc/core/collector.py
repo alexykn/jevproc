@@ -182,6 +182,7 @@ def collect(
     processes = _collect_selected_processes(selected, settings, now)
     return sanitize_snapshot(_snapshot(now, processes, omitted), settings.command_line)
 
+
 def load_snapshot(path: Path, include_command_line: bool = False) -> Snapshot:
     with path.open("rb") as handle:
         raw = handle.read(16 * 1024 * 1024 + 1)

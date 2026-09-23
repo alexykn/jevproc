@@ -37,9 +37,7 @@ async def test_cache_is_per_process_and_only_changed_process_reexecutes(config, 
             assert second.summary["cached_processes"] == 4
 
             changed_process = snapshot.processes[0].model_copy(update={"executable": "/different/tool"})
-            changed = snapshot.model_copy(
-                update={"processes": [changed_process, *snapshot.processes[1:]]}
-            )
+            changed = snapshot.model_copy(update={"processes": [changed_process, *snapshot.processes[1:]]})
             third = await engine.scan(changed, "demo")
             assert third.summary["requests"] == 1
             assert third.summary["cached_processes"] == 3
@@ -51,10 +49,7 @@ async def test_context_rejection_is_process_local(config, snapshot):
         pid = payload["state"]["process"]["pid"]
         if pid == 4819:
             return httpx.Response(413)
-        answers = {
-            key: {"type": "noul", "noul": 0.08}
-            for key in payload["questions"]
-        }
+        answers = {key: {"type": "noul", "noul": 0.08} for key in payload["questions"]}
         return httpx.Response(
             200,
             json={
@@ -64,9 +59,7 @@ async def test_context_rejection_is_process_local(config, snapshot):
             },
         )
 
-    async with JevClient(
-        config.jev, "demo", transport=httpx.MockTransport(handler)
-    ) as client:
+    async with JevClient(config.jev, "demo", transport=httpx.MockTransport(handler)) as client:
         report = await Engine(config, client).scan(snapshot, "demo")
     assert report.summary["requests"] == 4
     assert report.summary["evaluated"] == 3
@@ -115,10 +108,7 @@ async def test_hundreds_of_processes_use_independent_bounded_requests(config, sn
     data = config.model_dump(mode="json")
     data["jev"]["concurrency"] = 8
     config = Config.model_validate(data)
-    processes = [
-        snapshot.processes[0].model_copy(update={"pid": 10000 + index, "ppid": None})
-        for index in range(700)
-    ]
+    processes = [snapshot.processes[0].model_copy(update={"pid": 10000 + index, "ppid": None}) for index in range(700)]
     source = snapshot.model_copy(update={"processes": processes})
     calls = 0
     active = 0
@@ -133,10 +123,7 @@ async def test_hundreds_of_processes_use_independent_bounded_requests(config, sn
         assert payload["state"]["process"]["pid"] >= 10000
         assert len(payload["questions"]) == 1
         await asyncio.sleep(0)
-        answers = {
-            key: {"type": "noul", "noul": 0.08}
-            for key in payload["questions"]
-        }
+        answers = {key: {"type": "noul", "noul": 0.08} for key in payload["questions"]}
         active -= 1
         return httpx.Response(
             200,
@@ -147,9 +134,7 @@ async def test_hundreds_of_processes_use_independent_bounded_requests(config, sn
             },
         )
 
-    async with JevClient(
-        config.jev, "demo", transport=httpx.MockTransport(handler)
-    ) as client:
+    async with JevClient(config.jev, "demo", transport=httpx.MockTransport(handler)) as client:
         report = await Engine(config, client).scan(source, "demo")
     assert calls == 700
     assert report.summary["requests"] == 700
@@ -175,10 +160,7 @@ async def test_assessment_callback_streams_before_scan_completes(config, snapsho
         pid = payload["state"]["process"]["pid"]
         if pid == 4819:
             await release_slow.wait()
-        answers = {
-            key: {"type": "noul", "noul": 0.08}
-            for key in payload["questions"]
-        }
+        answers = {key: {"type": "noul", "noul": 0.08} for key in payload["questions"]}
         return httpx.Response(
             200,
             json={
@@ -193,9 +175,7 @@ async def test_assessment_callback_streams_before_scan_completes(config, snapsho
         if assessment.process.pid == 3101:
             fast_emitted.set()
 
-    async with JevClient(
-        config.jev, "demo", transport=httpx.MockTransport(handler)
-    ) as client:
+    async with JevClient(config.jev, "demo", transport=httpx.MockTransport(handler)) as client:
         task = asyncio.create_task(
             Engine(config, client).scan(
                 source,

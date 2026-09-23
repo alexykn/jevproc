@@ -42,9 +42,7 @@ class Corpus(CorpusRecord):
 
 
 def load_corpus() -> Corpus:
-    return Corpus.model_validate_json(
-        files("jevproc").joinpath("data/test-corpus.json").read_bytes()
-    )
+    return Corpus.model_validate_json(files("jevproc").joinpath("data/test-corpus.json").read_bytes())
 
 
 def selected_cases(corpus: Corpus, selected: list[str] | None) -> list[CorpusCase]:

@@ -20,7 +20,7 @@ def test_threshold_patch_is_additive(tmp_path):
 
 def test_custom_rules_and_explicit_ignore(tmp_path):
     path = tmp_path / "config.yaml"
-    path.write_text('''ignore: [JPR001]
+    path.write_text("""ignore: [JPR001]
 rulesets:
   local:
     - id: LOCAL01
@@ -29,19 +29,26 @@ rulesets:
       question:
         type: noul
         instructions: Does the invocation violate the supplied site context?
-''')
+""")
     config = load_config(path)
     assert len(config.active_rules) == 1
     assert [r.id for r in config.active_rules] == ["LOCAL01"]
 
 
-@pytest.mark.parametrize("text", [
-    "jev: {timeout_seconds: 0}", "jev: {timeout_seconds: .nan}", "unknown: true",
-    "ignore: [TYPO]", "ignore: [process]", "rulesets: {process: oops}",
-    "rulesets: {process: [{id: JPR001}, {id: JPR001}]}",
-    "rulesets: {process: [{id: JPR001, policy: {warning_at: 0.5, uncertain_at: 0.7}}]}",
-    "rulesets: {local: [{id: LOCALC, title: x, message: x, question: {type: choice, instructions: x, criteria: {a: a, b: b}}, policy: {warning_choices: [invented]}}]}",
-])
+@pytest.mark.parametrize(
+    "text",
+    [
+        "jev: {timeout_seconds: 0}",
+        "jev: {timeout_seconds: .nan}",
+        "unknown: true",
+        "ignore: [TYPO]",
+        "ignore: [process]",
+        "rulesets: {process: oops}",
+        "rulesets: {process: [{id: JPR001}, {id: JPR001}]}",
+        "rulesets: {process: [{id: JPR001, policy: {warning_at: 0.5, uncertain_at: 0.7}}]}",
+        "rulesets: {local: [{id: LOCALC, title: x, message: x, question: {type: choice, instructions: x, criteria: {a: a, b: b}}, policy: {warning_choices: [invented]}}]}",
+    ],
+)
 def test_invalid_config_rejected(tmp_path, text):
     path = tmp_path / "bad.yaml"
     path.write_text(text)

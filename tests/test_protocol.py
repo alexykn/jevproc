@@ -38,12 +38,10 @@ def test_request_contains_only_one_process_but_all_applicable_rules(config, snap
 def test_noul_is_scalar_without_confidence():
     question = NoulQuestion(type="noul", instructions="Is evidence present?")
     value = validate_response(
-        encode(
-            {
-                "model": "jev-1.13.0",
-                "answers": {"q": {"type": "noul", "noul": 0.7}},
-            }
-        ),
+        encode({
+            "model": "jev-1.13.0",
+            "answers": {"q": {"type": "noul", "noul": 0.7}},
+        }),
         {"q": question},
     )
     assert value.answers["q"].noul == 0.7
@@ -83,9 +81,7 @@ def test_provider_distributions_not_normalized_or_rejected():
 )
 def test_bad_noul_rejected(noul):
     question = NoulQuestion(type="noul", instructions="Evidence?")
-    raw = json.dumps(
-        {"model": "jev-1.13.0", "answers": {"q": {"type": "noul", "noul": noul}}}
-    ).encode()
+    raw = json.dumps({"model": "jev-1.13.0", "answers": {"q": {"type": "noul", "noul": noul}}}).encode()
     with pytest.raises(JevError):
         validate_response(raw, {"q": question})
 

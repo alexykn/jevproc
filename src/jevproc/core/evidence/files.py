@@ -132,6 +132,7 @@ def _signature(path: str) -> tuple[dict[str, Any], Coverage]:
         values.update(_signature_metadata(display))
     return values, "observed"
 
+
 def _valid_file_path(path: str | None) -> bool:
     return bool(path and os.path.isabs(path) and "\x00" not in path)
 
@@ -196,6 +197,7 @@ def _file_info(
     if stable:
         _remember_file(cache, key, executable, final_coverage)
     return executable, final_coverage
+
 
 def _observations(path: str | None, info: Executable) -> list[str]:
     facts = []

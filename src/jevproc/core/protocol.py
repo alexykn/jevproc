@@ -46,9 +46,7 @@ class RequestRejectedError(JevError):
         machine_fields: dict[str, tuple[str, ...]],
         request_id: str,
     ) -> None:
-        details = ", ".join(
-            f"{key}={','.join(values)}" for key, values in machine_fields.items() if values
-        )
+        details = ", ".join(f"{key}={','.join(values)}" for key, values in machine_fields.items() if values)
         suffix = f"; {details}" if details else ""
         request = f"; request-id={request_id}" if request_id else ""
         super().__init__(f"Jev rejected request (HTTP {status}{suffix}{request})")
@@ -95,9 +93,7 @@ class JevResponse(Wire):
 
 
 def encode(value: Any) -> bytes:
-    return json.dumps(
-        value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False
-    ).encode("utf-8")
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
 def validate_response(raw: bytes, questions: dict[str, Question]) -> JevResponse:
@@ -208,9 +204,7 @@ def _process_state(process: Process) -> dict[str, Any]:
 
 def make_request(snapshot: Snapshot, process: Process, config: Config) -> EvaluationRequest:
     checks = [
-        Check(f"{process.ref}_{rule.id}", process, rule)
-        for rule in config.active_rules
-        if applicable(rule, process)
+        Check(f"{process.ref}_{rule.id}", process, rule) for rule in config.active_rules if applicable(rule, process)
     ]
     state = {
         "schema_version": 1,

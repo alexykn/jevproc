@@ -142,15 +142,13 @@ class Reporter:
         self.closed = False
 
         if self.format_name == "jsonl":
-            self._json_line(
-                {
-                    "event": "start",
-                    "schema_version": 1,
-                    "mode": mode,
-                    "snapshot_time": snapshot_time,
-                    "model_requested": model_requested,
-                }
-            )
+            self._json_line({
+                "event": "start",
+                "schema_version": 1,
+                "mode": mode,
+                "snapshot_time": snapshot_time,
+                "model_requested": model_requested,
+            })
         else:
             self._header()
 
@@ -270,21 +268,13 @@ class Reporter:
             self.term.line("SHA-256 (on disk): " + process.file.sha256, indent=6, style="\x1b[2m")
         for connection in process.connections:
             local = f"[{connection.local_address}]:{connection.local_port}"
-            remote = (
-                f"[{connection.remote_address}]:{connection.remote_port}"
-                if connection.remote_address
-                else "-"
-            )
+            remote = f"[{connection.remote_address}]:{connection.remote_port}" if connection.remote_address else "-"
             self.term.line(
                 f"Socket: {connection.protocol} local={local} remote={remote} {connection.status}",
                 indent=6,
                 style="\x1b[2m",
             )
-        coverage = ", ".join(
-            f"{key}={value}"
-            for key, value in sorted(process.coverage.items())
-            if value != "observed"
-        )
+        coverage = ", ".join(f"{key}={value}" for key, value in sorted(process.coverage.items()) if value != "observed")
         if coverage:
             self.term.line(f"Coverage: {coverage}", indent=6, style="\x1b[2m")
 

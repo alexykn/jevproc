@@ -121,10 +121,7 @@ def _mock_client(monkeypatch, score_for_label):
             process = payload["state"]["process"]
             case = by_pid[process["pid"]]
             value = score_for_label(case.label)
-            answers = {
-                key: {"type": "noul", "noul": value}
-                for key in payload["questions"]
-            }
+            answers = {key: {"type": "noul", "noul": value} for key in payload["questions"]}
             return httpx.Response(
                 200,
                 json={

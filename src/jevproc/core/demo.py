@@ -25,7 +25,8 @@ def demo_transport() -> httpx.MockTransport:
             if answer is None or answer["type"] != question["type"]:
                 return httpx.Response(422, json={"error": {"code": "unsupported_demo_rule"}})
             answers[key] = answer
-        return httpx.Response(200, json={"model": payload["model"], "answers": answers,
-                                        "usage": {"input_tokens": 0, "output_tokens": 0}})
+        return httpx.Response(
+            200, json={"model": payload["model"], "answers": answers, "usage": {"input_tokens": 0, "output_tokens": 0}}
+        )
 
     return httpx.MockTransport(handle)

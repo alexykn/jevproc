@@ -115,12 +115,15 @@ async def _run(args: argparse.Namespace, config: Config, stdout: TextIO, stderr:
         return await _cycles(args, config, Engine(config), stdout)
     api_key = "synthetic-demo-key" if args.demo else os.environ.get("TYPESAFE_API_KEY", "")
     origin = "https://api.typesafe.ai" if args.demo else os.environ.get("TYPESAFE_BASE_URL", "https://api.typesafe.ai")
-    async with JevClient(config.jev, api_key, base_url=origin, transport=demo_transport() if args.demo else None) as client:
+    async with JevClient(
+        config.jev, api_key, base_url=origin, transport=demo_transport() if args.demo else None
+    ) as client:
         if not args.demo:
             Terminal(stderr, color=args.color, width=args.width).line(
                 "Live mode sends sanitized process metadata to the configured TypeSafe endpoint. "
                 "Target environments and memory are not read; binary contents are never submitted. Use --offline for local inventory.",
-                style="\x1b[2m")
+                style="\x1b[2m",
+            )
         with ExitStack() as stack:
             cache = None
             if config.cache.enabled:
@@ -152,7 +155,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     except (OSError, sqlite3.Error, ValidationError, UnicodeError) as exc:
         # Never display a validation error containing a snapshot or config secret.
-        Terminal(sys.stderr, color="never").line(f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied")
+        Terminal(sys.stderr, color="never").line(
+            f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied"
+        )
         return 2
     except ExceptionGroup as exc:
         # TaskGroup failures must remain operational failures, not a successful empty report.

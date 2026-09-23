@@ -5,7 +5,9 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Coverage = Literal["observed", "partial", "denied", "unavailable", "not_requested", "truncated", "gone"]
-Status = Literal["warning", "uncertain_warning", "probably_legitimate", "no_warning", "unknown", "not_applicable", "not_evaluated"]
+Status = Literal[
+    "warning", "uncertain_warning", "probably_legitimate", "no_warning", "unknown", "not_applicable", "not_evaluated"
+]
 Text = Annotated[str, Field(max_length=8192)]
 Name = Annotated[str, Field(max_length=512)]
 
@@ -62,19 +64,22 @@ class Executable(Record):
         "unavailable",
         "not_requested",
     ] = "not_requested"
-    signature_issue: Literal[
-        "weak_resource_rules",
-        "weak_resource_envelope",
-        "signature_modified",
-        "resource_modified",
-        "nested_code_invalid",
-        "requirement_failed",
-        "bundle_format_invalid",
-        "revoked",
-        "certificate_expired",
-        "strict_validation_failed",
-        "other",
-    ] | None = None
+    signature_issue: (
+        Literal[
+            "weak_resource_rules",
+            "weak_resource_envelope",
+            "signature_modified",
+            "resource_modified",
+            "nested_code_invalid",
+            "requirement_failed",
+            "bundle_format_invalid",
+            "revoked",
+            "certificate_expired",
+            "strict_validation_failed",
+            "other",
+        ]
+        | None
+    ) = None
     signature_identifier: Name | None = None
     signature_team_id: Name | None = None
     signature_authorities: list[Name] = Field(default_factory=list, max_length=8)

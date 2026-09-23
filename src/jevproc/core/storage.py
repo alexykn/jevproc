@@ -205,6 +205,7 @@ def _prepare_cache_file(directory: Path) -> Path:
     _validate_cache_file(path)
     return path
 
+
 def _open_cache_database(path: Path) -> sqlite3.Connection:
     """Transfer ownership only after setup succeeds; close on every failure path."""
     with ExitStack() as cleanup:
