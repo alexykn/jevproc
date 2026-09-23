@@ -82,94 +82,139 @@ def _snapshot(args: argparse.Namespace, config: Config) -> Snapshot:
 
 
 def exit_code(report: Report, fail_on: str) -> int:
-    if report.summary["incomplete"]:
-        return 2
-    if fail_on != "none" and report.summary["warnings"]:
-        return 1
-    if fail_on == "any" and report.summary["uncertain_warnings"]:
-        return 1
-    return 0
+    outcomes = (
+        (bool(report.summary["incomplete"]), 2),
+        (bool(fail_on != "none" and report.summary["warnings"]), 1),
+        (bool(fail_on == "any" and report.summary["uncertain_warnings"]), 1),
+    )
+    return next((code for matches, code in outcomes if matches), 0)
+
+
+def _scan_mode(args: argparse.Namespace) -> str:
+    return "demo" if args.demo else "offline" if args.offline else "live"
+
+
+def _save_snapshot(args: argparse.Namespace, snapshot: Snapshot) -> None:
+    if args.save_snapshot is not None:
+        write_private(args.save_snapshot, (snapshot.model_dump_json(indent=2) + "\n").encode())
+
+
+async def _rendered_scan(
+    args: argparse.Namespace,
+    config: Config,
+    engine: Engine,
+    snapshot: Snapshot,
+    stdout: TextIO,
+) -> Report:
+    mode = _scan_mode(args)
+    if args.format == "json":
+        report = await engine.scan(snapshot, mode=mode)
+        render(report, stdout, verbose=args.verbose, format_name=args.format, width=args.width, color=args.color)
+        return report
+
+    reporter = Reporter(
+        stdout,
+        mode=mode,
+        snapshot_time=snapshot.captured_at,
+        model_requested=config.jev.model,
+        synthetic=snapshot.synthetic or mode == "demo",
+        total_processes=len(snapshot.processes),
+        verbose=args.verbose,
+        format_name=args.format,
+        width=args.width,
+        color=args.color,
+    )
+    report = await engine.scan(snapshot, mode=mode, on_assessment=reporter.emit)
+    reporter.finish(report)
+    return report
+
+
+async def _scan_cycle(
+    args: argparse.Namespace,
+    config: Config,
+    engine: Engine,
+    stdout: TextIO,
+) -> Report:
+    snapshot = _snapshot(args, config)
+    _save_snapshot(args, snapshot)
+    return await _rendered_scan(args, config, engine, snapshot, stdout)
+
+
+def _stop_watching(args: argparse.Namespace, report: Report) -> bool:
+    return any((args.watch is None, bool(report.summary["incomplete"])))
 
 
 async def _cycles(args: argparse.Namespace, config: Config, engine: Engine, stdout: TextIO) -> int:
     code = 0
     while True:
-        # Collection is synchronous and bounded by the selected process/file budgets.
-        snapshot = _snapshot(args, config)
-        if args.save_snapshot is not None:
-            write_private(args.save_snapshot, (snapshot.model_dump_json(indent=2) + "\n").encode())
-        mode = "demo" if args.demo else "offline" if args.offline else "live"
-        if args.format == "json":
-            report = await engine.scan(snapshot, mode=mode)
-            render(
-                report,
-                stdout,
-                verbose=args.verbose,
-                format_name=args.format,
-                width=args.width,
-                color=args.color,
-            )
-        else:
-            reporter = Reporter(
-                stdout,
-                mode=mode,
-                snapshot_time=snapshot.captured_at,
-                model_requested=config.jev.model,
-                synthetic=snapshot.synthetic or mode == "demo",
-                total_processes=len(snapshot.processes),
-                verbose=args.verbose,
-                format_name=args.format,
-                width=args.width,
-                color=args.color,
-            )
-            report = await engine.scan(snapshot, mode=mode, on_assessment=reporter.emit)
-            reporter.finish(report)
+        report = await _scan_cycle(args, config, engine, stdout)
         code = max(code, exit_code(report, args.fail_on))
-        if args.watch is None or report.summary["incomplete"]:
+        if _stop_watching(args, report):
             return code
         await asyncio.sleep(args.watch)
+
+def _live_api_key(args: argparse.Namespace) -> str:
+    return "synthetic-demo-key" if args.demo else os.environ.get("TYPESAFE_API_KEY", "")
+
+
+def _live_origin(args: argparse.Namespace) -> str:
+    return "https://api.typesafe.ai" if args.demo else os.environ.get(
+        "TYPESAFE_BASE_URL", "https://api.typesafe.ai"
+    )
+
+
+def _live_notice(args: argparse.Namespace, stderr: TextIO) -> None:
+    if args.demo:
+        return
+    Terminal(stderr, color=args.color, width=args.width).line(
+        "Live mode sends sanitized process metadata to the configured TypeSafe endpoint. "
+        "Target environments and memory are not read; binary contents are never submitted. "
+        "Use --offline for local inventory.",
+        style="\x1b[2m",
+    )
+
+
+def _answer_cache(args: argparse.Namespace, config: Config, stack: ExitStack) -> AnswerCache | None:
+    if not config.cache.enabled:
+        return None
+    return stack.enter_context(AnswerCache(args.cache_dir or default_cache_dir(), config.cache))
 
 
 async def _run(args: argparse.Namespace, config: Config, stdout: TextIO, stderr: TextIO) -> int:
     if args.offline:
         return await _cycles(args, config, Engine(config), stdout)
-    api_key = "synthetic-demo-key" if args.demo else os.environ.get("TYPESAFE_API_KEY", "")
-    origin = "https://api.typesafe.ai" if args.demo else os.environ.get("TYPESAFE_BASE_URL", "https://api.typesafe.ai")
+
     async with JevClient(
-        config.jev, api_key, base_url=origin, transport=demo_transport() if args.demo else None
+        config.jev,
+        _live_api_key(args),
+        base_url=_live_origin(args),
+        transport=demo_transport() if args.demo else None,
     ) as client:
-        if not args.demo:
-            Terminal(stderr, color=args.color, width=args.width).line(
-                "Live mode sends sanitized process metadata to the configured TypeSafe endpoint. "
-                "Target environments and memory are not read; binary contents are never submitted. Use --offline for local inventory.",
-                style="\x1b[2m",
-            )
+        _live_notice(args, stderr)
         with ExitStack() as stack:
-            cache = None
-            if config.cache.enabled:
-                cache = stack.enter_context(AnswerCache(args.cache_dir or default_cache_dir(), config.cache))
+            cache = _answer_cache(args, config, stack)
             return await _cycles(args, config, Engine(config, client, cache), stdout)
+
+def _watch_error(args: argparse.Namespace) -> str | None:
+    invalid = args.watch and any((args.demo, args.input, args.save_snapshot, args.format == "json"))
+    return "--watch requires live collection, text/jsonl output, and no --save-snapshot" if invalid else None
+
+
+def _demo_error(args: argparse.Namespace) -> str | None:
+    invalid = args.demo and any((args.input, args.pid, args.family, args.save_snapshot))
+    return "--demo cannot be combined with --input, --pid, --family or --save-snapshot" if invalid else None
+
+
+def _input_error(args: argparse.Namespace) -> str | None:
+    invalid = args.input and any((args.pid, args.family))
+    return "--pid/--family cannot be combined with --input" if invalid else None
 
 
 def _validate_args(p: argparse.ArgumentParser, args: argparse.Namespace) -> None:
-    invalid = (
-        (
-            bool(args.watch and any((args.demo, args.input, args.save_snapshot, args.format == "json"))),
-            "--watch requires live collection, text/jsonl output, and no --save-snapshot",
-        ),
-        (
-            bool(args.demo and any((args.input, args.pid, args.family, args.save_snapshot))),
-            "--demo cannot be combined with --input, --pid, --family or --save-snapshot",
-        ),
-        (
-            bool(args.input and any((args.pid, args.family))),
-            "--pid/--family cannot be combined with --input",
-        ),
-    )
-    message = next((message for failed, message in invalid if failed), None)
+    validators = (_watch_error, _demo_error, _input_error)
+    message = next(filter(None, (validate(args) for validate in validators)), None)
     if message is not None:
         p.error(message)
-
 
 def _safe_error(message: str) -> int:
     Terminal(sys.stderr, color="never").line(message)
