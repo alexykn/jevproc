@@ -41,17 +41,20 @@ def skipped_rule(rule: Rule, process: Process) -> RuleResult:
     return RuleResult(rule=rule.id, title=rule.title, status=status, message=message)
 
 
+def _decision_message(rule: Rule, status: Status, limited: bool) -> str:
+    visible = status in VISIBLE
+    suffix = " Relevant evidence is partial or unavailable; this finding remains uncertain." if limited and visible else ""
+    return (rule.message if visible else "") + suffix
+
+
 def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
     limited = evidence_limited(rule, process)
     decision = _decide(rule.policy, answer, limited)
-    message = rule.message if decision.status in VISIBLE else ""
-    if limited and decision.status in VISIBLE:
-        message += " Relevant evidence is partial or unavailable; this finding remains uncertain."
     return RuleResult(
         rule=rule.id,
         title=rule.title,
         status=decision.status,
-        message=message,
+        message=_decision_message(rule, decision.status, limited),
         value=decision.value,
         probability=decision.probability,
         confidence=decision.confidence,
@@ -68,9 +71,15 @@ _AGGREGATE_PRIORITY: tuple[Status, ...] = (
 )
 
 
+_AGGREGATE_RANK = {status: index for index, status in enumerate(_AGGREGATE_PRIORITY)}
+
+
 def aggregate(rules: list[RuleResult]) -> Status:
-    statuses = {result.status for result in rules}
-    return next((status for status in _AGGREGATE_PRIORITY if status in statuses), "not_evaluated")
+    return min(
+        (result.status for result in rules),
+        key=lambda status: _AGGREGATE_RANK.get(status, len(_AGGREGATE_PRIORITY)),
+        default="not_evaluated",
+    )
 
 
 def assess(process: Process, rules: list[Rule], answers: dict[str, Answer], model: str, cached: bool) -> Assessment:
@@ -150,9 +159,9 @@ def _score_decision(policy: Policy, answer: ScoreAnswer, limited: bool) -> _Deci
 
 
 def _decide(policy: Policy, answer: Answer, limited: bool) -> _Decision:
-    if isinstance(answer, NoulAnswer):
-        return _noul_decision(policy, answer, limited)
-    if isinstance(answer, ChoiceAnswer):
-        return _choice_decision(policy, answer, limited)
-    assert isinstance(answer, ScoreAnswer)
-    return _score_decision(policy, answer, limited)
+    handlers = {
+        "noul": _noul_decision,
+        "choice": _choice_decision,
+        "score": _score_decision,
+    }
+    return handlers[answer.type](policy, answer, limited)
