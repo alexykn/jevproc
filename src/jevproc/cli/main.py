@@ -226,18 +226,30 @@ def _execute(args: argparse.Namespace) -> int:
     return asyncio.run(_run(args, config, sys.stdout, sys.stderr))
 
 
+def _configuration_failure(exc: BaseException) -> int:
+    return _safe_error(f"jevproc: {exc}")
+
+
+def _operation_failure(exc: BaseException) -> int:
+    return _safe_error(f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied")
+
+
+def _worker_failure(exc: BaseException) -> int:
+    return _safe_error(f"jevproc: worker failed ({type(exc).__name__}); scan incomplete")
+
+
+_FAILURE_HANDLERS = (
+    ((KeyboardInterrupt,), lambda _exc: 130),
+    ((BrokenPipeError,), lambda _exc: 0),
+    ((ConfigError, CollectionError, StorageError, JevError), _configuration_failure),
+    ((OSError, sqlite3.Error, ValidationError, UnicodeError), _operation_failure),
+    ((ExceptionGroup,), _worker_failure),
+)
+
+
 def _known_failure(exc: BaseException) -> int | None:
-    if isinstance(exc, KeyboardInterrupt):
-        return 130
-    if isinstance(exc, BrokenPipeError):
-        return 0
-    if isinstance(exc, (ConfigError, CollectionError, StorageError, JevError)):
-        return _safe_error(f"jevproc: {exc}")
-    if isinstance(exc, (OSError, sqlite3.Error, ValidationError, UnicodeError)):
-        return _safe_error(f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied")
-    if isinstance(exc, ExceptionGroup):
-        return _safe_error(f"jevproc: worker failed ({type(exc).__name__}); scan incomplete")
-    return None
+    handler = next((handler for types, handler in _FAILURE_HANDLERS if isinstance(exc, types)), None)
+    return handler(exc) if handler is not None else None
 
 
 def _guarded_execute(args: argparse.Namespace) -> int:
