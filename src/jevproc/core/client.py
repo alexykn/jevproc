@@ -41,22 +41,37 @@ class Limiter:
         self.next_start = max(self.next_start, asyncio.get_running_loop().time() + delay)
 
 
+def _origin_shape_valid(parts) -> bool:
+    invalid = (
+        not parts.hostname,
+        parts.username is not None,
+        parts.password is not None,
+        bool(parts.query),
+        bool(parts.fragment),
+        parts.path not in {"", "/"},
+    )
+    return not any(invalid)
+
+
+def _origin_scheme_valid(parts) -> bool:
+    loopback_http = all(
+        (
+            parts.scheme == "http",
+            parts.hostname in {"localhost", "127.0.0.1", "::1"},
+        )
+    )
+    return any((parts.scheme == "https", loopback_http))
+
+
 def endpoint(value: str) -> str:
     try:
         parts = urlsplit(value)
         _ = parts.port
     except ValueError as exc:
         raise JevError("invalid TYPESAFE_BASE_URL origin") from exc
-    if (
-        not parts.hostname
-        or parts.username
-        or parts.password
-        or parts.query
-        or parts.fragment
-        or parts.path not in {"", "/"}
-    ):
+    if not _origin_shape_valid(parts):
         raise JevError("TYPESAFE_BASE_URL must be an origin without credentials, path, query or fragment")
-    if parts.scheme != "https" and not (parts.scheme == "http" and parts.hostname in {"localhost", "127.0.0.1", "::1"}):
+    if not _origin_scheme_valid(parts):
         raise JevError("TYPESAFE_BASE_URL requires HTTPS except for a loopback test server")
     return value.rstrip("/")
 
@@ -100,14 +115,20 @@ def _safe_request_id(response: httpx.Response) -> str:
     return "".join(char for char in value if char.isalnum() or char in "-_")
 
 
-def _safe_machine_value(value: object) -> str | None:
+def _machine_scalar(value: object) -> str | None:
     if isinstance(value, bool):
         return str(value).lower()
     if isinstance(value, int):
         return str(value)
-    if not isinstance(value, str) or not 1 <= len(value) <= 80:
+    return value if isinstance(value, str) else None
+
+
+def _safe_machine_value(value: object) -> str | None:
+    text = _machine_scalar(value)
+    if text is None:
         return None
-    return value if all(char.isalnum() or char in "._:-" for char in value) else None
+    valid = all((1 <= len(text) <= 80, all(char.isalnum() or char in "._:-" for char in text)))
+    return text if valid else None
 
 
 _MACHINE_FIELD_KEYS = frozenset({"code", "type", "status", "error"})
