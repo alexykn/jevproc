@@ -1,7 +1,6 @@
 """Per-process identity, invocation, and resource observations."""
 
 import os
-import subprocess
 import sys
 import time
 from contextlib import nullcontext, suppress
@@ -56,47 +55,28 @@ def _resource_value(action: Callable[[], Any]) -> tuple[Any, Coverage]:
         return None, "unavailable"
 
 
-def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUsage, Coverage]:
-    values: dict[str, Any] = {}
-    states: list[Coverage] = []
-
-    if cpu_primed:
-        value, state = _resource_value(lambda: proc.cpu_percent(interval=None))
-        values["cpu_percent"] = value
-        states.append(state)
-    else:
-        values["cpu_percent"] = None
-        states.append("unavailable")
-
-    memory_info, state = _resource_value(proc.memory_info)
-    values["rss_bytes"] = memory_info.rss if memory_info is not None else None
-    states.append(state)
-
-    value, state = _resource_value(proc.memory_percent)
-    values["memory_percent"] = value
-    states.append(state)
-
-    value, state = _resource_value(proc.num_threads)
-    values["thread_count"] = value
-    states.append(state)
-
-    value, state = _resource_value(proc.num_fds)
-    values["fd_count"] = value
-    states.append(state)
-
-    observed = sum(state == "observed" for state in states)
+def _resource_coverage(states: list[Coverage]) -> Coverage:
+    observed = states.count("observed")
     if observed == len(states):
-        coverage: Coverage = "observed"
-    elif observed:
-        coverage = "partial"
-    elif "denied" in states:
-        coverage = "denied"
-    elif "gone" in states:
-        coverage = "gone"
-    else:
-        coverage = "unavailable"
-    return ResourceUsage.model_validate(values), coverage
+        return "observed"
+    if observed:
+        return "partial"
+    return next((state for state in ("denied", "gone") if state in states), "unavailable")
 
+
+def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUsage, Coverage]:
+    cpu = _resource_value(lambda: proc.cpu_percent(interval=None)) if cpu_primed else (None, "unavailable")
+    memory_info, memory_state = _resource_value(proc.memory_info)
+    measurements = (
+        ("cpu_percent", cpu),
+        ("rss_bytes", (memory_info.rss if memory_info is not None else None, memory_state)),
+        ("memory_percent", _resource_value(proc.memory_percent)),
+        ("thread_count", _resource_value(proc.num_threads)),
+        ("fd_count", _resource_value(proc.num_fds)),
+    )
+    values = {name: result[0] for name, result in measurements}
+    states = [result[1] for _, result in measurements]
+    return ResourceUsage.model_validate(values), _resource_coverage(states)
 
 def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dict[int, psutil.Process]:
     if not settings.resources:
@@ -114,34 +94,21 @@ def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dic
     return probes
 
 
-def _darwin_comm_table() -> dict[int, str]:
-    try:
-        result = subprocess.run(
-            ["/bin/ps", "-axo", "pid=,comm="],
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            timeout=5,
-            check=False,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return {}
-    if result.returncode != 0:
-        return {}
-    table: dict[int, str] = {}
-    for line in result.stdout.splitlines():
-        value = line.strip()
-        if not value:
-            continue
-        pid_text, separator, command = value.partition(" ")
-        if not separator or not pid_text.isdigit():
-            continue
-        command = command.strip()
-        if command:
-            table[int(pid_text)] = command[:8192]
-    return table
+def _comm_entry(line: str) -> tuple[int, str] | None:
+    value = line.strip()
+    pid_text, separator, command = value.partition(" ")
+    if not value or not separator or not pid_text.isdigit():
+        return None
+    command = command.strip()
+    return (int(pid_text), command[:8192]) if command else None
 
+
+def _darwin_comm_table() -> dict[int, str]:
+    result = run_fixed("/bin/ps", ("-axo", "pid=,comm="), timeout=5)
+    if result is None or result.returncode != 0:
+        return {}
+    entries = filter(None, (_comm_entry(line) for line in result.stdout.splitlines()))
+    return dict(entries)
 
 def _darwin_comm(pid: int) -> str | None:
     result = run_fixed("/bin/ps", ("-p", str(pid), "-o", "comm="), timeout=2)
@@ -150,21 +117,40 @@ def _darwin_comm(pid: int) -> str | None:
     return result.stdout.strip()[:8192] or None
 
 
+def _linux_process_name(pid: int) -> str:
+    with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as handle:
+        return handle.read(513).strip()[:512] or "<unavailable>"
+
+
+def _darwin_process_name(pid: int, command: str | None) -> str:
+    value = command or _darwin_comm(pid)
+    return os.path.basename(value)[:512] if value else "<unavailable>"
+
+
 def _process_name_without_cmdline(
     proc: psutil.Process,
     pid: int,
     darwin_comm: str | None = None,
 ) -> str:
+    resolvers = {
+        "linux": lambda: _linux_process_name(pid),
+        "darwin": lambda: _darwin_process_name(pid, darwin_comm),
+    }
+    action = resolvers.get(sys.platform, lambda: proc.name()[:512])
     try:
-        if sys.platform == "linux":
-            with open(f"/proc/{pid}/comm", encoding="utf-8", errors="replace") as handle:
-                return handle.read(513).strip()[:512] or "<unavailable>"
-        if sys.platform == "darwin":
-            value = darwin_comm or _darwin_comm(pid)
-            return os.path.basename(value)[:512] if value else "<unavailable>"
-        return proc.name()[:512]
+        return action()
     except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
         return "<unavailable>"
+
+
+def _linux_executable(pid: int) -> str | None:
+    value = str(Path(f"/proc/{pid}/exe").readlink()).removesuffix(" (deleted)")
+    return value[:8192] or None
+
+
+def _darwin_executable(pid: int, command: str | None) -> str | None:
+    value = command or _darwin_comm(pid)
+    return value[:8192] if value else None
 
 
 def _process_executable_without_cmdline(
@@ -172,24 +158,23 @@ def _process_executable_without_cmdline(
     pid: int,
     darwin_comm: str | None = None,
 ) -> str | None:
+    resolvers = {
+        "linux": lambda: _linux_executable(pid),
+        "darwin": lambda: _darwin_executable(pid, darwin_comm),
+    }
+    action = resolvers.get(sys.platform, lambda: (proc.exe() or None))
     try:
-        if sys.platform == "linux":
-            value = str(Path(f"/proc/{pid}/exe").readlink()).removesuffix(" (deleted)")
-            return value[:8192] or None
-        if sys.platform == "darwin":
-            value = darwin_comm or _darwin_comm(pid)
-            return value[:8192] if value else None
-        value = proc.exe() or None
-        return value[:8192] if value else None
+        value = action()
     except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
         return None
-
+    return value[:8192] if value else None
 
 def _age_band(created: float | None, now: float) -> str:
     if created is None or created > now:
         return "unknown"
     age = now - created
-    return "under_minute" if age < 60 else "under_hour" if age < 3600 else "under_day" if age < 86400 else "older"
+    bands = ((60, "under_minute"), (3600, "under_hour"), (86400, "under_day"))
+    return next((label for limit, label in bands if age < limit), "older")
 
 
 def _process(
