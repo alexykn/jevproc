@@ -38,70 +38,72 @@ def _endpoint(text: str) -> tuple[str, int]:
     return ("" if host == "*" else host[:512], int(port))
 
 
+def _lsof_connection(
+    pid: int | None,
+    protocol: str,
+    endpoint: str,
+    status: str,
+) -> Connection | None:
+    if pid is None or protocol not in {"TCP", "UDP"} or not endpoint:
+        return None
+    local_text, arrow, remote_text = endpoint.partition("->")
+    local_address, local_port = _endpoint(local_text)
+    remote_address, remote_port = _endpoint(remote_text) if arrow else ("", 0)
+    return Connection(
+        protocol="tcp" if protocol == "TCP" else "udp",
+        local_address=local_address,
+        local_port=local_port,
+        remote_address=remote_address,
+        remote_port=remote_port,
+        status=status[:512],
+    )
+
+
+def _deduplicated_connections(entries: list[Connection]) -> list[Connection]:
+    unique = {
+        (item.protocol, item.local_address, item.local_port, item.remote_address, item.remote_port, item.status): item
+        for item in entries
+    }
+    return sorted(
+        unique.values(),
+        key=lambda item: (
+            item.protocol,
+            item.local_address,
+            item.local_port,
+            item.remote_address,
+            item.remote_port,
+            item.status,
+        ),
+    )
+
+
 def _parse_lsof_network(output: str) -> dict[int, list[Connection]]:
     """Parse lsof field output; f records delimit sockets and p records delimit processes."""
     by_pid: dict[int, list[Connection]] = defaultdict(list)
     pid: int | None = None
-    protocol = ""
-    endpoint = ""
-    status = ""
+    protocol = endpoint = status = ""
 
     def flush() -> None:
         nonlocal protocol, endpoint, status
-        if pid is not None and protocol in {"TCP", "UDP"} and endpoint:
-            local_text, arrow, remote_text = endpoint.partition("->")
-            local_address, local_port = _endpoint(local_text)
-            remote_address, remote_port = _endpoint(remote_text) if arrow else ("", 0)
-            by_pid[pid].append(
-                Connection(
-                    protocol="tcp" if protocol == "TCP" else "udp",
-                    local_address=local_address,
-                    local_port=local_port,
-                    remote_address=remote_address,
-                    remote_port=remote_port,
-                    status=status[:512],
-                )
-            )
+        connection = _lsof_connection(pid, protocol, endpoint, status)
+        if connection is not None and pid is not None:
+            by_pid[pid].append(connection)
         protocol = endpoint = status = ""
 
-    for line in output.splitlines():
-        if not line:
-            continue
+    for line in filter(None, output.splitlines()):
         field, value = line[0], line[1:]
+        if field in {"p", "f"}:
+            flush()
         if field == "p":
-            flush()
-            try:
-                pid = int(value)
-            except ValueError:
-                pid = None
-        elif field == "f":
-            flush()
+            pid = int(value) if value.isdigit() else None
         elif field == "P":
             protocol = value.upper()
         elif field == "n":
             endpoint = value
-        elif field == "T" and value.startswith("ST="):
-            status = value[3:]
+        elif field == "T":
+            status = value.removeprefix("ST=") if value.startswith("ST=") else status
     flush()
-
-    result: dict[int, list[Connection]] = {}
-    for owner, entries in by_pid.items():
-        unique = {
-            (c.protocol, c.local_address, c.local_port, c.remote_address, c.remote_port, c.status): c for c in entries
-        }
-        result[owner] = sorted(
-            unique.values(),
-            key=lambda c: (
-                c.protocol,
-                c.local_address,
-                c.local_port,
-                c.remote_address,
-                c.remote_port,
-                c.status,
-            ),
-        )
-    return result
-
+    return {owner: _deduplicated_connections(entries) for owner, entries in by_pid.items()}
 
 def _lsof_network() -> tuple[dict[int, list[Connection]], Coverage]:
     """Best-effort macOS fallback when psutil cannot enumerate system sockets unprivileged."""
@@ -123,37 +125,70 @@ def _lsof_network() -> tuple[dict[int, list[Connection]], Coverage]:
     return _parse_lsof_network(result.stdout), "partial"
 
 
-def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
-    if not settings.connections:
-        return {}, "not_requested"
+def _socket_connection(item) -> Connection:
+    return Connection(
+        protocol="tcp" if item.type == socket.SOCK_STREAM else "udp",
+        local_address=item.laddr.ip if item.laddr else "",
+        local_port=item.laddr.port if item.laddr else 0,
+        remote_address=item.raddr.ip if item.raddr else "",
+        remote_port=item.raddr.port if item.raddr else 0,
+        status=item.status,
+    )
+
+
+def _group_sockets(sockets) -> dict[int, list[Connection]]:
+    by_pid: dict[int, list[Connection]] = defaultdict(list)
+    for item in sockets:
+        if item.pid is not None:
+            by_pid[item.pid].append(_socket_connection(item))
+    for entries in by_pid.values():
+        entries.sort(key=lambda item: (item.protocol, item.local_address, item.local_port, item.remote_address, item.remote_port))
+    return dict(by_pid)
+
+
+def _psutil_network() -> tuple[dict[int, list[Connection]], Coverage]:
     try:
         sockets = psutil.net_connections(kind="inet")
     except psutil.AccessDenied:
-        if sys.platform == "darwin":
-            return _lsof_network()
-        return {}, "denied"
+        return _lsof_network() if sys.platform == "darwin" else ({}, "denied")
     except (OSError, NotImplementedError):
         return {}, "unavailable"
-    by_pid: dict[int, list[Connection]] = defaultdict(list)
-    # Linux may silently omit inaccessible entries. Even root sees a point-in-time snapshot,
-    # not a complete history, and sockets with no owner remain unattributed.
-    incomplete = os.geteuid() != 0 or any(item.pid is None for item in sockets)
-    for item in sockets:
-        if item.pid is None:
-            continue
-        by_pid[item.pid].append(
-            Connection(
-                protocol="tcp" if item.type == socket.SOCK_STREAM else "udp",
-                local_address=item.laddr.ip if item.laddr else "",
-                local_port=item.laddr.port if item.laddr else 0,
-                remote_address=item.raddr.ip if item.raddr else "",
-                remote_port=item.raddr.port if item.raddr else 0,
-                status=item.status,
-            )
-        )
-    for entries in by_pid.values():
-        entries.sort(key=lambda c: (c.protocol, c.local_address, c.local_port, c.remote_address, c.remote_port))
-    return dict(by_pid), "partial" if incomplete else "observed"
+    incomplete = any((os.geteuid() != 0, any(item.pid is None for item in sockets)))
+    return _group_sockets(sockets), "partial" if incomplete else "observed"
+
+
+def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
+    return _psutil_network() if settings.connections else ({}, "not_requested")
+
+def _revalidate_process(process: Process) -> tuple[str, Coverage]:
+    try:
+        current = psutil.Process(process.pid)
+        oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
+        with oneshot:
+            current_created = current.create_time()
+            current_executable = current.exe() if process.executable else None
+    except psutil.NoSuchProcess:
+        return "gone", "gone"
+    except (psutil.AccessDenied, OSError):
+        return "unverified", "unavailable"
+    if current_created != process.created_at:
+        return "reused", "unavailable"
+    if process.executable and current_executable != process.executable:
+        return "changed", "unavailable"
+    return process.freshness, "observed"
+
+
+def _network_state(
+    process: Process,
+    entries: list[Connection],
+    coverage: Coverage,
+) -> tuple[str, list[Connection], Coverage]:
+    if process.freshness != "observed" or process.created_at is None:
+        return process.freshness, [], "unavailable"
+    freshness, verified = _revalidate_process(process)
+    if verified != "observed":
+        return freshness, [], verified
+    return freshness, entries, "truncated" if len(entries) > 128 else coverage
 
 
 def _attach_network_one(
@@ -161,27 +196,8 @@ def _attach_network_one(
     network: dict[int, list[Connection]],
     coverage: Coverage,
 ) -> Process:
-    freshness = process.freshness
     entries = network.get(process.pid, [])
-    state = coverage
-    if freshness != "observed" or process.created_at is None:
-        entries, state = [], "unavailable"
-    else:
-        try:
-            # Fresh objects avoid psutil's cached executable/start-time attributes.
-            current = psutil.Process(process.pid)
-            oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
-            with oneshot:
-                if current.create_time() != process.created_at:
-                    freshness, entries, state = "reused", [], "unavailable"
-                elif process.executable and current.exe() != process.executable:
-                    freshness, entries, state = "changed", [], "unavailable"
-        except psutil.NoSuchProcess:
-            freshness, entries, state = "gone", [], "gone"
-        except (psutil.AccessDenied, OSError):
-            freshness, entries, state = "unverified", [], "unavailable"
-    if len(entries) > 128:
-        state = "truncated"
+    freshness, entries, state = _network_state(process, entries, coverage)
     return process.model_copy(
         update={
             "connections": entries[:128],
@@ -189,7 +205,6 @@ def _attach_network_one(
             "coverage": {**process.coverage, "connections": state},
         }
     )
-
 
 def attach_network(
     processes: list[Process],
