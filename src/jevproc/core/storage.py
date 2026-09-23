@@ -53,31 +53,45 @@ def _created_directory(path: Path) -> _CreatedDirectory:
     return _CreatedDirectory(path=path, device=info.st_dev, inode=info.st_ino)
 
 
+def _same_directory(entry: _CreatedDirectory, info: os.stat_result) -> bool:
+    return (info.st_dev, info.st_ino) == (entry.device, entry.inode)
+
+
+def _rollback_directory(entry: _CreatedDirectory) -> None:
+    try:
+        info = entry.path.lstat()
+    except FileNotFoundError:
+        return
+    if not _same_directory(entry, info):
+        return
+    try:
+        entry.path.rmdir()
+    except OSError:
+        # Never remove a directory that acquired contents or otherwise changed.
+        return
+
+
 def _rollback_directories(created: list[_CreatedDirectory]) -> None:
     for entry in reversed(created):
-        try:
-            info = entry.path.lstat()
-        except FileNotFoundError:
-            continue
-        if (info.st_dev, info.st_ino) != (entry.device, entry.inode):
-            continue
-        try:
-            entry.path.rmdir()
-        except OSError:
-            # Never remove a directory that acquired contents or otherwise changed.
-            continue
+        _rollback_directory(entry)
+
+
+def _create_directory(directory: Path, final: Path) -> _CreatedDirectory | None:
+    mode = 0o700 if directory == final else 0o777
+    try:
+        directory.mkdir(mode=mode)
+    except FileExistsError:
+        return None
+    return _created_directory(directory)
 
 
 def _create_directory_chain(path: Path) -> list[_CreatedDirectory]:
     created: list[_CreatedDirectory] = []
     try:
         for directory in _missing_directory_chain(path):
-            mode = 0o700 if directory == path else 0o777
-            try:
-                directory.mkdir(mode=mode)
-            except FileExistsError:
-                continue
-            created.append(_created_directory(directory))
+            entry = _create_directory(directory, path)
+            if entry is not None:
+                created.append(entry)
     except BaseException:
         _rollback_directories(created)
         raise
@@ -86,7 +100,8 @@ def _create_directory_chain(path: Path) -> list[_CreatedDirectory]:
 
 def _validate_private_directory(path: Path) -> None:
     info = path.lstat()
-    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+    invalid = any((not stat.S_ISDIR(info.st_mode), info.st_uid != os.geteuid(), bool(info.st_mode & 0o077)))
+    if invalid:
         raise StorageError("cache directory must be a private, owned directory (0700), not a symlink")
 
 
@@ -117,18 +132,32 @@ class AnswerCache:
         self.db = _open_cache_database(_prepare_cache_file(directory))
         self.settings = settings
 
+    @staticmethod
+    def _usable_row(row: tuple | None) -> bool:
+        return bool(
+            row is not None
+            and isinstance(row[1], bytes)
+            and row[0] > time.time()
+            and len(row[1]) <= 2 * 1024 * 1024
+        )
+
+    @staticmethod
+    def _validated_body(body: bytes, questions: Mapping[str, Question]) -> JevResponse | None:
+        try:
+            return validate_response(body, questions)
+        except JevError:
+            return None
+
     def get(self, key: str, questions: Mapping[str, Question]) -> JevResponse | None:
         row = self.db.execute("SELECT expires, body FROM answers WHERE key=?", (key,)).fetchone()
-        if row is None:
+        if not self._usable_row(row):
+            if row is not None:
+                self.delete(key)
             return None
-        if row[0] <= time.time() or not isinstance(row[1], bytes) or len(row[1]) > 2 * 1024 * 1024:
+        response = self._validated_body(row[1], questions)
+        if response is None:
             self.delete(key)
-            return None
-        try:
-            return validate_response(row[1], questions)
-        except JevError:
-            self.delete(key)
-            return None
+        return response
 
     def put(self, key: str, response: JevResponse) -> None:
         expires = time.time() + self.settings.ttl_seconds
@@ -163,7 +192,15 @@ def _open_cache_file(path: Path) -> tuple[int, bool]:
 
 
 def _validate_cache_info(info: os.stat_result) -> None:
-    if not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077 or info.st_nlink != 1:
+    invalid = any(
+        (
+            not stat.S_ISREG(info.st_mode),
+            info.st_uid != os.geteuid(),
+            bool(info.st_mode & 0o077),
+            info.st_nlink != 1,
+        )
+    )
+    if invalid:
         raise StorageError("cache must be a private, owned regular file with one link")
 
 
