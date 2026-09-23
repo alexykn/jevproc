@@ -290,18 +290,29 @@ def _rule_mappings(value: object) -> list[ConfigMap]:
     return list(map(_rule_mapping, value))
 
 
-def _patch_rules(existing: object, patches: object) -> list[ConfigMap]:
-    base_rules = _rule_mappings(existing)
-    patch_rules = _rule_mappings(patches)
-    patch_ids = [str(rule["id"]) for rule in patch_rules]
-    if len(set(patch_ids)) != len(patch_ids):
+def _patch_ids(rules: list[ConfigMap]) -> list[str]:
+    ids = [str(rule["id"]) for rule in rules]
+    if len(set(ids)) != len(ids):
         raise ConfigError("duplicate rule ID in a ruleset override")
-    by_id = {str(rule["id"]): rule for rule in base_rules}
+    return ids
+
+
+def _rule_index(rules: list[ConfigMap]) -> dict[str, ConfigMap]:
+    return {str(rule["id"]): rule for rule in rules}
+
+
+def _merged_rule_index(base_rules: list[ConfigMap], patch_rules: list[ConfigMap]) -> dict[str, ConfigMap]:
+    by_id = _rule_index(base_rules)
     by_id.update({
         rule_id: _merge(by_id.get(rule_id, {}), rule)
-        for rule_id, rule in zip(patch_ids, patch_rules, strict=True)
+        for rule_id, rule in zip(_patch_ids(patch_rules), patch_rules, strict=True)
     })
-    return list(by_id.values())
+    return by_id
+
+
+def _patch_rules(existing: object, patches: object) -> list[ConfigMap]:
+    merged = _merged_rule_index(_rule_mappings(existing), _rule_mappings(patches))
+    return list(merged.values())
 
 
 def _apply_override(defaults: Mapping[str, object], override: Mapping[str, object]) -> ConfigMap:
