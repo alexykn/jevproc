@@ -37,6 +37,14 @@ class BudgetError(JevError):
     pass
 
 
+def _machine_details(machine_fields: dict[str, tuple[str, ...]]) -> str:
+    return ", ".join(f"{key}={','.join(values)}" for key, values in machine_fields.items())
+
+
+def _optional_detail(prefix: str, value: str) -> str:
+    return (f"; {prefix}{value}") * bool(value)
+
+
 class RequestRejectedError(JevError):
     """One provider-rejected request with bounded machine-readable metadata only."""
 
@@ -47,10 +55,9 @@ class RequestRejectedError(JevError):
         machine_fields: dict[str, tuple[str, ...]],
         request_id: str,
     ) -> None:
-        details = ", ".join(f"{key}={','.join(values)}" for key, values in machine_fields.items())
-        suffix = ("; " + details) * bool(details)
-        request = ("; request-id=" + request_id) * bool(request_id)
-        super().__init__(f"Jev rejected request (HTTP {status}{suffix}{request})")
+        details = _optional_detail("", _machine_details(machine_fields))
+        request = _optional_detail("request-id=", request_id)
+        super().__init__(f"Jev rejected request (HTTP {status}{details}{request})")
         self.status = status
         self.machine_fields = machine_fields
         self.request_id = request_id
