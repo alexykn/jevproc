@@ -565,13 +565,48 @@ def test_file_inspection_cache_deduplicates_hash_and_signature(tmp_path, monkeyp
     assert first[0].signature_identifier == "com.example.binary"
 
 
+class FakeResourceProcess:
+    def __init__(
+        self,
+        *,
+        cpu_percent: float,
+        rss_bytes: int,
+        memory_percent: float,
+        thread_count: int,
+        fd_count: int | None,
+    ) -> None:
+        self._cpu_percent = cpu_percent
+        self._rss_bytes = rss_bytes
+        self._memory_percent = memory_percent
+        self._thread_count = thread_count
+        self._fd_count = fd_count
+
+    def cpu_percent(self, interval: float | None = None) -> float:
+        assert interval is None
+        return self._cpu_percent
+
+    def memory_info(self):
+        return SimpleNamespace(rss=self._rss_bytes)
+
+    def memory_percent(self) -> float:
+        return self._memory_percent
+
+    def num_threads(self) -> int:
+        return self._thread_count
+
+    def num_fds(self) -> int:
+        if self._fd_count is None:
+            raise psutil.AccessDenied()
+        return self._fd_count
+
+
 def test_resource_usage_collects_short_sample_context():
-    proc = SimpleNamespace(
-        cpu_percent=lambda _interval=None: 87.5,
-        memory_info=lambda: SimpleNamespace(rss=3 * 1024 * 1024 * 1024),
-        memory_percent=lambda: 12.5,
-        num_threads=lambda: 42,
-        num_fds=lambda: 99,
+    proc = FakeResourceProcess(
+        cpu_percent=87.5,
+        rss_bytes=3 * 1024 * 1024 * 1024,
+        memory_percent=12.5,
+        thread_count=42,
+        fd_count=99,
     )
     resources, coverage = _resource_usage(proc, cpu_primed=True)
     assert coverage == "observed"
@@ -583,12 +618,12 @@ def test_resource_usage_collects_short_sample_context():
 
 
 def test_resource_usage_is_partial_when_one_measure_is_denied():
-    proc = SimpleNamespace(
-        cpu_percent=lambda _interval=None: 10.0,
-        memory_info=lambda: SimpleNamespace(rss=128 * 1024 * 1024),
-        memory_percent=lambda: 1.2,
-        num_threads=lambda: 8,
-        num_fds=lambda: (_ for _ in ()).throw(psutil.AccessDenied()),
+    proc = FakeResourceProcess(
+        cpu_percent=10.0,
+        rss_bytes=128 * 1024 * 1024,
+        memory_percent=1.2,
+        thread_count=8,
+        fd_count=None,
     )
     resources, coverage = _resource_usage(proc, cpu_primed=True)
     assert coverage == "partial"
