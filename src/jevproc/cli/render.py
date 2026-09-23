@@ -12,7 +12,7 @@ from wcwidth import wcwidth
 
 from jevproc import __version__
 from jevproc.core.assessment import VISIBLE
-from jevproc.core.models import Assessment, Report, RuleResult
+from jevproc.core.models import Assessment, Process, Report, RuleResult
 from jevproc.core.privacy import terminal_text
 
 _STYLES = {
@@ -211,12 +211,13 @@ class Reporter:
             self.stream.flush()
         self._progress()
 
-    def _process(self, result: Assessment) -> None:
+    def _process_header(self, result: Assessment) -> None:
         process = result.process
-        self.term.line()
         suffix = "  [cached]" if result.cached else ""
+        uid = process.uid if process.uid is not None else "?"
+        self.term.line()
         self.term.line(
-            f"{process.name}  PID {process.pid}  UID {process.uid if process.uid is not None else '?'}{suffix}",
+            f"{process.name}  PID {process.pid}  UID {uid}{suffix}",
             style="\x1b[1m",
             indent=2,
             following=4,
@@ -225,9 +226,10 @@ class Reporter:
         if process.ancestors:
             chain = " -> ".join(f"{parent.name} ({parent.pid})" for parent in reversed(process.ancestors))
             self.term.line(f"Parents: {chain}", indent=4, style="\x1b[2m")
-        for rule in result.rules:
-            if not self.verbose and rule.status not in VISIBLE:
-                continue
+
+    def _process_rules(self, result: Assessment) -> None:
+        visible_rules = result.rules if self.verbose else [rule for rule in result.rules if rule.status in VISIBLE]
+        for rule in visible_rules:
             self.term.line(
                 f"{_MARKERS[rule.status]} {rule.rule}  {rule.title}",
                 indent=6,
@@ -237,25 +239,25 @@ class Reporter:
             self.term.line(_value(rule), indent=8, style=_STYLES[rule.status])
             if rule.message:
                 self.term.line(rule.message, indent=8, style="\x1b[2m")
+
+    def _process_observations(self, process: Process) -> None:
         for observation in process.observations:
             self.term.line(f"Observed: {observation}", indent=6, style="\x1b[2m")
-        if not self.verbose:
-            return
-        if process.command_line is not None:
-            self.term.line("Arguments: " + shlex.join(process.command_line), indent=6, style="\x1b[2m")
-        details = []
-        if process.file.mode is not None:
-            details.append(f"mode={process.file.mode:04o}")
-        if process.file.owner_uid is not None:
-            details.append(f"owner-uid={process.file.owner_uid}")
-        if process.file.signature != "not_requested":
-            details.append(f"signature={process.file.signature}")
-        if process.file.signature_issue:
-            details.append(f"signature-issue={process.file.signature_issue}")
-        if process.file.signature_identifier:
-            details.append(f"identifier={process.file.signature_identifier}")
-        if process.file.signature_team_id:
-            details.append(f"team-id={process.file.signature_team_id}")
+
+    @staticmethod
+    def _disk_details(process: Process) -> list[str]:
+        candidates = (
+            process.file.mode is not None and f"mode={process.file.mode:04o}",
+            process.file.owner_uid is not None and f"owner-uid={process.file.owner_uid}",
+            process.file.signature != "not_requested" and f"signature={process.file.signature}",
+            process.file.signature_issue and f"signature-issue={process.file.signature_issue}",
+            process.file.signature_identifier and f"identifier={process.file.signature_identifier}",
+            process.file.signature_team_id and f"team-id={process.file.signature_team_id}",
+        )
+        return [str(value) for value in candidates if value]
+
+    def _verbose_file(self, process: Process) -> None:
+        details = self._disk_details(process)
         if details:
             self.term.line("On disk: " + "  ".join(details), indent=6, style="\x1b[2m")
         if process.file.signature_authorities:
@@ -266,6 +268,8 @@ class Reporter:
             )
         if process.file.sha256:
             self.term.line("SHA-256 (on disk): " + process.file.sha256, indent=6, style="\x1b[2m")
+
+    def _verbose_connections(self, process: Process) -> None:
         for connection in process.connections:
             local = f"[{connection.local_address}]:{connection.local_port}"
             remote = f"[{connection.remote_address}]:{connection.remote_port}" if connection.remote_address else "-"
@@ -274,19 +278,28 @@ class Reporter:
                 indent=6,
                 style="\x1b[2m",
             )
-        coverage = ", ".join(f"{key}={value}" for key, value in sorted(process.coverage.items()) if value != "observed")
+
+    def _verbose_coverage(self, process: Process) -> None:
+        limited = ((key, value) for key, value in sorted(process.coverage.items()) if value != "observed")
+        coverage = ", ".join(f"{key}={value}" for key, value in limited)
         if coverage:
             self.term.line(f"Coverage: {coverage}", indent=6, style="\x1b[2m")
 
-    def finish(self, report: Report) -> None:
-        if self.closed:
-            return
-        self._clear_progress()
-        if self.format_name == "jsonl":
-            self._json_line({"event": "summary", **report.summary})
-            self.closed = True
-            return
+    def _verbose_process(self, process: Process) -> None:
+        if process.command_line is not None:
+            self.term.line("Arguments: " + shlex.join(process.command_line), indent=6, style="\x1b[2m")
+        self._verbose_file(process)
+        self._verbose_connections(process)
+        self._verbose_coverage(process)
 
+    def _process(self, result: Assessment) -> None:
+        self._process_header(result)
+        self._process_rules(result)
+        self._process_observations(result.process)
+        if self.verbose:
+            self._verbose_process(result.process)
+
+    def _summary_lines(self, report: Report) -> None:
         summary = report.summary
         self.term.line()
         self.term.line(
@@ -308,25 +321,38 @@ class Reporter:
             f"input-tokens={summary['input_tokens']}  elapsed={summary['elapsed_seconds']:.2f}s",
             style="\x1b[2m",
         )
-        if summary["incomplete"]:
+
+    def _summary_warnings(self, report: Report) -> None:
+        if report.summary["incomplete"]:
             self.term.line(
                 "INCOMPLETE: some selected processes were omitted or could not be evaluated.",
                 style="\x1b[1;31m",
             )
         for error in sorted({assessment.error for assessment in report.assessments if assessment.error}):
             self.term.line(f"error: {error}", style="\x1b[31m")
+
+    def _summary_footer(self, report: Report) -> None:
         if report.mode == "offline":
-            self.term.line(
-                "Offline inventory: no semantic classification was performed.",
-                style="\x1b[2m",
-            )
+            self.term.line("Offline inventory: no semantic classification was performed.", style="\x1b[2m")
         if not self.verbose:
-            self.term.line(
-                "Use -v/--verbose for other processes and all rule results.",
-                style="\x1b[2m",
-            )
+            self.term.line("Use -v/--verbose for other processes and all rule results.", style="\x1b[2m")
+
+    def _finish_text(self, report: Report) -> None:
+        self._summary_lines(report)
+        self._summary_warnings(report)
+        self._summary_footer(report)
         self.stream.flush()
         self.closed = True
+
+    def finish(self, report: Report) -> None:
+        if self.closed:
+            return
+        self._clear_progress()
+        if self.format_name == "jsonl":
+            self._json_line({"event": "summary", **report.summary})
+            self.closed = True
+            return
+        self._finish_text(report)
 
 
 def render(
