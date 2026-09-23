@@ -160,21 +160,23 @@ def _psutil_network() -> tuple[dict[int, list[Connection]], Coverage]:
 def _network(settings: CollectionSettings) -> tuple[dict[int, list[Connection]], Coverage]:
     return _psutil_network() if settings.connections else ({}, "not_requested")
 
+def _executable_changed(current: psutil.Process, expected: str | None) -> bool:
+    return bool(expected and current.exe() != expected)
+
+
 def _revalidate_process(process: Process) -> tuple[str, Coverage]:
     try:
         current = psutil.Process(process.pid)
         oneshot = current.oneshot() if hasattr(current, "oneshot") else nullcontext()
         with oneshot:
-            current_created = current.create_time()
-            current_executable = current.exe() if process.executable else None
+            if current.create_time() != process.created_at:
+                return "reused", "unavailable"
+            if _executable_changed(current, process.executable):
+                return "changed", "unavailable"
     except psutil.NoSuchProcess:
         return "gone", "gone"
     except (psutil.AccessDenied, OSError):
         return "unverified", "unavailable"
-    if current_created != process.created_at:
-        return "reused", "unavailable"
-    if process.executable and current_executable != process.executable:
-        return "changed", "unavailable"
     return process.freshness, "observed"
 
 
