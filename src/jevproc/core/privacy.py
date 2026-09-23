@@ -48,15 +48,10 @@ def redact_text(text: str) -> str:
 
 
 def redact_argv(arguments: list[str]) -> tuple[list[str], bool]:
-    """Redact first, then apply the wire limits without exposing a partial secret."""
-    result: list[str] = []
-    shortened = len(arguments) > 64
-    for cleaned in _redacted_arguments(arguments[:64]):
-        if len(cleaned) > 512:
-            cleaned = cleaned[:498] + "...<truncated>"
-            shortened = True
-        result.append(cleaned)
-    return result, shortened
+    """Apply positional redaction, text redaction, then independent wire bounds."""
+    structurally_redacted = _structural_redactions(arguments[:64])
+    text_redacted = (redact_text(value) for value in structurally_redacted)
+    return _bound_arguments(text_redacted, arguments_truncated=len(arguments) > 64)
 
 
 def sanitize_process(process: Process, include_command_line: bool) -> Process:
@@ -132,18 +127,32 @@ def _secret_flag(value: str) -> tuple[str, bool]:
     return (flag + "=<redacted>", False) if separator else (value, True)
 
 
-def _redact_argument(index: int, value: str, redact_next: bool) -> tuple[str, bool]:
-    """Resolve argv-position state; text-pattern redaction happens separately."""
-    if redact_next:
-        return "<redacted>", value.lower() in {"bearer", "basic"}
-    if index:
-        return _secret_flag(value)
-    return value, False
-
-
-def _redacted_arguments(arguments: list[str]) -> Iterator[str]:
-    """Apply argv-state redaction, then the independent text redaction pass."""
+def _structural_redactions(arguments: list[str]) -> Iterator[str]:
+    """Redact split secret values using argv position only; no text matching here."""
     redact_next = False
     for index, value in enumerate(arguments):
-        value, redact_next = _redact_argument(index, value, redact_next)
-        yield redact_text(value)
+        if redact_next:
+            yield "<redacted>"
+            redact_next = value.lower() in {"bearer", "basic"}
+            continue
+        if index == 0:
+            yield value
+            continue
+        value, redact_next = _secret_flag(value)
+        yield value
+
+
+def _bound_argument(value: str) -> tuple[str, bool]:
+    if len(value) <= 512:
+        return value, False
+    return value[:498] + "...<truncated>", True
+
+
+def _bound_arguments(arguments: Iterator[str], *, arguments_truncated: bool) -> tuple[list[str], bool]:
+    bounded: list[str] = []
+    shortened = arguments_truncated
+    for value in arguments:
+        value, truncated = _bound_argument(value)
+        bounded.append(value)
+        shortened = shortened or truncated
+    return bounded, shortened
