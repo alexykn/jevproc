@@ -51,14 +51,18 @@ def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
     )
 
 
+_AGGREGATE_PRIORITY: tuple[Status, ...] = (
+    "warning",
+    "uncertain_warning",
+    "unknown",
+    "probably_legitimate",
+    "no_warning",
+)
+
+
 def aggregate(rules: list[RuleResult]) -> Status:
-    statuses = {r.status for r in rules}
-    for status in ("warning", "uncertain_warning", "unknown"):
-        if status in statuses:
-            return status
-    if "probably_legitimate" in statuses:
-        return "probably_legitimate"
-    return "no_warning" if "no_warning" in statuses else "not_evaluated"
+    statuses = {result.status for result in rules}
+    return next((status for status in _AGGREGATE_PRIORITY if status in statuses), "not_evaluated")
 
 
 def assess(process: Process, rules: list[Rule], answers: dict[str, Answer], model: str, cached: bool) -> Assessment:
@@ -79,41 +83,61 @@ class _Decision:
     confidence: float | None = None
 
 
+def _first_status(options: tuple[tuple[bool, Status], ...], fallback: Status) -> Status:
+    return next((status for matches, status in options if matches), fallback)
+
+
 def _noul_decision(policy: Policy, answer: NoulAnswer, limited: bool) -> _Decision:
     value = answer.noul
-    if value >= policy.warning_at and not limited:
-        status: Status = "warning"
-    elif value >= policy.uncertain_at:
-        status = "uncertain_warning"
-    else:
-        status = "unknown" if limited else "probably_legitimate"
+    status = _first_status(
+        (
+            (all((value >= policy.warning_at, not limited)), "warning"),
+            (value >= policy.uncertain_at, "uncertain_warning"),
+        ),
+        "unknown" if limited else "probably_legitimate",
+    )
     return _Decision(status, value, probability=value)
 
 
 def _choice_decision(policy: Policy, answer: ChoiceAnswer, limited: bool) -> _Decision:
     probability = answer.probabilities[answer.choice]
-    confident = probability >= policy.warning_at and answer.confidence >= policy.confidence_min and not limited
+    confident = all(
+        (
+            probability >= policy.warning_at,
+            answer.confidence >= policy.confidence_min,
+            not limited,
+        )
+    )
     selected_risk = answer.choice in policy.warning_choices
-    # Provider supports need not sum to one: never synthesize a summed risk.
     risk_support = max(answer.probabilities[label] for label in policy.warning_choices)
-    if selected_risk and confident:
-        status: Status = "warning"
-    elif selected_risk or risk_support >= policy.uncertain_at:
-        status = "uncertain_warning"
-    elif answer.choice in policy.legitimate_choices and confident:
-        status = "probably_legitimate"
-    else:
-        status = "unknown"
+    status = _first_status(
+        (
+            (all((selected_risk, confident)), "warning"),
+            (any((selected_risk, risk_support >= policy.uncertain_at)), "uncertain_warning"),
+            (all((answer.choice in policy.legitimate_choices, confident)), "probably_legitimate"),
+        ),
+        "unknown",
+    )
     return _Decision(status, answer.choice, probability, answer.confidence)
 
 
 def _score_decision(policy: Policy, answer: ScoreAnswer, limited: bool) -> _Decision:
-    if answer.score >= policy.score_warning_at and answer.confidence >= policy.confidence_min and not limited:
-        status: Status = "warning"
-    elif answer.score >= policy.score_uncertain_at:
-        status = "uncertain_warning"
-    else:
-        status = "unknown" if answer.confidence < policy.confidence_min else "no_warning"
+    status = _first_status(
+        (
+            (
+                all(
+                    (
+                        answer.score >= policy.score_warning_at,
+                        answer.confidence >= policy.confidence_min,
+                        not limited,
+                    )
+                ),
+                "warning",
+            ),
+            (answer.score >= policy.score_uncertain_at, "uncertain_warning"),
+        ),
+        "unknown" if answer.confidence < policy.confidence_min else "no_warning",
+    )
     return _Decision(status, answer.score, confidence=answer.confidence)
 
 
