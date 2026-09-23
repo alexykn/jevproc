@@ -126,7 +126,8 @@ class Snapshot(Record):
 
     @model_validator(mode="after")
     def unique_processes(self) -> "Snapshot":
-        if len({p.pid for p in self.processes}) != len(self.processes):
+        unique = len(set(map(lambda process: process.pid, self.processes))) == len(self.processes)
+        if not unique:
             raise ValueError("snapshot contains duplicate PIDs")
         return self
 
