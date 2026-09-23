@@ -14,6 +14,7 @@ from jevproc.core.collector import (
     load_snapshot,
 )
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence import CollectionError
 from jevproc.core.evidence.command import CommandResult
 from jevproc.core.evidence.files import (
     _classify_codesign_failure,
@@ -659,6 +660,17 @@ def test_family_selection_walks_descendants_only(monkeypatch):
     monkeypatch.setattr(module.psutil, "pid_exists", lambda pid: pid in {1, 10, 11, 12, 13, 20})
     monkeypatch.setattr(module.psutil, "process_iter", lambda *_args, **_kwargs: iter(table))
     assert _family_pids(10) == [10, 11, 12, 13]
+
+
+def test_family_selection_detects_root_exit_during_snapshot(monkeypatch):
+    import jevproc.core.evidence.relationships as module
+
+    liveness = iter((True, False))
+    monkeypatch.setattr(module.psutil, "pid_exists", lambda _pid: next(liveness))
+    monkeypatch.setattr(module.psutil, "process_iter", lambda *_args, **_kwargs: iter(()))
+
+    with pytest.raises(CollectionError, match="root PID 10 exited"):
+        _family_pids(10)
 
 
 def test_live_missing_parent_can_be_resolved_for_single_pid(monkeypatch):

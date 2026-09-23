@@ -143,10 +143,13 @@ def _descendants(root_pid: int, children: dict[int, list[int]]) -> list[int]:
 
 
 def _family_pids(root_pid: int) -> list[int]:
-    if not psutil.pid_exists(root_pid):
+    root_existed_before_snapshot = psutil.pid_exists(root_pid)
+    if not root_existed_before_snapshot:
         raise CollectionError(f"process family root PID {root_pid} does not exist")
+
     children, seen_pids = _process_family_index()
-    if root_pid not in seen_pids and not psutil.pid_exists(root_pid):
+    root_exists_after_snapshot = psutil.pid_exists(root_pid)
+    if root_pid not in seen_pids and not root_exists_after_snapshot:
         raise CollectionError(f"process family root PID {root_pid} exited")
     return _descendants(root_pid, children)
 

@@ -119,12 +119,11 @@ def _safe_request_id(response: httpx.Response) -> str:
 
 
 def _machine_scalar(value: object) -> str | None:
-    scalar = {
-        bool: lambda item: str(item).lower(),
-        int: str,
-        str: str,
-    }.get(type(value))
-    return scalar(value) if scalar is not None else None
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, (int, str)):
+        return str(value)
+    return None
 
 
 def _safe_machine_value(value: object) -> str | None:
