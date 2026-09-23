@@ -85,9 +85,10 @@ def _prime_resource_probe(pid: int) -> psutil.Process | None:
     try:
         proc = psutil.Process(pid)
         proc.cpu_percent(interval=None)
-        return proc
     except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
         return None
+    else:
+        return proc
 
 
 def _prime_resource_probes(pids: list[int], settings: CollectionSettings) -> dict[int, psutil.Process]:
