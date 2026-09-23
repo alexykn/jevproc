@@ -160,7 +160,7 @@ def _score_decision(policy: Policy, answer: ScoreAnswer, limited: bool) -> _Deci
 
 
 @singledispatch
-def _answer_decision(answer: Answer, policy: Policy, limited: bool) -> _Decision:
+def _answer_decision(answer: Answer, _policy: Policy, _limited: bool) -> _Decision:
     raise TypeError(f"unsupported answer type: {type(answer).__name__}")
 
 
