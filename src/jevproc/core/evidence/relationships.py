@@ -8,6 +8,7 @@ from typing import Any
 import psutil
 
 from jevproc.core.evidence import CollectionError
+from jevproc.core.evidence.access import observed
 from jevproc.core.evidence.process import (
     _darwin_comm_table,
     _process_executable_without_cmdline,
@@ -22,15 +23,12 @@ from jevproc.core.models import (
 
 
 def _child_records(commands: dict[int, str]) -> tuple[list[tuple[int, Child, bool]], Coverage]:
-    records: list[tuple[int, Child, bool]] = []
-    try:
-        for item in psutil.process_iter(["pid", "ppid", "create_time", "status"], ad_value=None):
-            record = _child_record(item, item.info, commands)
-            if record is not None:
-                records.append(record)
-    except (OSError, NotImplementedError):
-        return [], "unavailable"
-    return records, "observed"
+    items, state = observed(
+        lambda: list(psutil.process_iter(["pid", "ppid", "create_time", "status"], ad_value=None)),
+        [],
+    )
+    records = filter(None, (_child_record(item, item.info, commands) for item in items))
+    return list(records), state
 
 
 def _group_children(records: list[tuple[int, Child, bool]]) -> tuple[dict[int, list[Child]], bool]:
@@ -115,21 +113,24 @@ def _family_row(info: dict[str, Any]) -> tuple[int, int | None] | None:
     return None if pid is None else (int(pid), info.get("ppid"))
 
 
-def _process_family_index() -> tuple[dict[int, list[int]], set[int]]:
+def _index_family_rows(rows: list[tuple[int, int | None]]) -> tuple[dict[int, list[int]], set[int]]:
     children: dict[int, list[int]] = defaultdict(list)
-    seen_pids: set[int] = set()
-    try:
-        rows = filter(
-            None,
-            (_family_row(item.as_dict(attrs=["pid", "ppid"], ad_value=None)) for item in psutil.process_iter()),
-        )
-        for pid, ppid in rows:
-            seen_pids.add(pid)
-            if ppid is not None:
-                children[int(ppid)].append(pid)
-    except (OSError, NotImplementedError) as exc:
-        raise CollectionError("could not enumerate process family") from exc
+    seen_pids = {pid for pid, _ in rows}
+    for pid, ppid in rows:
+        if ppid is not None:
+            children[int(ppid)].append(pid)
     return children, seen_pids
+
+
+def _process_family_index() -> tuple[dict[int, list[int]], set[int]]:
+    items, state = observed(lambda: list(psutil.process_iter()), [])
+    if state != "observed":
+        raise CollectionError("could not enumerate process family")
+    rows = filter(
+        None,
+        (_family_row(item.as_dict(attrs=["pid", "ppid"], ad_value=None)) for item in items),
+    )
+    return _index_family_rows(list(rows))
 
 def _descendants(root_pid: int, children: dict[int, list[int]]) -> list[int]:
     ordered = [root_pid]
@@ -149,26 +150,28 @@ def _family_pids(root_pid: int) -> list[int]:
         raise CollectionError(f"process family root PID {root_pid} exited")
     return _descendants(root_pid, children)
 
+def _parent_snapshot(pid: int) -> tuple[Parent, int | None]:
+    proc = psutil.Process(pid)
+    oneshot = proc.oneshot() if hasattr(proc, "oneshot") else nullcontext()
+    with oneshot:
+        created = proc.create_time()
+        name = _process_name_without_cmdline(proc, pid)
+        executable = _process_executable_without_cmdline(proc, pid)
+        ppid = proc.ppid()
+    return (
+        Parent(
+            pid=pid,
+            created_at=created,
+            name=name[:512],
+            executable=executable[:8192] if executable else None,
+        ),
+        ppid,
+    )
+
+
 def _live_parent(pid: int) -> tuple[Parent, int | None] | None:
-    try:
-        proc = psutil.Process(pid)
-        oneshot = proc.oneshot() if hasattr(proc, "oneshot") else nullcontext()
-        with oneshot:
-            created = proc.create_time()
-            name = _process_name_without_cmdline(proc, pid)
-            executable = _process_executable_without_cmdline(proc, pid)
-            ppid = proc.ppid()
-        return (
-            Parent(
-                pid=pid,
-                created_at=created,
-                name=name[:512],
-                executable=executable[:8192] if executable else None,
-            ),
-            ppid,
-        )
-    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError):
-        return None
+    result, state = observed(lambda: _parent_snapshot(pid))
+    return result if state == "observed" else None
 
 
 def attach_ancestry(processes: list[Process], depth: int, *, resolve_missing: bool = False) -> list[Process]:
