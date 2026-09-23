@@ -1,7 +1,6 @@
 """Packaged synthetic evaluation corpus for live Jev regression checks."""
 
 from collections.abc import Iterable
-from operator import attrgetter
 from importlib.resources import files
 from typing import Hashable, Literal
 
