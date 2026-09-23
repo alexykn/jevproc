@@ -6,7 +6,7 @@ import os
 import sqlite3
 import sys
 from contextlib import ExitStack
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 
 from pydantic import ValidationError
 
@@ -90,7 +90,7 @@ def exit_code(report: Report, fail_on: str) -> int:
     return next((code for matches, code in outcomes if matches), 0)
 
 
-def _scan_mode(args: argparse.Namespace) -> str:
+def _scan_mode(args: argparse.Namespace) -> Literal["live", "offline", "demo"]:
     return "demo" if args.demo else "offline" if args.offline else "live"
 
 
