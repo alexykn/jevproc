@@ -140,33 +140,70 @@ def _pair_counts(predictions: list[tuple[str, str]]) -> tuple[Counter[str], Coun
     return Counter(label for label, _ in predictions), Counter(predictions)
 
 
+@dataclass(frozen=True)
+class _ObservationCounts:
+    totals: Counter[str]
+    pairs: Counter[tuple[str, str]]
+
+    @classmethod
+    def from_predictions(cls, predictions: list[tuple[str, str]]) -> "_ObservationCounts":
+        totals, pairs = _pair_counts(predictions)
+        return cls(totals, pairs)
+
+    def correct(self, label: str) -> int:
+        return self.pairs[(label, _TARGET_BAND[label])]
+
+    def total(self, label: str) -> int:
+        return self.totals[label]
+
+    @property
+    def benign_false_positive(self) -> int:
+        return self.total("benign") - self.pairs[("benign", "benign")]
+
+    @property
+    def benign_warning(self) -> int:
+        return self.pairs[("benign", "warning")]
+
+    @property
+    def suspicious_surface(self) -> int:
+        return self.pairs[("suspicious", "ambiguous")] + self.pairs[("suspicious", "warning")]
+
+    @property
+    def sample_count(self) -> int:
+        return sum(self.totals.values())
+
+
+def _valid_threshold_pair(uncertain_at: float, warning_at: float) -> bool:
+    return 0 <= uncertain_at < warning_at <= 1
+
+
 def _evaluate_observations(
     observations: Iterable[tuple[str, float]],
     uncertain_at: float,
     warning_at: float,
 ) -> PairMetrics:
-    if not 0 <= uncertain_at < warning_at <= 1:
+    if not _valid_threshold_pair(uncertain_at, warning_at):
         raise ValueError("candidate thresholds must satisfy 0 <= uncertain < warning <= 1")
 
-    totals, counts = _pair_counts(_labelled_predictions(observations, uncertain_at, warning_at))
-    correct = {label: counts[(label, _TARGET_BAND[label])] for label in _CALIBRATION_LABELS}
-    recalls = [_rate(correct[label], totals[label]) for label in _CALIBRATION_LABELS]
-    benign_fp = totals["benign"] - counts[("benign", "benign")]
-    benign_warning = counts[("benign", "warning")]
-    suspicious_surface = counts[("suspicious", "ambiguous")] + counts[("suspicious", "warning")]
-    total = sum(totals.values())
+    counts = _ObservationCounts.from_predictions(
+        _labelled_predictions(observations, uncertain_at, warning_at)
+    )
+    correct = {label: counts.correct(label) for label in _CALIBRATION_LABELS}
+    recalls = [_rate(correct[label], counts.total(label)) for label in _CALIBRATION_LABELS]
+    benign_total = counts.total("benign")
+    suspicious_total = counts.total("suspicious")
     return PairMetrics(
         uncertain_at=uncertain_at,
         warning_at=warning_at,
         macro_recall=sum(recalls) / len(recalls),
-        exact_accuracy=_rate(sum(correct.values()), total),
-        benign_false_positive_rate=_rate(benign_fp, totals["benign"]),
-        benign_warning_rate=_rate(benign_warning, totals["benign"]),
-        benign_surface_rate=_rate(benign_fp, totals["benign"]),
-        benign_hard_warning_rate=_rate(benign_warning, totals["benign"]),
-        ambiguous_band_recall=_rate(correct["ambiguous"], totals["ambiguous"]),
-        suspicious_surface_recall=_rate(suspicious_surface, totals["suspicious"]),
-        suspicious_warning_recall=_rate(correct["suspicious"], totals["suspicious"]),
+        exact_accuracy=_rate(sum(correct.values()), counts.sample_count),
+        benign_false_positive_rate=_rate(counts.benign_false_positive, benign_total),
+        benign_warning_rate=_rate(counts.benign_warning, benign_total),
+        benign_surface_rate=_rate(counts.benign_false_positive, benign_total),
+        benign_hard_warning_rate=_rate(counts.benign_warning, benign_total),
+        ambiguous_band_recall=_rate(correct["ambiguous"], counts.total("ambiguous")),
+        suspicious_surface_recall=_rate(counts.suspicious_surface, suspicious_total),
+        suspicious_warning_recall=_rate(correct["suspicious"], suspicious_total),
     )
 
 def evaluate_pair(
