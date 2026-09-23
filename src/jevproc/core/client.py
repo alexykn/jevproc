@@ -347,11 +347,21 @@ def _generic_http_error(response: httpx.Response) -> JevError:
     return JevError(f"Jev request failed (HTTP {response.status_code}{suffix})")
 
 
+def _context_failure(response: httpx.Response) -> JevError | None:
+    return ContextLimitError("Jev rejected the context size") if _context_error(response) else None
+
+
+def _rejection_failure(response: httpx.Response) -> JevError | None:
+    return _request_rejected(response) if response.status_code in {400, 422} else None
+
+
+def _transient_response(response: httpx.Response) -> bool:
+    return response.status_code in {408, 429} or response.status_code >= 500
+
+
 def _permanent_failure(response: httpx.Response) -> JevError | None:
-    contextual = ContextLimitError("Jev rejected the context size") if _context_error(response) else None
-    rejected = _request_rejected(response) if response.status_code in {400, 422} else None
-    transient = response.status_code in {408, 429} or response.status_code >= 500
-    return contextual or rejected or (None if transient else _generic_http_error(response))
+    classified = _context_failure(response) or _rejection_failure(response)
+    return classified or (None if _transient_response(response) else _generic_http_error(response))
 
 
 def _raise_permanent_failure(response: httpx.Response) -> None:
