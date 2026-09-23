@@ -53,7 +53,7 @@ def test_unsafe_cache_directory_is_rejected(tmp_path):
 
 
 def test_new_private_directory_is_rolled_back_when_validation_fails(tmp_path, monkeypatch):
-    import jevproc.core.storage as storage
+    from jevproc.core import storage
 
     directory = tmp_path / "parent" / "nested" / "cache"
     monkeypatch.setattr(
@@ -70,7 +70,7 @@ def test_new_private_directory_is_rolled_back_when_validation_fails(tmp_path, mo
 
 
 def test_existing_private_directory_is_never_rolled_back(tmp_path, monkeypatch):
-    import jevproc.core.storage as storage
+    from jevproc.core import storage
 
     directory = tmp_path / "cache"
     directory.mkdir(mode=0o700)
@@ -80,7 +80,7 @@ def test_existing_private_directory_is_never_rolled_back(tmp_path, monkeypatch):
     monkeypatch.setattr(
         storage,
         "_validate_private_directory",
-        lambda path: (_ for _ in ()).throw(StorageError("synthetic directory validation failure")),
+        lambda _path: (_ for _ in ()).throw(StorageError("synthetic directory validation failure")),
     )
     with pytest.raises(StorageError, match="synthetic"):
         AnswerCache(directory, CacheSettings())
@@ -103,7 +103,7 @@ def test_cache_symlinks_are_rejected(tmp_path):
 
 
 def test_new_cache_file_is_rolled_back_when_validation_fails(tmp_path, monkeypatch):
-    import jevproc.core.storage as storage
+    from jevproc.core import storage
 
     directory = tmp_path / "cache"
     monkeypatch.setattr(
