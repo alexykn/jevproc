@@ -1,7 +1,8 @@
 """Packaged synthetic evaluation corpus for live Jev regression checks."""
 
+from collections.abc import Iterable
 from importlib.resources import files
-from typing import Literal
+from typing import Hashable, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -26,8 +27,9 @@ class CorpusCase(CorpusRecord):
     process: Process
 
 
-def _unique(values: list[object]) -> bool:
-    return len(values) == len(set(values))
+def _unique(values: Iterable[Hashable]) -> bool:
+    items = list(values)
+    return len(items) == len(set(items))
 
 
 def _validate_case_identity(cases: list[CorpusCase]) -> None:
