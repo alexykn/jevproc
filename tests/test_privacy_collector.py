@@ -51,6 +51,12 @@ def test_sensitive_arguments_are_redacted_before_truncation():
     assert cleaned[1] == "--token=<redacted>" and not truncated
 
 
+def test_split_authorization_scheme_redacts_scheme_and_value():
+    cleaned, shortened = redact_argv(["curl", "--authorization", "Bearer", "secret-token", "public"])
+    assert cleaned == ["curl", "--authorization", "<redacted>", "<redacted>", "public"]
+    assert shortened is False
+
+
 def test_argument_limits_are_explicit():
     args, truncated = redact_argv(["a"] * 70)
     assert len(args) == 64 and truncated
