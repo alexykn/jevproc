@@ -12,6 +12,7 @@ from typing import Any, Protocol
 import psutil
 
 from jevproc.core.config import CollectionSettings
+from jevproc.core.evidence.access import observed
 from jevproc.core.evidence.command import run_fixed
 from jevproc.core.evidence.files import _file_info, _observations
 from jevproc.core.models import (
@@ -23,26 +24,8 @@ from jevproc.core.models import (
 from jevproc.core.privacy import redact_argv
 
 
-_FAILURE_COVERAGE = (
-    (psutil.AccessDenied, "denied"),
-    ((psutil.NoSuchProcess, psutil.ZombieProcess), "gone"),
-    ((OSError, NotImplementedError, AttributeError), "unavailable"),
-)
-
-
-def _failure_coverage(exc: BaseException) -> Coverage:
-    return next(state for types, state in _FAILURE_COVERAGE if isinstance(exc, types))
-
-
-def _observed(action: Callable[[], Any], default: Any = None) -> tuple[Any, Coverage]:
-    try:
-        return action(), "observed"
-    except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess, OSError, NotImplementedError, AttributeError) as exc:
-        return default, _failure_coverage(exc)
-
-
 def _get(field: str, action: Callable[[], Any], coverage: dict[str, Coverage], default: Any = None) -> Any:
-    value, coverage[field] = _observed(action, default)
+    value, coverage[field] = observed(action, default)
     return value
 
 
@@ -55,7 +38,7 @@ class ResourceProcess(Protocol):
 
 
 def _resource_value(action: Callable[[], Any]) -> tuple[Any, Coverage]:
-    return _observed(action)
+    return observed(action)
 
 
 def _resource_coverage(states: list[Coverage]) -> Coverage:
@@ -84,10 +67,10 @@ def _resource_usage(proc: ResourceProcess, cpu_primed: bool) -> tuple[ResourceUs
     return ResourceUsage.model_validate(values), _resource_coverage(states)
 
 def _prime_resource_probe(pid: int) -> psutil.Process | None:
-    proc, state = _observed(lambda: psutil.Process(pid))
+    proc, state = observed(lambda: psutil.Process(pid))
     if state != "observed":
         return None
-    _, state = _observed(lambda: proc.cpu_percent(interval=None))
+    _, state = observed(lambda: proc.cpu_percent(interval=None))
     return proc if state == "observed" else None
 
 
@@ -141,7 +124,7 @@ def _process_name_without_cmdline(
         "darwin": lambda: _darwin_process_name(pid, darwin_comm),
     }
     action = resolvers.get(sys.platform, lambda: proc.name()[:512])
-    value, state = _observed(action, "<unavailable>")
+    value, state = observed(action, "<unavailable>")
     return value if state == "observed" else "<unavailable>"
 
 
@@ -165,7 +148,7 @@ def _process_executable_without_cmdline(
         "darwin": lambda: _darwin_executable(pid, darwin_comm),
     }
     action = resolvers.get(sys.platform, lambda: (proc.exe() or None))
-    value, state = _observed(action)
+    value, state = observed(action)
     return value[:8192] if state == "observed" and value else None
 
 def _age_band(created: float | None, now: float) -> str:
