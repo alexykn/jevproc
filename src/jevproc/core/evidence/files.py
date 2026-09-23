@@ -58,7 +58,7 @@ def _classify_codesign_failure(stderr: str) -> tuple[str, str | None]:
     return "verification_failed", "other"
 
 
-def _codesign_verify(path: str):
+def _codesign_verify(path: str) -> subprocess.CompletedProcess[str] | None:
     try:
         return subprocess.run(
             ["/usr/bin/codesign", "--verify", "--strict", "--", path],
