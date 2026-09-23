@@ -24,7 +24,7 @@ def settings(**changes):
 
 
 async def test_wire_and_success():
-    def handler(_request):
+    def handler(request):
         assert request.url.path == "/v1/systemone"
         assert request.headers["authorization"] == "Bearer test-only-key"
         assert json.loads(request.content)["state"] == "synthetic"
