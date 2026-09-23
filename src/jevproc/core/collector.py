@@ -58,19 +58,20 @@ def _collect_processes_parallel(
     return [by_pid[pid] for pid in selected]
 
 
+def _evidence_path(process: Process) -> str | None:
+    usable = process.coverage.get("executable") != "truncated"
+    return process.executable if usable else None
+
+
 def _file_evidence_futures(
     processes: list[Process],
     settings: CollectionSettings,
     executor: ThreadPoolExecutor,
 ) -> dict[str, Future[tuple[Executable, dict[str, Coverage]]]]:
-    if not (settings.hashes or settings.signatures):
+    if not any((settings.hashes, settings.signatures)):
         return {}
-    paths = {
-        process.executable
-        for process in processes
-        if process.executable and process.coverage.get("executable") != "truncated"
-    }
-    return {path: executor.submit(_file_info, path, settings, None) for path in sorted(paths)}
+    paths = sorted(set(filter(None, map(_evidence_path, processes))))
+    return {path: executor.submit(_file_info, path, settings, None) for path in paths}
 
 
 def _apply_file_evidence(
