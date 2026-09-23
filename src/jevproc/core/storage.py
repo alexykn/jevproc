@@ -5,7 +5,7 @@ import os
 import sqlite3
 import stat
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -117,7 +117,7 @@ class AnswerCache:
         self.db = _open_cache_database(_prepare_cache_file(directory))
         self.settings = settings
 
-    def get(self, key: str, questions: dict[str, Question]) -> JevResponse | None:
+    def get(self, key: str, questions: Mapping[str, Question]) -> JevResponse | None:
         row = self.db.execute("SELECT expires, body FROM answers WHERE key=?", (key,)).fetchone()
         if row is None:
             return None
