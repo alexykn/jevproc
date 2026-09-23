@@ -256,24 +256,29 @@ def _next_ancestor(
     return _resolve_parent(next_pid, created, by_pid, resolve_missing)
 
 
+def _ancestry_state(process: Process, depth: int) -> tuple[list[Parent], set[int], int | None, float | None, Coverage]:
+    state: Coverage = "not_requested" if depth == 0 else "observed"
+    return [], {process.pid}, process.ppid, process.created_at, state
+
+
+def _append_ancestor(parents: list[Parent], seen: set[int], link: tuple[Parent, int | None]) -> tuple[int | None, float]:
+    parent, next_pid = link
+    parents.append(parent)
+    seen.add(parent.pid)
+    return next_pid, parent.created_at
+
+
 def _ancestry(
     process: Process, by_pid: dict[int, Process], depth: int, resolve_missing: bool
 ) -> tuple[list[Parent], Coverage]:
-    parents: list[Parent] = []
-    seen = {process.pid}
-    next_pid, created = process.ppid, process.created_at
-    state: Coverage = "not_requested" if depth == 0 else "observed"
-
+    parents, seen, next_pid, created, state = _ancestry_state(process, depth)
     for _ in range(depth):
         if next_pid in (0, None):
             return parents, state
         link = _next_ancestor(next_pid, created, seen, by_pid, resolve_missing)
         if link is None:
             return parents, "partial"
-        parent, next_pid = link
-        parents.append(parent)
-        seen.add(parent.pid)
-        created = parent.created_at
+        next_pid, created = _append_ancestor(parents, seen, link)
 
     truncated = depth > 0 and next_pid not in (0, None)
     return parents, "truncated" if truncated else state
