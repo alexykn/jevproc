@@ -49,9 +49,7 @@ def _collection_limits(args: argparse.Namespace, collection: dict[str, Any]) -> 
         "max_processes": args.max_processes,
         "workers": args.collection_workers,
     }
-    for key, value in overrides.items():
-        if value is not None:
-            collection[key] = value
+    collection.update({key: value for key, value in overrides.items() if value is not None})
 
 
 def _jev_overrides(args: argparse.Namespace, jev: dict[str, Any]) -> None:
