@@ -116,22 +116,40 @@ def _safe_request_id(response: httpx.Response) -> str:
 
 
 def _machine_scalar(value: object) -> str | None:
-    if isinstance(value, bool):
-        return str(value).lower()
-    if isinstance(value, int):
-        return str(value)
-    return value if isinstance(value, str) else None
+    scalar = {
+        bool: lambda item: str(item).lower(),
+        int: str,
+        str: str,
+    }.get(type(value))
+    return scalar(value) if scalar is not None else None
 
 
 def _safe_machine_value(value: object) -> str | None:
     text = _machine_scalar(value)
-    if text is None:
-        return None
-    valid = all((1 <= len(text) <= 80, all(char.isalnum() or char in "._:-" for char in text)))
-    return text if valid else None
+    valid = text is not None and 1 <= len(text) <= 80
+    safe = valid and all(char.isalnum() or char in "._:-" for char in text)
+    return text if safe else None
 
 
 _MACHINE_FIELD_KEYS = frozenset({"code", "type", "status", "error"})
+
+
+def _machine_pair(raw_key: object, value: object) -> tuple[str, str] | None:
+    key = str(raw_key)
+    safe = _safe_machine_value(value)
+    return (key, safe) if key in _MACHINE_FIELD_KEYS and safe is not None else None
+
+
+def _nested_values(value: object) -> list[object]:
+    if isinstance(value, dict):
+        return list(value.values())
+    return list(value[:64]) if isinstance(value, list) else []
+
+
+def _direct_machine_items(value: object) -> Iterator[tuple[str, str]]:
+    if not isinstance(value, dict):
+        return iter(())
+    return filter(None, (_machine_pair(key, child) for key, child in value.items()))
 
 
 def _machine_items(body: object) -> Iterator[tuple[str, str]]:
@@ -139,17 +157,8 @@ def _machine_items(body: object) -> Iterator[tuple[str, str]]:
     pending = [body]
     while pending:
         value = pending.pop()
-        if isinstance(value, dict):
-            for raw_key, child in value.items():
-                key = str(raw_key)
-                if key in _MACHINE_FIELD_KEYS:
-                    safe = _safe_machine_value(child)
-                    if safe is not None:
-                        yield key, safe
-                pending.append(child)
-        elif isinstance(value, list):
-            pending.extend(reversed(value[:64]))
-
+        yield from _direct_machine_items(value)
+        pending.extend(reversed(_nested_values(value)))
 
 def _machine_fields(body: object) -> dict[str, tuple[str, ...]]:
     found: dict[str, set[str]] = {}
@@ -165,16 +174,18 @@ def _json_body(response: httpx.Response) -> object:
         return None
 
 
-def _context_error(response: httpx.Response) -> bool:
-    if response.status_code == 413:
-        return True
-    if response.status_code not in {400, 422}:
-        return False
+_CONTEXT_CODES = frozenset({"max_tokens_exceeded", "context_length_exceeded", "content_too_large"})
+
+
+def _machine_values(response: httpx.Response) -> Iterator[str]:
     fields = _machine_fields(_json_body(response))
-    return any(
-        value in {"max_tokens_exceeded", "context_length_exceeded", "content_too_large"}
-        for values in fields.values()
-        for value in values
+    return (value for values in fields.values() for value in values)
+
+
+def _context_error(response: httpx.Response) -> bool:
+    return response.status_code == 413 or (
+        response.status_code in {400, 422}
+        and any(value in _CONTEXT_CODES for value in _machine_values(response))
     )
 
 
@@ -182,6 +193,13 @@ def _context_error(response: httpx.Response) -> bool:
 class _Retry:
     delay: float
     defer_shared: bool = False
+
+
+def _validate_api_key(api_key: str) -> None:
+    if not api_key.strip():
+        raise JevError("set TYPESAFE_API_KEY for live analysis, or use --offline or --demo")
+    if any(ord(char) < 33 or ord(char) > 126 for char in api_key):
+        raise JevError("TYPESAFE_API_KEY contains invalid header characters")
 
 
 class JevClient:
@@ -193,10 +211,7 @@ class JevClient:
         base_url: str = "https://api.typesafe.ai",
         transport: httpx.AsyncBaseTransport | None = None,
     ):
-        if not api_key.strip():
-            raise JevError("set TYPESAFE_API_KEY for live analysis, or use --offline or --demo")
-        if any(ord(char) < 33 or ord(char) > 126 for char in api_key):
-            raise JevError("TYPESAFE_API_KEY contains invalid header characters")
+        _validate_api_key(api_key)
         self.settings = settings
         self.base_url = endpoint(base_url)
         self.requests = 0
@@ -315,16 +330,31 @@ async def _read_bounded_response(response: httpx.Response) -> httpx.Response:
     return httpx.Response(response.status_code, headers=headers, content=b"".join(parts))
 
 
-def _raise_permanent_failure(response: httpx.Response) -> None:
+def _request_rejected(response: httpx.Response) -> RequestRejectedError:
+    return RequestRejectedError(
+        status=response.status_code,
+        machine_fields=_machine_fields(_json_body(response)),
+        request_id=_safe_request_id(response),
+    )
+
+
+def _generic_http_error(response: httpx.Response) -> JevError:
+    request_id = _safe_request_id(response)
+    suffix = f"; request-id={request_id}" if request_id else ""
+    return JevError(f"Jev request failed (HTTP {response.status_code}{suffix})")
+
+
+def _permanent_failure(response: httpx.Response) -> JevError | None:
     if _context_error(response):
-        raise ContextLimitError("Jev rejected the context size")
+        return ContextLimitError("Jev rejected the context size")
     if response.status_code in {400, 422}:
-        raise RequestRejectedError(
-            status=response.status_code,
-            machine_fields=_machine_fields(_json_body(response)),
-            request_id=_safe_request_id(response),
-        )
-    if response.status_code not in {408, 429} and response.status_code < 500:
-        request_id = _safe_request_id(response)
-        suffix = f"; request-id={request_id}" if request_id else ""
-        raise JevError(f"Jev request failed (HTTP {response.status_code}{suffix})")
+        return _request_rejected(response)
+    transient = response.status_code in {408, 429} or response.status_code >= 500
+    return None if transient else _generic_http_error(response)
+
+
+def _raise_permanent_failure(response: httpx.Response) -> None:
+    error = _permanent_failure(response)
+    if error is not None:
+        raise error
+
