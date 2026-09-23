@@ -184,14 +184,16 @@ def _validate_ignore(ignore: list[str], all_ids: list[str], rulesets: dict[str, 
         raise ValueError("ignore references an unknown rule or ruleset")
 
 
+def _active_ruleset(name: str, rules: list[Rule], ignored: set[str]) -> list[Rule]:
+    return [] if name in ignored else [rule for rule in rules if rule.id not in ignored]
+
+
 def _active_rules(rulesets: dict[str, list[Rule]], ignore: list[str]) -> list[Rule]:
     ignored = set(ignore)
     return [
         rule
         for name, rules in rulesets.items()
-        if name not in ignored
-        for rule in rules
-        if rule.id not in ignored
+        for rule in _active_ruleset(name, rules, ignored)
     ]
 
 
