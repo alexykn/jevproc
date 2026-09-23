@@ -132,13 +132,18 @@ def _secret_flag(value: str) -> tuple[str, bool]:
     return (flag + "=<redacted>", False) if separator else (value, True)
 
 
+def _redact_argument(index: int, value: str, redact_next: bool) -> tuple[str, bool]:
+    """Resolve argv-position state; text-pattern redaction happens separately."""
+    if redact_next:
+        return "<redacted>", value.lower() in {"bearer", "basic"}
+    if index:
+        return _secret_flag(value)
+    return value, False
+
+
 def _redacted_arguments(arguments: list[str]) -> Iterator[str]:
-    """Track split secret values, including a separate Bearer/Basic scheme."""
+    """Apply argv-state redaction, then the independent text redaction pass."""
     redact_next = False
     for index, value in enumerate(arguments):
-        if redact_next:
-            redact_next = value.lower() in {"bearer", "basic"}
-            value = "<redacted>"
-        elif index:
-            value, redact_next = _secret_flag(value)
+        value, redact_next = _redact_argument(index, value, redact_next)
         yield redact_text(value)
