@@ -22,14 +22,14 @@ def test_cache_setup_failure_always_releases_connection(tmp_path, monkeypatch, s
     calls = 0
     closed = []
 
-    def operation(*args):
+    def operation(*_args):
         nonlocal calls
         calls += 1
         if calls == step:
             raise error_type("synthetic setup failure")
 
     connection = SimpleNamespace(execute=operation, commit=operation, close=lambda: closed.append(True))
-    monkeypatch.setattr(storage.sqlite3, "connect", lambda *args, **kwargs: connection)
+    monkeypatch.setattr(storage.sqlite3, "connect", lambda *_args, **_kwargs: connection)
     cache = AnswerCache.__new__(AnswerCache)
     with pytest.raises(error_type):
         cache.__init__(tmp_path / "cache", CacheSettings())
