@@ -17,7 +17,7 @@ from jevproc.core.storage import AnswerCache
 @pytest.mark.parametrize("step", [1, 2, 3])
 @pytest.mark.parametrize("error_type", [sqlite3.DatabaseError, KeyboardInterrupt])
 def test_cache_setup_failure_always_releases_connection(tmp_path, monkeypatch, step, error_type):
-    import jevproc.core.storage as storage
+    from jevproc.core import storage
 
     calls = 0
     closed = []
