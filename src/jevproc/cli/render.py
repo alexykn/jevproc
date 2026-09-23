@@ -124,7 +124,7 @@ _VALUE_SUFFIXES = {
 
 def _value(result: RuleResult) -> str:
     answer_type = result.answer.get("type")
-    formatter = _VALUE_FORMATTERS.get(answer_type)
+    formatter = _VALUE_FORMATTERS.get(answer_type) if isinstance(answer_type, str) else None
     text = formatter(result) if formatter is not None else result.status.replace("_", " ")
     suffix = _VALUE_SUFFIXES.get(result.status, "") if result.answer or result.status == "uncertain_warning" else ""
     return text + suffix
