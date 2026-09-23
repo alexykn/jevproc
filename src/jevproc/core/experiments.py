@@ -108,11 +108,9 @@ class CorpusExperiment:
 
     def exit_code(self, calibrating: bool) -> int:
         summary = self.summary
-        outcomes = (
-            (bool(summary["operational_failures"]), 2),
-            (bool(not calibrating and summary["mismatches"]), 1),
-        )
-        return next((code for matches, code in outcomes if matches), 0)
+        operational = 2 * int(bool(summary["operational_failures"]))
+        mismatch = int(bool(summary["mismatches"])) * int(not calibrating)
+        return max(operational, mismatch)
 
 
 async def run_corpus(
