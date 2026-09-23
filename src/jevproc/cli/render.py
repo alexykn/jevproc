@@ -75,6 +75,13 @@ class Terminal:
         self.width = max(20, width or shutil.get_terminal_size(fallback=(100, 24)).columns)
         self.color = _color_enabled(stream, color)
 
+    def _styled(self, text: str, style: str) -> str:
+        return style + text + "\x1b[0m" if self.color and style else text
+
+    @staticmethod
+    def _indent(number: int, first: int, continuation: int) -> str:
+        return " " * (first if number == 0 else continuation)
+
     def line(
         self,
         text: str = "",
@@ -88,10 +95,7 @@ class Terminal:
         continuation = min(following if following is not None else indent, self.width // 3)
         chunks = wrap_cells(text, self.width - max(indent, continuation))
         for number, chunk in enumerate(chunks):
-            prefix = " " * (indent if number == 0 else continuation)
-            if self.color and style:
-                chunk = style + chunk + "\x1b[0m"
-            self.stream.write(prefix + chunk + "\n")
+            self.stream.write(self._indent(number, indent, continuation) + self._styled(chunk, style) + "\n")
 
 
 def _noul_value(result: RuleResult) -> str:
@@ -231,50 +235,86 @@ class Reporter:
             self.stream.flush()
         self._progress()
 
-    def _process_header(self, result: Assessment) -> None:
+    @staticmethod
+    def _process_title(result: Assessment) -> str:
         process = result.process
         suffix = "  [cached]" if result.cached else ""
         uid = process.uid if process.uid is not None else "?"
+        return f"{process.name}  PID {process.pid}  UID {uid}{suffix}"
+
+    @staticmethod
+    def _parents(process: Process) -> str | None:
+        if not process.ancestors:
+            return None
+        chain = " -> ".join(f"{parent.name} ({parent.pid})" for parent in reversed(process.ancestors))
+        return f"Parents: {chain}"
+
+    def _process_header(self, result: Assessment) -> None:
+        process = result.process
         self.term.line()
-        self.term.line(
-            f"{process.name}  PID {process.pid}  UID {uid}{suffix}",
-            style="\x1b[1m",
-            indent=2,
-            following=4,
-        )
+        self.term.line(self._process_title(result), style="\x1b[1m", indent=2, following=4)
         self.term.line(process.executable or "<executable unavailable>", indent=4, style="\x1b[2m")
-        if process.ancestors:
-            chain = " -> ".join(f"{parent.name} ({parent.pid})" for parent in reversed(process.ancestors))
-            self.term.line(f"Parents: {chain}", indent=4, style="\x1b[2m")
+        parents = self._parents(process)
+        if parents is not None:
+            self.term.line(parents, indent=4, style="\x1b[2m")
+
+    def _rules_to_render(self, result: Assessment) -> list[RuleResult]:
+        return result.rules if self.verbose else [rule for rule in result.rules if rule.status in VISIBLE]
+
+    def _render_rule(self, rule: RuleResult) -> None:
+        self.term.line(
+            f"{_MARKERS[rule.status]} {rule.rule}  {rule.title}",
+            indent=6,
+            following=8,
+            style=_STYLES[rule.status],
+        )
+        self.term.line(_value(rule), indent=8, style=_STYLES[rule.status])
+        if rule.message:
+            self.term.line(rule.message, indent=8, style="\x1b[2m")
 
     def _process_rules(self, result: Assessment) -> None:
-        visible_rules = result.rules if self.verbose else [rule for rule in result.rules if rule.status in VISIBLE]
-        for rule in visible_rules:
-            self.term.line(
-                f"{_MARKERS[rule.status]} {rule.rule}  {rule.title}",
-                indent=6,
-                following=8,
-                style=_STYLES[rule.status],
-            )
-            self.term.line(_value(rule), indent=8, style=_STYLES[rule.status])
-            if rule.message:
-                self.term.line(rule.message, indent=8, style="\x1b[2m")
+        for rule in self._rules_to_render(result):
+            self._render_rule(rule)
 
     def _process_observations(self, process: Process) -> None:
         for observation in process.observations:
             self.term.line(f"Observed: {observation}", indent=6, style="\x1b[2m")
 
     @staticmethod
-    def _disk_details(process: Process) -> list[str]:
-        candidates = (
-            process.file.mode is not None and f"mode={process.file.mode:04o}",
-            process.file.owner_uid is not None and f"owner-uid={process.file.owner_uid}",
-            process.file.signature != "not_requested" and f"signature={process.file.signature}",
-            process.file.signature_issue and f"signature-issue={process.file.signature_issue}",
-            process.file.signature_identifier and f"identifier={process.file.signature_identifier}",
-            process.file.signature_team_id and f"team-id={process.file.signature_team_id}",
+    def _mode_detail(process: Process) -> str | None:
+        return f"mode={process.file.mode:04o}" if process.file.mode is not None else None
+
+    @staticmethod
+    def _owner_detail(process: Process) -> str | None:
+        return f"owner-uid={process.file.owner_uid}" if process.file.owner_uid is not None else None
+
+    @staticmethod
+    def _signature_detail(process: Process) -> str | None:
+        return f"signature={process.file.signature}" if process.file.signature != "not_requested" else None
+
+    @staticmethod
+    def _signature_issue_detail(process: Process) -> str | None:
+        return f"signature-issue={process.file.signature_issue}" if process.file.signature_issue else None
+
+    @staticmethod
+    def _identifier_detail(process: Process) -> str | None:
+        return f"identifier={process.file.signature_identifier}" if process.file.signature_identifier else None
+
+    @staticmethod
+    def _team_detail(process: Process) -> str | None:
+        return f"team-id={process.file.signature_team_id}" if process.file.signature_team_id else None
+
+    @classmethod
+    def _disk_details(cls, process: Process) -> list[str]:
+        builders = (
+            cls._mode_detail,
+            cls._owner_detail,
+            cls._signature_detail,
+            cls._signature_issue_detail,
+            cls._identifier_detail,
+            cls._team_detail,
         )
-        return [str(value) for value in candidates if value]
+        return list(filter(None, (builder(process) for builder in builders)))
 
     def _verbose_file(self, process: Process) -> None:
         details = self._disk_details(process)
