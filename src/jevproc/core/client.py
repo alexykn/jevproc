@@ -232,7 +232,7 @@ class JevClient:
         self.retries += 1
         await asyncio.sleep(retry.delay)
 
-    def _accept_response(self, response: httpx.Response, questions: dict[str, Question]) -> JevResponse:
+    def _accept_response(self, response: httpx.Response, questions: Mapping[str, Question]) -> JevResponse:
         validated = validate_response(response.content, questions)
         if self.settings.model not in {"jev-latest", "jev-preview"} and validated.model != self.settings.model:
             raise JevError("Jev returned a different model than the requested pinned version")
