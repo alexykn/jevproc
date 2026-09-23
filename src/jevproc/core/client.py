@@ -2,8 +2,8 @@
 
 import asyncio
 import math
-import random
-from collections.abc import Iterator
+import secrets
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -204,7 +204,7 @@ class JevClient:
                 self.fatal_error = f"Jev authentication/authorization failed (HTTP {result.status_code})"
             return result
 
-    async def evaluate(self, body: bytes, questions: dict[str, Question]) -> JevResponse:
+    async def evaluate(self, body: bytes, questions: Mapping[str, Question]) -> JevResponse:
         for attempt in range(self.settings.retries + 1):
             outcome = await self._attempt(body, questions, attempt)
             if isinstance(outcome, JevResponse):
@@ -256,7 +256,7 @@ class JevClient:
         return delay
 
     def _backoff(self, attempt: int) -> float:
-        return min(self.settings.max_retry_delay, 0.5 * 2**attempt + random.random() * 0.2)
+        return min(self.settings.max_retry_delay, 0.5 * 2**attempt + secrets.randbelow(200_000) / 1_000_000)
 
     async def __aenter__(self) -> Self:
         return self
