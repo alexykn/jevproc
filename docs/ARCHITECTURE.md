@@ -187,11 +187,14 @@ Keep that dependency direction; core must not import the CLI.
 - `core/assessment.py` has independent Noul, Choice, and Score decision functions;
   `judge` adds the common evidence qualification and result envelope.
 - `core/storage.py` validates filesystem ownership before acquiring SQLite and
-  transfers connection ownership only after initialization succeeds. Descriptor
-  ownership is scoped by a context manager; cache preparation only composes
-  directory validation, path selection, and file validation. A cache file created
-  by the current call is rolled back if validation fails; an existing invalid
-  cache file is never deleted.
+  transfers connection ownership only after initialization succeeds. Cache
+  directory creation is transactional across missing path components: only
+  directory inodes created by the current call are rolled back if validation
+  fails, while pre-existing directories are never removed. Descriptor ownership
+  is scoped by a context manager; cache preparation composes directory validation,
+  path selection, and file validation. A cache file created by the current call is
+  similarly rolled back on validation failure; an existing invalid cache file is
+  never deleted.
 
 There is deliberately no plugin system, dependency-injection container, generic
 repository layer, event bus, or parallel implementation of the detector. Private

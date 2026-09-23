@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Make cache-directory creation transactional: roll back only directory inodes created by the current call when validation fails.
+
+
 - Simplify the final Jevscan hotspots: retry driving, argv redaction stages, and cache-file preparation/resource ownership.
 
 

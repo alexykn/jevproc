@@ -5,9 +5,10 @@ import os
 import sqlite3
 import stat
 import time
-from contextlib import ExitStack, contextmanager
-from pathlib import Path
 from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Self
 
 from jevproc.core.config import CacheSettings, Question
@@ -23,11 +24,79 @@ def default_cache_dir() -> Path:
     return (Path(base) if base and Path(base).is_absolute() else Path.home() / ".cache") / "jevproc"
 
 
-def _private_directory(path: Path) -> None:
-    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+@dataclass(frozen=True)
+class _CreatedDirectory:
+    path: Path
+    device: int
+    inode: int
+
+
+def _missing_directory_chain(path: Path) -> list[Path]:
+    missing: list[Path] = []
+    current = path
+    while True:
+        try:
+            current.lstat()
+        except FileNotFoundError:
+            missing.append(current)
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+            continue
+        break
+    return list(reversed(missing))
+
+
+def _created_directory(path: Path) -> _CreatedDirectory:
+    info = path.lstat()
+    return _CreatedDirectory(path=path, device=info.st_dev, inode=info.st_ino)
+
+
+def _rollback_directories(created: list[_CreatedDirectory]) -> None:
+    for entry in reversed(created):
+        try:
+            info = entry.path.lstat()
+        except FileNotFoundError:
+            continue
+        if (info.st_dev, info.st_ino) != (entry.device, entry.inode):
+            continue
+        try:
+            entry.path.rmdir()
+        except OSError:
+            # Never remove a directory that acquired contents or otherwise changed.
+            continue
+
+
+def _create_directory_chain(path: Path) -> list[_CreatedDirectory]:
+    created: list[_CreatedDirectory] = []
+    try:
+        for directory in _missing_directory_chain(path):
+            mode = 0o700 if directory == path else 0o777
+            try:
+                directory.mkdir(mode=mode)
+            except FileExistsError:
+                continue
+            created.append(_created_directory(directory))
+    except BaseException:
+        _rollback_directories(created)
+        raise
+    return created
+
+
+def _validate_private_directory(path: Path) -> None:
     info = path.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
         raise StorageError("cache directory must be a private, owned directory (0700), not a symlink")
+
+
+def _private_directory(path: Path) -> None:
+    created = _create_directory_chain(path)
+    try:
+        _validate_private_directory(path)
+    except BaseException:
+        _rollback_directories(created)
+        raise
 
 
 def write_private(path: Path, data: bytes) -> None:
