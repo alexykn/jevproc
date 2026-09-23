@@ -12,7 +12,7 @@ import statistics
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from itertools import pairwise
+from itertools import combinations, pairwise
 from typing import Any, Iterable
 
 from jevproc.core.corpus import CorpusCase
@@ -116,15 +116,23 @@ def _predicted_band(score: float, uncertain_at: float, warning_at: float) -> str
     return next((band for matches, band in bands if matches), "benign")
 
 
+def _labelled_observations(observations: Iterable[tuple[str, float]]) -> list[tuple[str, float]]:
+    return [(label, score) for label, score in observations if label != "unknown"]
+
+
+def _validate_calibration_labels(observations: list[tuple[str, float]]) -> None:
+    unsupported = {label for label, _ in observations}.difference(_CALIBRATION_LABELS)
+    if unsupported:
+        raise ValueError(f"unsupported calibration label: {min(unsupported)}")
+
+
 def _labelled_predictions(
     observations: Iterable[tuple[str, float]],
     uncertain_at: float,
     warning_at: float,
 ) -> list[tuple[str, str]]:
-    labelled = [(label, score) for label, score in observations if label != "unknown"]
-    unsupported = {label for label, _ in labelled}.difference(_CALIBRATION_LABELS)
-    if unsupported:
-        raise ValueError(f"unsupported calibration label: {min(unsupported)}")
+    labelled = _labelled_observations(observations)
+    _validate_calibration_labels(labelled)
     return [(label, _predicted_band(score, uncertain_at, warning_at)) for label, score in labelled]
 
 
@@ -250,9 +258,7 @@ def _candidate_grid(observations: list[tuple[str, float]]) -> list[PairMetrics]:
     thresholds = _thresholds(score for _, score in observations)
     return [
         _evaluate_observations(observations, uncertain, warning)
-        for uncertain in thresholds
-        for warning in thresholds
-        if uncertain < warning
+        for uncertain, warning in combinations(thresholds, 2)
     ]
 
 
@@ -344,11 +350,10 @@ def _label_means(
     cases: list[CorpusCase],
     case_means: dict[str, float],
 ) -> dict[str, list[float]]:
-    result = {label: [] for label in _CALIBRATION_LABELS}
-    for case in cases:
-        if case.id in case_means and case.label in result:
-            result[case.label].append(case_means[case.id])
-    return result
+    return {
+        label: [case_means[case.id] for case in cases if case.label == label and case.id in case_means]
+        for label in _CALIBRATION_LABELS
+    }
 
 
 def _maximum(values: list[float]) -> float | None:
