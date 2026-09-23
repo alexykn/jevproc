@@ -226,19 +226,28 @@ def _execute(args: argparse.Namespace) -> int:
     return asyncio.run(_run(args, config, sys.stdout, sys.stderr))
 
 
+def _known_failure(exc: BaseException) -> int | None:
+    if isinstance(exc, KeyboardInterrupt):
+        return 130
+    if isinstance(exc, BrokenPipeError):
+        return 0
+    if isinstance(exc, (ConfigError, CollectionError, StorageError, JevError)):
+        return _safe_error(f"jevproc: {exc}")
+    if isinstance(exc, (OSError, sqlite3.Error, ValidationError, UnicodeError)):
+        return _safe_error(f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied")
+    if isinstance(exc, ExceptionGroup):
+        return _safe_error(f"jevproc: worker failed ({type(exc).__name__}); scan incomplete")
+    return None
+
+
 def _guarded_execute(args: argparse.Namespace) -> int:
     try:
         return _execute(args)
-    except KeyboardInterrupt:
-        return 130
-    except BrokenPipeError:
-        return 0
-    except (ConfigError, CollectionError, StorageError, JevError) as exc:
-        return _safe_error(f"jevproc: {exc}")
-    except (OSError, sqlite3.Error, ValidationError, UnicodeError) as exc:
-        return _safe_error(f"jevproc: operation failed ({type(exc).__name__}); no clean result is implied")
-    except ExceptionGroup as exc:
-        return _safe_error(f"jevproc: worker failed ({type(exc).__name__}); scan incomplete")
+    except BaseException as exc:
+        code = _known_failure(exc)
+        if code is None:
+            raise
+        return code
 
 
 def main(argv: list[str] | None = None) -> int:
