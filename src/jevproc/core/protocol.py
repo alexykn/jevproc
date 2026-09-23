@@ -1,6 +1,7 @@
 """Explicit per-process target bindings and strict typed Jev answers."""
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
@@ -96,7 +97,7 @@ def encode(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
 
-def validate_response(raw: bytes, questions: dict[str, Question]) -> JevResponse:
+def validate_response(raw: bytes, questions: Mapping[str, Question]) -> JevResponse:
     try:
         response = JevResponse.model_validate_json(raw)
     except ValidationError as exc:
