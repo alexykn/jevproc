@@ -42,10 +42,14 @@ def skipped_rule(rule: Rule, process: Process) -> RuleResult:
     return RuleResult(rule=rule.id, title=rule.title, status=status, message=message)
 
 
+_LIMITED_SUFFIX = " Relevant evidence is partial or unavailable; this finding remains uncertain."
+
+
 def _decision_message(rule: Rule, status: Status, limited: bool) -> str:
     visible = status in VISIBLE
-    suffix = " Relevant evidence is partial or unavailable; this finding remains uncertain." if limited and visible else ""
-    return (rule.message if visible else "") + suffix
+    base = {False: "", True: rule.message}[visible]
+    suffix = {(True, True): _LIMITED_SUFFIX}.get((limited, visible), "")
+    return base + suffix
 
 
 def judge(rule: Rule, process: Process, answer: Answer) -> RuleResult:
