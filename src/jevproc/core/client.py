@@ -61,24 +61,38 @@ def endpoint(value: str) -> str:
     return value.rstrip("/")
 
 
-def retry_after(headers: httpx.Headers) -> float | None:
+def _finite_delay(value: float) -> float | None:
+    return max(0.0, value) if math.isfinite(value) else None
+
+
+def _numeric_delay(raw: str, divisor: float = 1.0) -> float | None:
     try:
-        if "retry-after-ms" in headers:
-            value = float(headers["retry-after-ms"]) / 1000
-        elif "retry-after" in headers:
-            raw = headers["retry-after"]
-            try:
-                value = float(raw)
-            except ValueError:
-                moment = parsedate_to_datetime(raw)
-                if moment.tzinfo is None:
-                    moment = moment.replace(tzinfo=UTC)
-                value = (moment - datetime.now(UTC)).total_seconds()
-        else:
-            return None
-        return max(0.0, value) if math.isfinite(value) else None
+        return _finite_delay(float(raw) / divisor)
     except (ValueError, TypeError, OverflowError):
         return None
+
+
+def _http_date_delay(raw: str) -> float | None:
+    try:
+        moment = parsedate_to_datetime(raw)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return _finite_delay((moment - datetime.now(UTC)).total_seconds())
+
+
+def retry_after(headers: httpx.Headers) -> float | None:
+    milliseconds = headers.get("retry-after-ms")
+    if milliseconds is not None:
+        return _numeric_delay(milliseconds, 1000)
+
+    raw = headers.get("retry-after")
+    if raw is None:
+        return None
+
+    numeric = _numeric_delay(raw)
+    return numeric if numeric is not None else _http_date_delay(raw)
 
 
 def _safe_request_id(response: httpx.Response) -> str:
