@@ -182,14 +182,16 @@ Keep that dependency direction; core must not import the CLI.
 - `core/experiments.py` records every synthetic sample, repeats scans, and prepares
   calibration inputs. `cli/corpus_render.py` only presents those results.
 - `core/client.py` separates response buffering, permanent error interpretation,
-  retry scheduling, and successful-answer validation/accounting.
+  one-attempt evaluation, retry scheduling, and successful-answer
+  validation/accounting. The public evaluate loop only drives attempt outcomes.
 - `core/assessment.py` has independent Noul, Choice, and Score decision functions;
   `judge` adds the common evidence qualification and result envelope.
 - `core/storage.py` validates filesystem ownership before acquiring SQLite and
-  transfers connection ownership only after initialization succeeds. A cache file
-  created by the current call is rolled back if validation fails; an existing
-  invalid cache file is never deleted. Setup errors close descriptors/connections
-  and remain visible.
+  transfers connection ownership only after initialization succeeds. Descriptor
+  ownership is scoped by a context manager; cache preparation only composes
+  directory validation, path selection, and file validation. A cache file created
+  by the current call is rolled back if validation fails; an existing invalid
+  cache file is never deleted.
 
 There is deliberately no plugin system, dependency-injection container, generic
 repository layer, event bus, or parallel implementation of the detector. Private
