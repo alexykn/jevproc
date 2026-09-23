@@ -35,40 +35,45 @@ _MARKERS = {
 }
 
 
+def _wrap_cut(text: str, width: int) -> tuple[str, str]:
+    cells = cut = last_space = 0
+    for index, char in enumerate(text):
+        cells += max(0, wcwidth(char))
+        if cells > width:
+            break
+        cut = index + 1
+        if char == " ":
+            last_space = cut
+    else:
+        return text, ""
+    cut = max(1, last_space or cut)
+    return text[:cut].rstrip(), text[cut:].lstrip()
+
+
 def wrap_cells(text: str, width: int) -> list[str]:
     """Wrap long paths too; codepoints are measured in terminal cells, not len()."""
-    lines = []
+    lines: list[str] = []
     remaining = text
     while remaining:
-        cells, cut, last_space = 0, 0, 0
-        for index, char in enumerate(remaining):
-            cells += max(0, wcwidth(char))
-            if cells > width:
-                break
-            cut = index + 1
-            if char == " ":
-                last_space = cut
-        else:
-            lines.append(remaining)
-            break
-        if last_space:
-            cut = last_space
-        cut = max(1, cut)
-        lines.append(remaining[:cut].rstrip())
-        remaining = remaining[cut:].lstrip()
+        line, remaining = _wrap_cut(remaining, width)
+        lines.append(line)
     return lines or [""]
 
+
+def _color_enabled(stream: TextIO, color: str) -> bool:
+    conditions = (
+        "NO_COLOR" not in os.environ,
+        color != "never",
+        os.getenv("TERM") != "dumb",
+        any((color == "always", stream.isatty())),
+    )
+    return all(conditions)
 
 class Terminal:
     def __init__(self, stream: TextIO, *, width: int | None = None, color: str = "auto"):
         self.stream = stream
         self.width = max(20, width or shutil.get_terminal_size(fallback=(100, 24)).columns)
-        self.color = (
-            "NO_COLOR" not in os.environ
-            and color != "never"
-            and os.getenv("TERM") != "dumb"
-            and (color == "always" or stream.isatty())
-        )
+        self.color = _color_enabled(stream, color)
 
     def line(
         self,
@@ -89,23 +94,38 @@ class Terminal:
             self.stream.write(prefix + chunk + "\n")
 
 
-def _value(result: RuleResult) -> str:
-    answer = result.answer
-    if answer.get("type") == "noul":
-        text = f"noul={answer['noul']:.3f}"
-    elif answer.get("type") == "choice":
-        text = f"{answer['choice']}  p={result.probability:.3f}  conf={answer['confidence']:.3f}"
-    elif answer.get("type") == "score":
-        scale = len(answer["probabilities"]) - 1
-        text = f"score={answer['score']:.3f}/{scale}  conf={answer['confidence']:.3f}"
-    else:
-        text = result.status.replace("_", " ")
-    if result.status == "uncertain_warning":
-        text += "  [uncertain warning]"
-    elif result.status == "unknown" and answer:
-        text += "  [unknown]"
-    return text
+def _noul_value(result: RuleResult) -> str:
+    return f"noul={result.answer['noul']:.3f}"
 
+
+def _choice_value(result: RuleResult) -> str:
+    answer = result.answer
+    return f"{answer['choice']}  p={result.probability:.3f}  conf={answer['confidence']:.3f}"
+
+
+def _score_value(result: RuleResult) -> str:
+    answer = result.answer
+    scale = len(answer["probabilities"]) - 1
+    return f"score={answer['score']:.3f}/{scale}  conf={answer['confidence']:.3f}"
+
+
+_VALUE_FORMATTERS = {
+    "noul": _noul_value,
+    "choice": _choice_value,
+    "score": _score_value,
+}
+_VALUE_SUFFIXES = {
+    "uncertain_warning": "  [uncertain warning]",
+    "unknown": "  [unknown]",
+}
+
+
+def _value(result: RuleResult) -> str:
+    answer_type = result.answer.get("type")
+    formatter = _VALUE_FORMATTERS.get(answer_type)
+    text = formatter(result) if formatter is not None else result.status.replace("_", " ")
+    suffix = _VALUE_SUFFIXES.get(result.status, "") if result.answer or result.status == "uncertain_warning" else ""
+    return text + suffix
 
 class Reporter:
     """Flush process results as workers complete; only the summary waits for the full scan."""
