@@ -21,25 +21,36 @@ from jevproc.core.models import (
 )
 
 
-def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
-    by_parent: dict[int, list[Child]] = defaultdict(list)
-    incomplete = False
-    commands = _darwin_comm_table() if sys.platform == "darwin" else {}
+def _child_records(commands: dict[int, str]) -> tuple[list[tuple[int, Child, bool]], Coverage]:
+    records: list[tuple[int, Child, bool]] = []
     try:
         for item in psutil.process_iter(["pid", "ppid", "create_time", "status"], ad_value=None):
             record = _child_record(item, item.info, commands)
-            if record is None:
-                incomplete = True
-                continue
-            ppid, child, complete = record
-            incomplete = incomplete or not complete
-            by_parent[ppid].append(child)
+            if record is not None:
+                records.append(record)
     except (OSError, NotImplementedError):
-        return {}, "unavailable"
+        return [], "unavailable"
+    return records, "observed"
+
+
+def _group_children(records: list[tuple[int, Child, bool]]) -> tuple[dict[int, list[Child]], bool]:
+    by_parent: dict[int, list[Child]] = defaultdict(list)
+    incomplete = False
+    for ppid, child, complete in records:
+        incomplete = incomplete or not complete
+        by_parent[ppid].append(child)
     for children in by_parent.values():
         children.sort(key=lambda child: (child.created_at or 0, child.pid))
-    return dict(by_parent), "partial" if incomplete else "observed"
+    return dict(by_parent), incomplete
 
+
+def _child_index() -> tuple[dict[int, list[Child]], Coverage]:
+    commands = _darwin_comm_table() if sys.platform == "darwin" else {}
+    records, coverage = _child_records(commands)
+    if coverage == "unavailable":
+        return {}, coverage
+    by_parent, incomplete = _group_children(records)
+    return by_parent, "partial" if incomplete else "observed"
 
 def _attach_children_from_index(
     processes: list[Process],
@@ -179,23 +190,23 @@ def _child_record(
     return int(ppid), child, complete
 
 
+def _selected_parent(process: Process) -> tuple[Parent, int | None] | None:
+    if process.created_at is None or process.freshness != "observed":
+        return None
+    return (
+        Parent(pid=process.pid, created_at=process.created_at, name=process.name, executable=process.executable),
+        process.ppid,
+    )
+
+
 def _resolve_parent(
     pid: int, created_before: float, by_pid: dict[int, Process], resolve_missing: bool
 ) -> tuple[Parent, int | None] | None:
     process = by_pid.get(pid)
-    if process is None:
-        link = _live_parent(pid) if resolve_missing else None
-    elif process.created_at is None or process.freshness != "observed":
+    link = (_live_parent(pid) if resolve_missing else None) if process is None else _selected_parent(process)
+    if link is None:
         return None
-    else:
-        link = (
-            Parent(pid=process.pid, created_at=process.created_at, name=process.name, executable=process.executable),
-            process.ppid,
-        )
-    if link is None or link[0].created_at > created_before:
-        return None
-    return link
-
+    return link if link[0].created_at <= created_before else None
 
 def _next_ancestor(
     next_pid: int | None,
